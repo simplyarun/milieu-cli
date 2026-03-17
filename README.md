@@ -80,4 +80,4 @@ This tool gives you a quick baseline of where your site stands.
 
 ## License
 
-MIT
+Apache-2.0
