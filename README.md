@@ -2,7 +2,7 @@
 
 Score how well your website's content is prepared for AI agents and LLMs.
 
-Runs 5 deterministic checks against any public URL and outputs a content readiness score normalized to **0–100**. No AI, no API keys, no config, no dependencies — just point it at a domain. Same site, same score, every time.
+Runs 5 deterministic checks against any public URL and outputs a content readiness score normalized to **0–100**. No AI, no API keys, no config, no dependencies. Just point it at a domain. Same site, same score, every time. Limitation: since the checks run on the home page, some of the results, such as schema, may not make sense because they are more apt on other pages for most sites.
 
 ## Quick start
 
