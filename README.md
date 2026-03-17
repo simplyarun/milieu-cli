@@ -1,4 +1,4 @@
-# milieu-content-score
+# Milieu Content Score CLI
 
 Score how well your website's content is prepared for AI agents and LLMs.
 
