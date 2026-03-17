@@ -1,0 +1,23 @@
+{
+  "name": "milieu-content-score",
+  "version": "0.1.0",
+  "description": "Score how well your website's content is prepared for AI agents and LLMs",
+  "type": "module",
+  "bin": {
+    "milieu-content-score": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsup src/index.ts --format esm --target node18 --dts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "tsup": "^8",
+    "tsx": "^4",
+    "typescript": "^5.9"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
