@@ -19,6 +19,7 @@ Provide the first credible, deterministic measurement layer for AI agent readine
 - ✓ SSRF protection and safe HTTP handling — existing (will be rebuilt)
 - ✓ JSON output mode — existing (will be rebuilt)
 - ✓ HTTP client with discriminated union errors, SSRF protection, URL normalization — Validated in Phase 2: HTTP Client and Utilities (2026-03-18)
+- ✓ Bridge 1 (Reachability): HTTPS check, HTTP status, RFC 9309 robots.txt parser, 6 AI crawler policies, meta robots, X-Robots-Tag, scoring with partial=0.5 — Validated in Phase 3 (2026-03-18)
 
 ### Active
 
