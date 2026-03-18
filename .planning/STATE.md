@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-03-18T19:21:36.116Z"
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-03-18T20:12:00.000Z"
 progress:
   total_phases: 10
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-17)
 
 **Core value:** First credible, deterministic measurement layer for AI agent readiness -- a Lighthouse for the agentic web
-**Current focus:** Phase 02 — http-client-and-utilities
+**Current focus:** Phase 02 — http-client-and-utilities (COMPLETE)
 
 ## Current Position
 
-Phase: 02 (http-client-and-utilities) — EXECUTING
-Plan: 2 of 2
+Phase: 02 (http-client-and-utilities) — COMPLETE
+Plan: 2 of 2 (all complete)
 
 ## Performance Metrics
 
@@ -49,6 +49,7 @@ Plan: 2 of 2
 | Phase 01 P01 | 2min | 2 tasks | 9 files |
 | Phase 01 P02 | 1min | 2 tasks | 3 files |
 | Phase 02 P01 | 3min | 2 tasks | 6 files |
+| Phase 02 P02 | 4min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -65,6 +66,8 @@ Recent decisions affecting current work:
 - [01-02]: Types cover all 10 phases upfront -- BridgeResult.score is number|null, ScanResult.bridges is 5-tuple, HttpResponse uses ok discriminated union
 - [Phase 02-01]: DNS timeout via Promise.race instead of AbortSignal.timeout (signal not in @types/node)
 - [Phase 02-01]: Vitest chosen as test framework for rich mocking (vi.mock for DNS) without external libraries
+- [Phase 02-02]: Retry only on 5xx/timeout/connection_refused -- not on dns, ssrf, ssl, bot_protected, or 4xx
+- [Phase 02-02]: Bot protection detection limited to Cloudflare 403/503 and 429 rate limiting
 
 ### Pending Todos
 
@@ -77,6 +80,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T19:21:36.115Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-03-18T20:12:00.000Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None
