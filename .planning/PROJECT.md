@@ -18,6 +18,7 @@ Provide the first credible, deterministic measurement layer for AI agent readine
 - ✓ HTTPS and HTTP health checks — existing (will be rebuilt)
 - ✓ SSRF protection and safe HTTP handling — existing (will be rebuilt)
 - ✓ JSON output mode — existing (will be rebuilt)
+- ✓ HTTP client with discriminated union errors, SSRF protection, URL normalization — Validated in Phase 2: HTTP Client and Utilities (2026-03-18)
 
 ### Active
 
