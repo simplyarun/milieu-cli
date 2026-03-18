@@ -10,7 +10,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Foundation
 
 - [ ] **FOUND-01**: Tool is published as `milieu-cli` npm package with `milieu scan <url>` as primary command
-- [ ] **FOUND-02**: All type definitions (CheckStatus, Check, BridgeResult, ScanResult) are defined before implementation
+- [x] **FOUND-02**: All type definitions (CheckStatus, Check, BridgeResult, ScanResult) are defined before implementation
 - [ ] **FOUND-03**: HTTP client returns discriminated union errors (dns, timeout, ssrf_blocked, http_error, bot_protected) instead of null
 - [ ] **FOUND-04**: URL normalization handles missing protocol, trailing slashes, and domain extraction
 - [ ] **FOUND-05**: SSRF protection blocks RFC-1918 ranges, IPv6, and IPv4-mapped IPv6 addresses
@@ -140,7 +140,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | FOUND-01 | Phase 10 | Pending |
-| FOUND-02 | Phase 1 | Pending |
+| FOUND-02 | Phase 1 | Complete |
 | FOUND-03 | Phase 2 | Pending |
 | FOUND-04 | Phase 2 | Pending |
 | FOUND-05 | Phase 2 | Pending |

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Phase 1 context gathered
-last_updated: "2026-03-18T04:54:33.740Z"
-last_activity: 2026-03-17 -- Roadmap created (10 phases, 62 requirements mapped)
+status: executing
+stopped_at: Completed 01-01-PLAN.md
+last_updated: "2026-03-18T05:19:07.504Z"
+last_activity: 2026-03-18 -- Completed 01-01 scaffold plan
 progress:
   total_phases: 10
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 2
+  completed_plans: 1
+  percent: 50
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 ## Current Position
 
 Phase: 1 of 10 (Project Scaffold and Types)
-Plan: 0 of 2 in current phase
-Status: Ready to plan
-Last activity: 2026-03-17 -- Roadmap created (10 phases, 62 requirements mapped)
+Plan: 1 of 2 in current phase
+Status: Executing
+Last activity: 2026-03-18 -- Completed 01-01 scaffold plan
 
-Progress: [..........] 0%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -50,6 +50,7 @@ Progress: [..........] 0%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 01 P01 | 2min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -60,6 +61,9 @@ Recent decisions affecting current work:
 
 - [Roadmap]: Ground-up rebuild with bottom-up build order (types -> utils -> bridges -> scoring -> rendering -> CLI)
 - [Roadmap]: Research spike needed before Phase 4 (Bridge 2) -- llms.txt and MCP specs evolving
+- [01-01]: Build with tsc directly instead of tsup -- simpler for ESM-only output
+- [01-01]: NodeNext module resolution for native ESM with .js import extensions
+- [01-01]: Only re-export core from package entry point -- other barrels are internal
 
 ### Pending Todos
 
@@ -72,6 +76,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T04:54:33.739Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-project-scaffold-and-types/01-CONTEXT.md
+Last session: 2026-03-18T05:17:11Z
+Stopped at: Completed 01-01-PLAN.md
+Resume file: .planning/phases/01-project-scaffold-and-types/01-02-PLAN.md
