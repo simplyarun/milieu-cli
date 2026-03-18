@@ -1,24 +1,32 @@
 {
-  "name": "milieu-content-score",
+  "name": "milieu-cli",
   "version": "0.1.0",
-  "description": "Score how well your website's content is prepared for AI agents and LLMs",
+  "description": "Measure how legible your product is to AI agents",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "bin": {
-    "milieu-content-score": "./dist/index.js"
+    "milieu": "./dist/cli/index.js"
   },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
   "scripts": {
+    "build": "tsc",
     "dev": "tsx src/index.ts",
-    "build": "tsup src/index.ts --format esm --target node18 --dts",
     "typecheck": "tsc --noEmit"
   },
-  "devDependencies": {
-    "@types/node": "^25.5.0",
-    "tsup": "^8",
-    "tsx": "^4",
-    "typescript": "^5.9"
-  },
-  "license": "Apache-2.0",
   "engines": {
     "node": ">=18"
+  },
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4",
+    "typescript": "^5.9"
   }
 }
