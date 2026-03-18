@@ -49,11 +49,11 @@ Plans:
   2. URL normalization correctly handles missing protocol, trailing slashes, and domain extraction
   3. SSRF protection blocks RFC-1918 private ranges, IPv6 loopback, and IPv4-mapped IPv6 addresses
   4. HTTP requests respect configurable timeout (default 10s), retry once on 5xx/timeout, and follow up to 5 redirects
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md -- Vitest setup, URL normalization with tests, SSRF protection with tests
+- [ ] 02-02-PLAN.md -- HTTP client with discriminated errors, retry, redirect tracking, barrel export
 
 ### Phase 3: Bridge 1 (Reachability)
 **Goal**: Users can scan a URL and see a complete reachability assessment -- the first real output of the tool
