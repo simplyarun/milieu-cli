@@ -34,11 +34,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. All shared type definitions (CheckStatus, Check, BridgeResult, ScanResult, ScanContext) compile and are importable
   3. `npm run build` produces ESM output with .d.ts declarations
   4. A minimal smoke test confirms types are usable (import and instantiate)
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md -- Gut existing code, rewrite configs, create directory scaffold with barrel exports
+- [ ] 01-02-PLAN.md -- Define complete type system (CheckStatus, Check, BridgeResult, ScanResult, ScanContext, HttpResponse), build and smoke test
 
 ### Phase 2: HTTP Client and Utilities
 **Goal**: All network and URL handling is production-ready before any bridge check is written
