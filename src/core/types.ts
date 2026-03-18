@@ -51,6 +51,10 @@ export interface BridgeResult {
   durationMs: number;
   /** Human-readable message for stubs (bridges 4-5) */
   message?: string;
+  /** If true, scan should abort -- no further bridges attempted */
+  abort?: boolean;
+  /** Reason for abort (dns, connection_refused, ssl_error) */
+  abortReason?: string;
 }
 
 // === Scan Types ===

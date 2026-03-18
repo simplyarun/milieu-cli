@@ -1,2 +1,2 @@
 // Bridge check implementations (Phases 3-5)
-export {};
+export { runReachabilityBridge } from "./reachability/index.js";
