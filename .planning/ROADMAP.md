@@ -65,12 +65,12 @@ Plans:
   3. robots.txt parser handles RFC 9309 edge cases: BOM stripping, CRLF line endings, group boundaries, Allow/Disallow precedence, wildcard rules, empty Disallow semantics
   4. User can see meta robots tags and X-Robots-Tag header directives
   5. Bridge 1 score is calculated as passed_checks / total_checks * 100, and scan aborts with clear error if target is completely unreachable
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
-- [ ] 03-03: TBD
+- [ ] 03-01-PLAN.md -- RFC 9309 robots.txt parser, matchesPath, and AI crawler policy evaluator with unit tests
+- [ ] 03-02-PLAN.md -- Meta robots tag and X-Robots-Tag header check functions with unit tests
+- [ ] 03-03-PLAN.md -- Check functions (HTTPS, HTTP status, robots.txt fetch), Bridge 1 orchestrator with scoring and abort, barrel export
 
 ### Phase 4: Bridge 2 (Standards)
 **Goal**: Users can see what machine-readable standards a domain supports -- the core differentiator of the tool
