@@ -14,10 +14,13 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
+    "test": "vitest run --reporter=verbose",
     "typecheck": "tsc --noEmit"
   },
   "engines": {
@@ -27,6 +30,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "tsx": "^4",
-    "typescript": "^5.9"
+    "typescript": "^5.9",
+    "vitest": "^4.1.0"
   }
 }
