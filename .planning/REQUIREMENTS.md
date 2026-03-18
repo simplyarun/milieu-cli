@@ -23,8 +23,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **REACH-03**: User can see whether robots.txt exists, is parseable, and how many rules it contains
 - [ ] **REACH-04**: User can see per-AI-crawler policy for GPTBot, ClaudeBot, CCBot, Googlebot, Bingbot, PerplexityBot (allowed/partial/blocked)
 - [ ] **REACH-05**: robots.txt parser is RFC 9309 compliant (BOM stripping, CRLF, group boundaries, Allow/Disallow precedence, wildcard rules, empty Disallow semantics)
-- [ ] **REACH-06**: User can see meta robots tags from HTML head (noindex, nofollow detection)
-- [ ] **REACH-07**: User can see X-Robots-Tag HTTP response header directives
+- [x] **REACH-06**: User can see meta robots tags from HTML head (noindex, nofollow detection)
+- [x] **REACH-07**: User can see X-Robots-Tag HTTP response header directives
 - [ ] **REACH-08**: Bridge 1 score calculated as (passed_checks / total_checks * 100) with pass/partial/fail status
 - [ ] **REACH-09**: If target is completely unreachable (DNS failure, connection refused), scan aborts with clear error — no further bridges attempted
 
@@ -150,8 +150,8 @@ Deferred to future release. Tracked but not in current roadmap.
 | REACH-03 | Phase 3 | Pending |
 | REACH-04 | Phase 3 | Pending |
 | REACH-05 | Phase 3 | Pending |
-| REACH-06 | Phase 3 | Pending |
-| REACH-07 | Phase 3 | Pending |
+| REACH-06 | Phase 3 | Complete |
+| REACH-07 | Phase 3 | Complete |
 | REACH-08 | Phase 3 | Pending |
 | REACH-09 | Phase 3 | Pending |
 | STND-01 | Phase 4 | Pending |
