@@ -49,7 +49,7 @@ Plans:
   2. URL normalization correctly handles missing protocol, trailing slashes, and domain extraction
   3. SSRF protection blocks RFC-1918 private ranges, IPv6 loopback, and IPv4-mapped IPv6 addresses
   4. HTTP requests respect configurable timeout (default 10s), retry once on 5xx/timeout, and follow up to 5 redirects
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 02-01-PLAN.md -- Vitest setup, URL normalization with tests, SSRF protection with tests
@@ -187,7 +187,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Project Scaffold and Types | 2/2 | Complete   | 2026-03-18 |
-| 2. HTTP Client and Utilities | 0/2 | Not started | - |
+| 2. HTTP Client and Utilities | 1/2 | In Progress|  |
 | 3. Bridge 1 (Reachability) | 0/3 | Not started | - |
 | 4. Bridge 2 (Standards) | 0/3 | Not started | - |
 | 5. Bridge 3 (Separation) and Scoring | 0/2 | Not started | - |

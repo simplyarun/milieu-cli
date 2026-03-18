@@ -12,8 +12,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **FOUND-01**: Tool is published as `milieu-cli` npm package with `milieu scan <url>` as primary command
 - [x] **FOUND-02**: All type definitions (CheckStatus, Check, BridgeResult, ScanResult) are defined before implementation
 - [ ] **FOUND-03**: HTTP client returns discriminated union errors (dns, timeout, ssrf_blocked, http_error, bot_protected) instead of null
-- [ ] **FOUND-04**: URL normalization handles missing protocol, trailing slashes, and domain extraction
-- [ ] **FOUND-05**: SSRF protection blocks RFC-1918 ranges, IPv6, and IPv4-mapped IPv6 addresses
+- [x] **FOUND-04**: URL normalization handles missing protocol, trailing slashes, and domain extraction
+- [x] **FOUND-05**: SSRF protection blocks RFC-1918 ranges, IPv6, and IPv4-mapped IPv6 addresses
 - [ ] **FOUND-06**: HTTP requests use configurable timeout (default 10s), 1 retry on 5xx/timeout, follow up to 5 redirects
 
 ### Reachability (Bridge 1)
@@ -142,8 +142,8 @@ Deferred to future release. Tracked but not in current roadmap.
 | FOUND-01 | Phase 10 | Pending |
 | FOUND-02 | Phase 1 | Complete |
 | FOUND-03 | Phase 2 | Pending |
-| FOUND-04 | Phase 2 | Pending |
-| FOUND-05 | Phase 2 | Pending |
+| FOUND-04 | Phase 2 | Complete |
+| FOUND-05 | Phase 2 | Complete |
 | FOUND-06 | Phase 2 | Pending |
 | REACH-01 | Phase 3 | Pending |
 | REACH-02 | Phase 3 | Pending |

@@ -2,16 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-03-18T05:54:17.996Z"
-last_activity: 2026-03-18 -- Completed 01-02 type system plan (Phase 1 complete)
+status: unknown
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-03-18T19:21:36.116Z"
 progress:
   total_phases: 10
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 50
+  total_plans: 4
+  completed_plans: 3
 ---
 
 # Project State
@@ -21,20 +19,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-17)
 
 **Core value:** First credible, deterministic measurement layer for AI agent readiness -- a Lighthouse for the agentic web
-**Current focus:** Phase 1: Project Scaffold and Types
+**Current focus:** Phase 02 — http-client-and-utilities
 
 ## Current Position
 
-Phase: 1 of 10 (Project Scaffold and Types) -- COMPLETE
-Plan: 2 of 2 in current phase
-Status: Phase Complete
-Last activity: 2026-03-18 -- Completed 01-02 type system plan
-
-Progress: [██████████] 100%
+Phase: 02 (http-client-and-utilities) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 0
 - Average duration: -
 - Total execution time: 0 hours
@@ -46,12 +41,14 @@ Progress: [██████████] 100%
 | - | - | - | - |
 
 **Recent Trend:**
+
 - Last 5 plans: -
 - Trend: -
 
 *Updated after each plan completion*
 | Phase 01 P01 | 2min | 2 tasks | 9 files |
 | Phase 01 P02 | 1min | 2 tasks | 3 files |
+| Phase 02 P01 | 3min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -66,6 +63,8 @@ Recent decisions affecting current work:
 - [01-01]: NodeNext module resolution for native ESM with .js import extensions
 - [01-01]: Only re-export core from package entry point -- other barrels are internal
 - [01-02]: Types cover all 10 phases upfront -- BridgeResult.score is number|null, ScanResult.bridges is 5-tuple, HttpResponse uses ok discriminated union
+- [Phase 02-01]: DNS timeout via Promise.race instead of AbortSignal.timeout (signal not in @types/node)
+- [Phase 02-01]: Vitest chosen as test framework for rich mocking (vi.mock for DNS) without external libraries
 
 ### Pending Todos
 
@@ -78,6 +77,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T05:52:32Z
-Stopped at: Completed 01-02-PLAN.md
-Resume file: Phase 1 complete -- next phase ready
+Last session: 2026-03-18T19:21:36.115Z
+Stopped at: Completed 02-01-PLAN.md
+Resume file: None
