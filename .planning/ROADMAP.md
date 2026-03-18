@@ -12,7 +12,7 @@ Ground-up rebuild of the milieu content score tool into `milieu-cli`, organized 
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Project Scaffold and Types** - Gut existing code, establish new project structure, define all shared types
+- [x] **Phase 1: Project Scaffold and Types** - Gut existing code, establish new project structure, define all shared types (completed 2026-03-18)
 - [ ] **Phase 2: HTTP Client and Utilities** - Build HTTP client with discriminated errors, URL normalization, SSRF protection
 - [ ] **Phase 3: Bridge 1 (Reachability)** - HTTPS, HTTP status, robots.txt with RFC 9309 parser, AI crawler policies, meta/header robots
 - [ ] **Phase 4: Bridge 2 (Standards)** - OpenAPI discovery, llms.txt, MCP endpoint, JSON-LD, Schema.org, well-known URIs (research spike first)
@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. All shared type definitions (CheckStatus, Check, BridgeResult, ScanResult, ScanContext) compile and are importable
   3. `npm run build` produces ESM output with .d.ts declarations
   4. A minimal smoke test confirms types are usable (import and instantiate)
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 01-01-PLAN.md -- Gut existing code, rewrite configs, create directory scaffold with barrel exports
@@ -186,7 +186,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Project Scaffold and Types | 0/2 | Not started | - |
+| 1. Project Scaffold and Types | 2/2 | Complete   | 2026-03-18 |
 | 2. HTTP Client and Utilities | 0/2 | Not started | - |
 | 3. Bridge 1 (Reachability) | 0/3 | Not started | - |
 | 4. Bridge 2 (Standards) | 0/3 | Not started | - |
