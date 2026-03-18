@@ -106,6 +106,7 @@ export type HttpErrorKind =
   | "bot_protected"
   | "connection_refused"
   | "ssl_error"
+  | "body_too_large"
   | "unknown";
 
 /** HTTP error with discriminated kind field */
