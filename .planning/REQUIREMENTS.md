@@ -139,74 +139,74 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 | Phase 1 | Pending |
+| FOUND-01 | Phase 10 | Pending |
 | FOUND-02 | Phase 1 | Pending |
-| FOUND-03 | Phase 1 | Pending |
-| FOUND-04 | Phase 1 | Pending |
-| FOUND-05 | Phase 1 | Pending |
-| FOUND-06 | Phase 1 | Pending |
-| REACH-01 | Phase 2 | Pending |
-| REACH-02 | Phase 2 | Pending |
-| REACH-03 | Phase 2 | Pending |
-| REACH-04 | Phase 2 | Pending |
-| REACH-05 | Phase 2 | Pending |
-| REACH-06 | Phase 2 | Pending |
-| REACH-07 | Phase 2 | Pending |
-| REACH-08 | Phase 2 | Pending |
-| REACH-09 | Phase 2 | Pending |
-| STND-01 | Phase 3 | Pending |
-| STND-02 | Phase 3 | Pending |
-| STND-03 | Phase 3 | Pending |
-| STND-04 | Phase 3 | Pending |
-| STND-05 | Phase 3 | Pending |
-| STND-06 | Phase 3 | Pending |
-| STND-07 | Phase 3 | Pending |
-| STND-08 | Phase 3 | Pending |
-| STND-09 | Phase 3 | Pending |
-| SEP-01 | Phase 4 | Pending |
-| SEP-02 | Phase 4 | Pending |
-| SEP-03 | Phase 4 | Pending |
-| SEP-04 | Phase 4 | Pending |
-| SEP-05 | Phase 4 | Pending |
-| STUB-01 | Phase 5 | Pending |
-| STUB-02 | Phase 5 | Pending |
-| STUB-03 | Phase 5 | Pending |
-| TERM-01 | Phase 5 | Pending |
-| TERM-02 | Phase 5 | Pending |
-| TERM-03 | Phase 5 | Pending |
-| TERM-04 | Phase 5 | Pending |
-| TERM-05 | Phase 5 | Pending |
-| TERM-06 | Phase 5 | Pending |
-| TERM-07 | Phase 5 | Pending |
-| JSON-01 | Phase 5 | Pending |
-| JSON-02 | Phase 5 | Pending |
-| JSON-03 | Phase 5 | Pending |
-| JSON-04 | Phase 5 | Pending |
-| CLI-01 | Phase 5 | Pending |
-| CLI-02 | Phase 5 | Pending |
-| CLI-03 | Phase 5 | Pending |
-| CLI-04 | Phase 5 | Pending |
-| CLI-05 | Phase 5 | Pending |
-| CLI-06 | Phase 5 | Pending |
-| API-01 | Phase 6 | Pending |
-| API-02 | Phase 6 | Pending |
-| API-03 | Phase 6 | Pending |
-| TEST-01 | Phase 7 | Pending |
-| TEST-02 | Phase 7 | Pending |
-| TEST-03 | Phase 7 | Pending |
-| TEST-04 | Phase 7 | Pending |
-| TEST-05 | Phase 7 | Pending |
-| PKG-01 | Phase 8 | Pending |
-| PKG-02 | Phase 8 | Pending |
-| PKG-03 | Phase 8 | Pending |
-| PKG-04 | Phase 8 | Pending |
-| PKG-05 | Phase 8 | Pending |
+| FOUND-03 | Phase 2 | Pending |
+| FOUND-04 | Phase 2 | Pending |
+| FOUND-05 | Phase 2 | Pending |
+| FOUND-06 | Phase 2 | Pending |
+| REACH-01 | Phase 3 | Pending |
+| REACH-02 | Phase 3 | Pending |
+| REACH-03 | Phase 3 | Pending |
+| REACH-04 | Phase 3 | Pending |
+| REACH-05 | Phase 3 | Pending |
+| REACH-06 | Phase 3 | Pending |
+| REACH-07 | Phase 3 | Pending |
+| REACH-08 | Phase 3 | Pending |
+| REACH-09 | Phase 3 | Pending |
+| STND-01 | Phase 4 | Pending |
+| STND-02 | Phase 4 | Pending |
+| STND-03 | Phase 4 | Pending |
+| STND-04 | Phase 4 | Pending |
+| STND-05 | Phase 4 | Pending |
+| STND-06 | Phase 4 | Pending |
+| STND-07 | Phase 4 | Pending |
+| STND-08 | Phase 4 | Pending |
+| STND-09 | Phase 4 | Pending |
+| SEP-01 | Phase 5 | Pending |
+| SEP-02 | Phase 5 | Pending |
+| SEP-03 | Phase 5 | Pending |
+| SEP-04 | Phase 5 | Pending |
+| SEP-05 | Phase 5 | Pending |
+| STUB-01 | Phase 6 | Pending |
+| STUB-02 | Phase 6 | Pending |
+| STUB-03 | Phase 6 | Pending |
+| TERM-01 | Phase 6 | Pending |
+| TERM-02 | Phase 6 | Pending |
+| TERM-03 | Phase 6 | Pending |
+| TERM-04 | Phase 6 | Pending |
+| TERM-05 | Phase 6 | Pending |
+| TERM-06 | Phase 6 | Pending |
+| TERM-07 | Phase 6 | Pending |
+| JSON-01 | Phase 7 | Pending |
+| JSON-02 | Phase 7 | Pending |
+| JSON-03 | Phase 7 | Pending |
+| JSON-04 | Phase 7 | Pending |
+| CLI-01 | Phase 7 | Pending |
+| CLI-02 | Phase 7 | Pending |
+| CLI-03 | Phase 7 | Pending |
+| CLI-04 | Phase 7 | Pending |
+| CLI-05 | Phase 7 | Pending |
+| CLI-06 | Phase 7 | Pending |
+| API-01 | Phase 8 | Pending |
+| API-02 | Phase 8 | Pending |
+| API-03 | Phase 8 | Pending |
+| TEST-01 | Phase 9 | Pending |
+| TEST-02 | Phase 9 | Pending |
+| TEST-03 | Phase 9 | Pending |
+| TEST-04 | Phase 9 | Pending |
+| TEST-05 | Phase 9 | Pending |
+| PKG-01 | Phase 10 | Pending |
+| PKG-02 | Phase 10 | Pending |
+| PKG-03 | Phase 10 | Pending |
+| PKG-04 | Phase 10 | Pending |
+| PKG-05 | Phase 10 | Pending |
 
 **Coverage:**
-- v1 requirements: 52 total
-- Mapped to phases: 52
+- v1 requirements: 62 total
+- Mapped to phases: 62
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-17*
-*Last updated: 2026-03-17 after initial definition*
+*Last updated: 2026-03-17 after roadmap creation*
