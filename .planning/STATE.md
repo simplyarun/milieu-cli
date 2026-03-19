@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-03-19T01:09:48Z"
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-03-19T01:25:00Z"
 progress:
   total_phases: 10
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 10
-  completed_plans: 9
+  completed_plans: 10
 ---
 
 # Project State
@@ -23,8 +23,8 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 
 ## Current Position
 
-Phase: 04 (bridge-2-standards) — EXECUTING
-Plan: 3 of 3
+Phase: 04 (bridge-2-standards) — COMPLETE
+Plan: 3 of 3 (all complete)
 
 ## Performance Metrics
 
@@ -54,6 +54,7 @@ Plan: 3 of 3
 | Phase 03 P01 | 2min | 2 tasks | 4 files |
 | Phase 04 P01 | 4min | 2 tasks | 3 files |
 | Phase 04 P02 | 5min | 2 tasks | 10 files |
+| Phase 04 P03 | 3min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,8 @@ Recent decisions affecting current work:
 - [Phase 04-02]: Schema.org reuses JSON-LD Check result to avoid re-parsing HTML
 - [Phase 04-02]: JSON-LD and Schema.org are pure functions (no HTTP) taking HTML string input
 - [Phase 04-02]: MCP validation is lenient due to draft spec (SEP-1649)
+- [Phase 04-03]: Bridge 2 calculateScore has no skip exclusion (unlike Bridge 1) -- all 8 checks always count
+- [Phase 04-03]: Check ordering: openapi, llms_txt, llms_full_txt, mcp, json_ld, schema_org, security_txt, ai_plugin
 
 ### Pending Todos
 
@@ -92,6 +95,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T01:09:48Z
-Stopped at: Completed 04-02-PLAN.md
-Resume file: .planning/phases/04-bridge-2-standards/04-03-PLAN.md
+Last session: 2026-03-19T01:25:00Z
+Stopped at: Completed 04-03-PLAN.md (Phase 04 complete)
+Resume file: Next phase

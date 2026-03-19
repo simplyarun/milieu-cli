@@ -38,7 +38,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **STND-06**: User can see JSON-LD structured data blocks with detected schema types
 - [x] **STND-07**: User can see Schema.org markup (Microdata itemtype/itemprop or JSON-LD with schema.org vocabulary)
 - [x] **STND-08**: User can see well-known URI presence (security.txt, ai-plugin.json)
-- [ ] **STND-09**: Bridge 2 score calculated as (passed_checks / total_checks * 100) with pass/partial/fail status
+- [x] **STND-09**: Bridge 2 score calculated as (passed_checks / total_checks * 100) with pass/partial/fail status
 
 ### Separation (Bridge 3)
 
@@ -162,7 +162,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | STND-06 | Phase 4 | Complete |
 | STND-07 | Phase 4 | Complete |
 | STND-08 | Phase 4 | Complete |
-| STND-09 | Phase 4 | Pending |
+| STND-09 | Phase 4 | Complete |
 | SEP-01 | Phase 5 | Pending |
 | SEP-02 | Phase 5 | Pending |
 | SEP-03 | Phase 5 | Pending |
