@@ -82,12 +82,12 @@ Plans:
   3. User can see MCP endpoint status at /.well-known/mcp.json and well-known URI presence (security.txt, ai-plugin.json)
   4. User can see JSON-LD structured data blocks with detected schema types, and Schema.org markup (Microdata or JSON-LD vocabulary)
   5. Bridge 2 score is calculated as passed_checks / total_checks * 100 with pass/partial/fail status
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
-- [ ] 04-03: TBD
+- [ ] 04-01-PLAN.md -- Bridge 1 ctx.shared modification, OpenAPI 9-path probe with Content-Type validation and tests
+- [ ] 04-02-PLAN.md -- llms-txt, MCP, well-known, JSON-LD, Schema.org check modules with tests
+- [ ] 04-03-PLAN.md -- Bridge 2 orchestrator with scoring, barrel export
 
 ### Phase 5: Bridge 3 (Separation) and Scoring
 **Goal**: Users can see a detection inventory of separation signals, and all bridge scores are finalized
