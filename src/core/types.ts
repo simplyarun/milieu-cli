@@ -65,6 +65,8 @@ export interface ScanOptions {
   timeout?: number;
   /** Show verbose output with individual check details */
   verbose?: boolean;
+  /** Suppress spinner and terminal output (for JSON/quiet modes) */
+  silent?: boolean;
 }
 
 /** Context shared across bridge checks during a single scan */
