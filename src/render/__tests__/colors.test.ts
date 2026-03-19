@@ -1,46 +1,55 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { green, yellow, red, cyan, dim, bold } from "../colors.js";
 
 const ANSI_REGEX =
   // eslint-disable-next-line no-control-regex
-  /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
+  /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/;
 
 function hasAnsi(text: string): boolean {
   return ANSI_REGEX.test(text);
 }
 
 describe("color functions (default, colors enabled)", () => {
-  it("green() returns string containing ANSI codes", () => {
-    const result = green("hello");
-    expect(hasAnsi(result)).toBe(true);
+  beforeEach(() => {
+    vi.stubEnv("FORCE_COLOR", "1");
+    vi.resetModules();
   });
 
-  it("yellow() returns string containing ANSI codes", () => {
-    const result = yellow("hello");
-    expect(hasAnsi(result)).toBe(true);
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
-  it("red() returns string containing ANSI codes", () => {
-    const result = red("hello");
-    expect(hasAnsi(result)).toBe(true);
+  it("green() returns string containing ANSI codes", async () => {
+    const { green } = await import("../colors.js");
+    expect(hasAnsi(green("hello"))).toBe(true);
   });
 
-  it("cyan() returns string containing ANSI codes", () => {
-    const result = cyan("hello");
-    expect(hasAnsi(result)).toBe(true);
+  it("yellow() returns string containing ANSI codes", async () => {
+    const { yellow } = await import("../colors.js");
+    expect(hasAnsi(yellow("hello"))).toBe(true);
   });
 
-  it("dim() returns string containing ANSI codes", () => {
-    const result = dim("hello");
-    expect(hasAnsi(result)).toBe(true);
+  it("red() returns string containing ANSI codes", async () => {
+    const { red } = await import("../colors.js");
+    expect(hasAnsi(red("hello"))).toBe(true);
   });
 
-  it("bold() returns string containing ANSI codes", () => {
-    const result = bold("hello");
-    expect(hasAnsi(result)).toBe(true);
+  it("cyan() returns string containing ANSI codes", async () => {
+    const { cyan } = await import("../colors.js");
+    expect(hasAnsi(cyan("hello"))).toBe(true);
   });
 
-  it("all functions preserve the input text", () => {
+  it("dim() returns string containing ANSI codes", async () => {
+    const { dim } = await import("../colors.js");
+    expect(hasAnsi(dim("hello"))).toBe(true);
+  });
+
+  it("bold() returns string containing ANSI codes", async () => {
+    const { bold } = await import("../colors.js");
+    expect(hasAnsi(bold("hello"))).toBe(true);
+  });
+
+  it("all functions preserve the input text", async () => {
+    const { green, yellow, red, cyan, dim, bold } = await import("../colors.js");
     expect(green("hello")).toContain("hello");
     expect(yellow("hello")).toContain("hello");
     expect(red("hello")).toContain("hello");
