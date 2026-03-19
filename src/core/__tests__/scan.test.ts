@@ -40,6 +40,11 @@ vi.mock("../../bridges/index.js", () => ({
   })),
 }));
 
+// Mock version module
+vi.mock("../version.js", () => ({
+  getVersion: vi.fn(() => "0.1.0"),
+}));
+
 // Mock utils
 vi.mock("../../utils/index.js", () => ({
   normalizeUrl: vi.fn((url: string) => ({
@@ -52,6 +57,7 @@ vi.mock("../../utils/index.js", () => ({
 }));
 
 import { scan } from "../scan.js";
+import ora from "ora";
 import {
   runReachabilityBridge,
   runStandardsBridge,
@@ -215,5 +221,29 @@ describe("scan", () => {
 
     expect(createBridge4Stub).toHaveBeenCalledOnce();
     expect(createBridge5Stub).toHaveBeenCalledOnce();
+  });
+
+  it("passes isSilent to ora when options.silent is true", async () => {
+    vi.mocked(runReachabilityBridge).mockResolvedValue(mockBridge1Normal);
+    vi.mocked(runStandardsBridge).mockResolvedValue(mockBridge2Normal);
+    vi.mocked(runSeparationBridge).mockResolvedValue(mockBridge3Normal);
+
+    await scan("https://example.com", { silent: true });
+
+    expect(vi.mocked(ora)).toHaveBeenCalledWith(
+      expect.objectContaining({ isSilent: true }),
+    );
+  });
+
+  it("passes isSilent false by default", async () => {
+    vi.mocked(runReachabilityBridge).mockResolvedValue(mockBridge1Normal);
+    vi.mocked(runStandardsBridge).mockResolvedValue(mockBridge2Normal);
+    vi.mocked(runSeparationBridge).mockResolvedValue(mockBridge3Normal);
+
+    await scan("https://example.com");
+
+    expect(vi.mocked(ora)).toHaveBeenCalledWith(
+      expect.objectContaining({ isSilent: false }),
+    );
   });
 });

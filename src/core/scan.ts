@@ -13,8 +13,7 @@ import {
   createBridge4Stub,
   createBridge5Stub,
 } from "../bridges/index.js";
-
-const VERSION = "0.1.0";
+import { getVersion } from "./version.js";
 
 export async function scan(
   url: string,
@@ -37,7 +36,8 @@ export async function scan(
     shared: {},
   };
 
-  const spinner = ora({ text: "Scanning...", color: "cyan" }).start();
+  const isSilent = options.silent ?? false;
+  const spinner = ora({ text: "Scanning...", color: "cyan", isSilent }).start();
 
   try {
     // Bridge 1: Reachability
@@ -101,7 +101,7 @@ export async function scan(
           : ("fail" as const);
 
     const result: ScanResult = {
-      version: VERSION,
+      version: getVersion(),
       url,
       timestamp: new Date().toISOString(),
       durationMs: Math.round(performance.now() - start),
