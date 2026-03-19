@@ -20,13 +20,12 @@ Provide the first credible, deterministic measurement layer for AI agent readine
 - ✓ JSON output mode — existing (will be rebuilt)
 - ✓ HTTP client with discriminated union errors, SSRF protection, URL normalization — Validated in Phase 2: HTTP Client and Utilities (2026-03-18)
 - ✓ Bridge 1 (Reachability): HTTPS check, HTTP status, RFC 9309 robots.txt parser, 6 AI crawler policies, meta robots, X-Robots-Tag, scoring with partial=0.5 — Validated in Phase 3 (2026-03-18)
+- ✓ Bridge 2 (Standards): OpenAPI 9-path discovery with Content-Type validation, llms.txt/llms-full.txt, MCP endpoint, JSON-LD extraction, Schema.org (JSON-LD + Microdata), security.txt, ai-plugin.json, scoring — Validated in Phase 4 (2026-03-19)
 
 ### Active
 
 - [ ] Rename to `milieu-cli` with `milieu scan <url>` as primary command
 - [ ] New project structure: `bridges/`, `render/`, `utils/` architecture
-- [ ] Bridge 1 (Reachability): HTTPS, HTTP status, robots.txt, 6 AI crawler policies, meta robots, X-Robots-Tag
-- [ ] Bridge 2 (Standards): OpenAPI discovery (9 paths), llms.txt, llms-full.txt, MCP endpoint, JSON-LD, Schema.org, well-known URIs
 - [ ] Bridge 3 (Separation): Presence detection only — API presence, developer docs, SDK/package references, webhook support
 - [ ] Bridges 4-5 stubs: Visible in output, marked "not evaluated", no hints about future evaluation
 - [ ] Bridge 1-2 scoring: `passed_checks / total_checks * 100`, equal weight
@@ -90,4 +89,4 @@ Key strategic considerations:
 | JSON output as public API contract | Enables ecosystem tooling (CI/CD, dashboards) without coupling to CLI | — Pending |
 
 ---
-*Last updated: 2026-03-17 after initialization*
+*Last updated: 2026-03-19 after Phase 4 completion*
