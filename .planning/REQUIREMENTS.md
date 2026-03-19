@@ -32,12 +32,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **STND-01**: User can see whether an OpenAPI spec exists (9 paths probed in order), with version and endpoint count
 - [x] **STND-02**: OpenAPI detection validates response contains `openapi` or `swagger` key with correct Content-Type (not HTML docs pages)
-- [ ] **STND-03**: User can see whether llms.txt exists at domain root (HTTP 200, non-empty, report size and first line)
-- [ ] **STND-04**: User can see whether llms-full.txt exists at domain root
-- [ ] **STND-05**: User can see whether MCP endpoint exists at /.well-known/mcp.json (valid JSON with MCP configuration)
-- [ ] **STND-06**: User can see JSON-LD structured data blocks with detected schema types
-- [ ] **STND-07**: User can see Schema.org markup (Microdata itemtype/itemprop or JSON-LD with schema.org vocabulary)
-- [ ] **STND-08**: User can see well-known URI presence (security.txt, ai-plugin.json)
+- [x] **STND-03**: User can see whether llms.txt exists at domain root (HTTP 200, non-empty, report size and first line)
+- [x] **STND-04**: User can see whether llms-full.txt exists at domain root
+- [x] **STND-05**: User can see whether MCP endpoint exists at /.well-known/mcp.json (valid JSON with MCP configuration)
+- [x] **STND-06**: User can see JSON-LD structured data blocks with detected schema types
+- [x] **STND-07**: User can see Schema.org markup (Microdata itemtype/itemprop or JSON-LD with schema.org vocabulary)
+- [x] **STND-08**: User can see well-known URI presence (security.txt, ai-plugin.json)
 - [ ] **STND-09**: Bridge 2 score calculated as (passed_checks / total_checks * 100) with pass/partial/fail status
 
 ### Separation (Bridge 3)
@@ -156,12 +156,12 @@ Deferred to future release. Tracked but not in current roadmap.
 | REACH-09 | Phase 3 | Pending |
 | STND-01 | Phase 4 | Complete |
 | STND-02 | Phase 4 | Complete |
-| STND-03 | Phase 4 | Pending |
-| STND-04 | Phase 4 | Pending |
-| STND-05 | Phase 4 | Pending |
-| STND-06 | Phase 4 | Pending |
-| STND-07 | Phase 4 | Pending |
-| STND-08 | Phase 4 | Pending |
+| STND-03 | Phase 4 | Complete |
+| STND-04 | Phase 4 | Complete |
+| STND-05 | Phase 4 | Complete |
+| STND-06 | Phase 4 | Complete |
+| STND-07 | Phase 4 | Complete |
+| STND-08 | Phase 4 | Complete |
 | STND-09 | Phase 4 | Pending |
 | SEP-01 | Phase 5 | Pending |
 | SEP-02 | Phase 5 | Pending |

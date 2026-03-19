@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-03-19T01:08:24Z"
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-03-19T01:09:48Z"
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 10
-  completed_plans: 8
+  completed_plans: 9
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 ## Current Position
 
 Phase: 04 (bridge-2-standards) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Plan: 2 of 3
 | Phase 03 P02 | 2min | 1 tasks | 2 files |
 | Phase 03 P01 | 2min | 2 tasks | 4 files |
 | Phase 04 P01 | 4min | 2 tasks | 3 files |
+| Phase 04 P02 | 5min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,9 @@ Recent decisions affecting current work:
 - [Phase 04-01]: JSON specs return pass, YAML specs return partial (zero-dep constraint prevents YAML parsing)
 - [Phase 04-01]: Bridge 1 stores both pageBody and pageHeaders in ctx.shared for Bridge 2 consumption
 - [Phase 04-01]: Unknown Content-Type with JSON body uses JSON.parse fallback
+- [Phase 04-02]: Schema.org reuses JSON-LD Check result to avoid re-parsing HTML
+- [Phase 04-02]: JSON-LD and Schema.org are pure functions (no HTTP) taking HTML string input
+- [Phase 04-02]: MCP validation is lenient due to draft spec (SEP-1649)
 
 ### Pending Todos
 
@@ -88,6 +92,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T01:08:24Z
-Stopped at: Completed 04-01-PLAN.md
-Resume file: .planning/phases/04-bridge-2-standards/04-02-PLAN.md
+Last session: 2026-03-19T01:09:48Z
+Stopped at: Completed 04-02-PLAN.md
+Resume file: .planning/phases/04-bridge-2-standards/04-03-PLAN.md
