@@ -56,13 +56,13 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Terminal Output
 
-- [ ] **TERM-01**: Default output shows all 5 bridges with progress bars (12-char) for Bridges 1-2, detection line for Bridge 3, dim labels for Bridges 4-5
+- [x] **TERM-01**: Default output shows all 5 bridges with progress bars (12-char) for Bridges 1-2, detection line for Bridge 3, dim labels for Bridges 4-5
 - [x] **TERM-02**: Colors: pass (>=80) green, partial (40-79) yellow, fail (<40) red, detected cyan, not evaluated dim/gray
-- [ ] **TERM-03**: Verbose mode (--verbose) shows individual check details with status indicators (check-mark green, x red, warning yellow, dash dim)
-- [ ] **TERM-04**: Spinner (ora) shows progress during scan
+- [x] **TERM-03**: Verbose mode (--verbose) shows individual check details with status indicators (check-mark green, x red, warning yellow, dash dim)
+- [x] **TERM-04**: Spinner (ora) shows progress during scan
 - [x] **TERM-05**: Supports NO_COLOR environment variable convention
-- [ ] **TERM-06**: Scan timestamp shown in output
-- [ ] **TERM-07**: Scan timing shown per bridge in output
+- [x] **TERM-06**: Scan timestamp shown in output
+- [x] **TERM-07**: Scan timing shown per bridge in output
 
 ### JSON Output
 
@@ -171,13 +171,13 @@ Deferred to future release. Tracked but not in current roadmap.
 | STUB-01 | Phase 6 | Complete |
 | STUB-02 | Phase 6 | Complete |
 | STUB-03 | Phase 6 | Complete |
-| TERM-01 | Phase 6 | Pending |
+| TERM-01 | Phase 6 | Complete |
 | TERM-02 | Phase 6 | Complete |
-| TERM-03 | Phase 6 | Pending |
-| TERM-04 | Phase 6 | Pending |
+| TERM-03 | Phase 6 | Complete |
+| TERM-04 | Phase 6 | Complete |
 | TERM-05 | Phase 6 | Complete |
-| TERM-06 | Phase 6 | Pending |
-| TERM-07 | Phase 6 | Pending |
+| TERM-06 | Phase 6 | Complete |
+| TERM-07 | Phase 6 | Complete |
 | JSON-01 | Phase 7 | Pending |
 | JSON-02 | Phase 7 | Pending |
 | JSON-03 | Phase 7 | Pending |
