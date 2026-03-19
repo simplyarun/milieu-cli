@@ -130,11 +130,11 @@ Plans:
   3. --timeout configures per-request timeout, --threshold N exits non-zero if score < N, --quiet suppresses terminal output
   4. Invalid URL produces helpful error message and exit code 1
   5. JSON output schema is treated as versioned public API surface
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans executed
 
 Plans:
-- [ ] 07-01-PLAN.md -- Version module (single source of truth), ScanOptions.silent, scan.ts refactor, install commander
-- [ ] 07-02-PLAN.md -- Commander CLI entry point with all flags, JSON/pretty/quiet output, error handling, tests
+- [x] 07-01-PLAN.md -- Version module (single source of truth), ScanOptions.silent, scan.ts refactor, install commander
+- [x] 07-02-PLAN.md -- Commander CLI entry point with all flags, JSON/pretty/quiet output, error handling, tests
 
 ### Phase 8: Programmatic API
 **Goal**: TypeScript consumers can import and use the scanner as a library

@@ -66,19 +66,19 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### JSON Output
 
-- [ ] **JSON-01**: --json flag outputs complete ScanResult object
-- [ ] **JSON-02**: --json --pretty outputs formatted JSON
+- [x] **JSON-01**: --json flag outputs complete ScanResult object
+- [x] **JSON-02**: --json --pretty outputs formatted JSON
 - [x] **JSON-03**: JSON schema includes version field for API stability
 - [x] **JSON-04**: JSON output is the public contract — schema treated as versioned API surface
 
 ### CLI
 
-- [ ] **CLI-01**: `milieu scan <url>` as primary command via commander
-- [ ] **CLI-02**: --timeout flag configures per-request timeout (default 10000ms)
-- [ ] **CLI-03**: --threshold N flag exits non-zero if overall score < N
-- [ ] **CLI-04**: --quiet flag suppresses terminal output (only JSON/exit code)
-- [ ] **CLI-05**: --version prints version, --help prints help (free via commander)
-- [ ] **CLI-06**: Invalid URL produces helpful error message and exit code 1
+- [x] **CLI-01**: `milieu scan <url>` as primary command via commander
+- [x] **CLI-02**: --timeout flag configures per-request timeout (default 10000ms)
+- [x] **CLI-03**: --threshold N flag exits non-zero if overall score < N
+- [x] **CLI-04**: --quiet flag suppresses terminal output (only JSON/exit code)
+- [x] **CLI-05**: --version prints version, --help prints help (free via commander)
+- [x] **CLI-06**: Invalid URL produces helpful error message and exit code 1
 
 ### Programmatic API
 
@@ -178,16 +178,16 @@ Deferred to future release. Tracked but not in current roadmap.
 | TERM-05 | Phase 6 | Complete |
 | TERM-06 | Phase 6 | Complete |
 | TERM-07 | Phase 6 | Complete |
-| JSON-01 | Phase 7 | Pending |
-| JSON-02 | Phase 7 | Pending |
+| JSON-01 | Phase 7 | Complete |
+| JSON-02 | Phase 7 | Complete |
 | JSON-03 | Phase 7 | Complete |
 | JSON-04 | Phase 7 | Complete |
-| CLI-01 | Phase 7 | Pending |
-| CLI-02 | Phase 7 | Pending |
-| CLI-03 | Phase 7 | Pending |
-| CLI-04 | Phase 7 | Pending |
-| CLI-05 | Phase 7 | Pending |
-| CLI-06 | Phase 7 | Pending |
+| CLI-01 | Phase 7 | Complete |
+| CLI-02 | Phase 7 | Complete |
+| CLI-03 | Phase 7 | Complete |
+| CLI-04 | Phase 7 | Complete |
+| CLI-05 | Phase 7 | Complete |
+| CLI-06 | Phase 7 | Complete |
 | API-01 | Phase 8 | Pending |
 | API-02 | Phase 8 | Pending |
 | API-03 | Phase 8 | Pending |

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 07-01-PLAN.md
-last_updated: "2026-03-19T22:37:26.911Z"
+stopped_at: Completed 07-02-PLAN.md
+last_updated: "2026-03-19T23:38:18.341Z"
 progress:
   total_phases: 10
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 16
-  completed_plans: 15
+  completed_plans: 16
 ---
 
 # Project State
@@ -23,8 +23,8 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 
 ## Current Position
 
-Phase: 07 (cli-integration-and-json-output) — EXECUTING
-Plan: 2 of 2
+Phase: 07 (cli-integration-and-json-output) — COMPLETE
+Plan: 2 of 2 (done)
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Plan: 2 of 2
 | Phase 06 P01 | 3min | 2 tasks | 11 files |
 | Phase 06 P02 | 3min | 2 tasks | 10 files |
 | Phase 07 P01 | 2min | 2 tasks | 8 files |
+| Phase 07 P02 | 4min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -97,6 +98,9 @@ Recent decisions affecting current work:
 - [Phase 06]: Abort case creates placeholder bridge2/3 preserving 5-tuple ScanResult.bridges invariant
 - [Phase 07-01]: createRequire to read package.json -- ESM-compatible, single source of truth for version
 - [Phase 07-01]: isSilent extracted as local variable for clarity before passing to ora constructor
+- [Phase 07]: buildProgram() pattern for testable CLI -- exports function, tests call exitOverride()
+- [Phase 07]: vi.hoisted() for mock variable hoisting in vitest vi.mock factories
+- [Phase 07]: JSON mode errors output structured JSON error to stdout (not text to stderr) for pipe consumers
 
 ### Pending Todos
 
@@ -109,6 +113,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T22:37:26.909Z
-Stopped at: Completed 07-01-PLAN.md
+Last session: 2026-03-19T23:38:18.339Z
+Stopped at: Completed 07-02-PLAN.md
 Resume file: None
