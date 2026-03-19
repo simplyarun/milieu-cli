@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 04-03-PLAN.md (Phase 04 complete)
-last_updated: "2026-03-19T01:44:22.428Z"
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-03-19T04:55:19.366Z"
 progress:
   total_phases: 10
   completed_phases: 4
-  total_plans: 10
-  completed_plans: 10
+  total_plans: 12
+  completed_plans: 11
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-17)
 
 **Core value:** First credible, deterministic measurement layer for AI agent readiness -- a Lighthouse for the agentic web
-**Current focus:** Phase 04 — bridge-2-standards
+**Current focus:** Phase 05 — bridge-3-separation-and-scoring
 
 ## Current Position
 
-Phase: 04 (bridge-2-standards) — COMPLETE
-Plan: 3 of 3 (all complete)
+Phase: 05 (bridge-3-separation-and-scoring) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -55,6 +55,7 @@ Plan: 3 of 3 (all complete)
 | Phase 04 P01 | 4min | 2 tasks | 3 files |
 | Phase 04 P02 | 5min | 2 tasks | 10 files |
 | Phase 04 P03 | 3min | 2 tasks | 3 files |
+| Phase 05 P01 | 4min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,8 @@ Recent decisions affecting current work:
 - [Phase 04-02]: MCP validation is lenient due to draft spec (SEP-1649)
 - [Phase 04-03]: Bridge 2 calculateScore has no skip exclusion (unlike Bridge 1) -- all 8 checks always count
 - [Phase 04-03]: Check ordering: openapi, llms_txt, llms_full_txt, mcp, json_ld, schema_org, security_txt, ai_plugin
+- [Phase 05]: API presence keeps /api/ links only -- /developer/ scanning belongs to developer-docs check
+- [Phase 05]: Developer-docs uses HEAD-only probing without GET fallback on 405 -- homepage link scanning provides secondary detection
 
 ### Pending Todos
 
@@ -95,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T01:25:00Z
-Stopped at: Completed 04-03-PLAN.md (Phase 04 complete)
-Resume file: Next phase
+Last session: 2026-03-19T04:55:19.364Z
+Stopped at: Completed 05-01-PLAN.md
+Resume file: None

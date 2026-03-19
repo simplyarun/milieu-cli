@@ -42,10 +42,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Separation (Bridge 3)
 
-- [ ] **SEP-01**: User can see whether API presence signals exist (reuses Bridge 2 OpenAPI result, HTML link scanning for /api/ /developer/ paths, API-related response headers)
-- [ ] **SEP-02**: User can see whether developer documentation exists (probes /docs, /developers, /developer, /api/docs, /documentation + homepage link scanning)
-- [ ] **SEP-03**: User can see whether SDK/package references exist (npm, PyPI, Maven, NuGet, Go, RubyGems mentions in page content)
-- [ ] **SEP-04**: User can see whether webhook support is mentioned in docs/HTML
+- [x] **SEP-01**: User can see whether API presence signals exist (reuses Bridge 2 OpenAPI result, HTML link scanning for /api/ /developer/ paths, API-related response headers)
+- [x] **SEP-02**: User can see whether developer documentation exists (probes /docs, /developers, /developer, /api/docs, /documentation + homepage link scanning)
+- [x] **SEP-03**: User can see whether SDK/package references exist (npm, PyPI, Maven, NuGet, Go, RubyGems mentions in page content)
+- [x] **SEP-04**: User can see whether webhook support is mentioned in docs/HTML
 - [ ] **SEP-05**: Bridge 3 outputs detection inventory (no score) with status "detected" or "not_evaluated"
 
 ### Output Stubs (Bridges 4-5)
@@ -163,10 +163,10 @@ Deferred to future release. Tracked but not in current roadmap.
 | STND-07 | Phase 4 | Complete |
 | STND-08 | Phase 4 | Complete |
 | STND-09 | Phase 4 | Complete |
-| SEP-01 | Phase 5 | Pending |
-| SEP-02 | Phase 5 | Pending |
-| SEP-03 | Phase 5 | Pending |
-| SEP-04 | Phase 5 | Pending |
+| SEP-01 | Phase 5 | Complete |
+| SEP-02 | Phase 5 | Complete |
+| SEP-03 | Phase 5 | Complete |
+| SEP-04 | Phase 5 | Complete |
 | SEP-05 | Phase 5 | Pending |
 | STUB-01 | Phase 6 | Pending |
 | STUB-02 | Phase 6 | Pending |
