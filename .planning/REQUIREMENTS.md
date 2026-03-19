@@ -50,17 +50,17 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Output Stubs (Bridges 4-5)
 
-- [ ] **STUB-01**: Bridge 4 (Schema) appears in every scan output with status "not_evaluated" and message "Schema quality assessment requires deeper analysis beyond automated checks."
-- [ ] **STUB-02**: Bridge 5 (Context) appears in every scan output with status "not_evaluated" and message "Context evaluation requires deeper analysis beyond automated checks."
-- [ ] **STUB-03**: No hints about future evaluation methods, no "coming soon", no "upgrade" messaging in Bridges 4-5
+- [x] **STUB-01**: Bridge 4 (Schema) appears in every scan output with status "not_evaluated" and message "Schema quality assessment requires deeper analysis beyond automated checks."
+- [x] **STUB-02**: Bridge 5 (Context) appears in every scan output with status "not_evaluated" and message "Context evaluation requires deeper analysis beyond automated checks."
+- [x] **STUB-03**: No hints about future evaluation methods, no "coming soon", no "upgrade" messaging in Bridges 4-5
 
 ### Terminal Output
 
 - [ ] **TERM-01**: Default output shows all 5 bridges with progress bars (12-char) for Bridges 1-2, detection line for Bridge 3, dim labels for Bridges 4-5
-- [ ] **TERM-02**: Colors: pass (>=80) green, partial (40-79) yellow, fail (<40) red, detected cyan, not evaluated dim/gray
+- [x] **TERM-02**: Colors: pass (>=80) green, partial (40-79) yellow, fail (<40) red, detected cyan, not evaluated dim/gray
 - [ ] **TERM-03**: Verbose mode (--verbose) shows individual check details with status indicators (check-mark green, x red, warning yellow, dash dim)
 - [ ] **TERM-04**: Spinner (ora) shows progress during scan
-- [ ] **TERM-05**: Supports NO_COLOR environment variable convention
+- [x] **TERM-05**: Supports NO_COLOR environment variable convention
 - [ ] **TERM-06**: Scan timestamp shown in output
 - [ ] **TERM-07**: Scan timing shown per bridge in output
 
@@ -168,14 +168,14 @@ Deferred to future release. Tracked but not in current roadmap.
 | SEP-03 | Phase 5 | Complete |
 | SEP-04 | Phase 5 | Complete |
 | SEP-05 | Phase 5 | Complete |
-| STUB-01 | Phase 6 | Pending |
-| STUB-02 | Phase 6 | Pending |
-| STUB-03 | Phase 6 | Pending |
+| STUB-01 | Phase 6 | Complete |
+| STUB-02 | Phase 6 | Complete |
+| STUB-03 | Phase 6 | Complete |
 | TERM-01 | Phase 6 | Pending |
-| TERM-02 | Phase 6 | Pending |
+| TERM-02 | Phase 6 | Complete |
 | TERM-03 | Phase 6 | Pending |
 | TERM-04 | Phase 6 | Pending |
-| TERM-05 | Phase 6 | Pending |
+| TERM-05 | Phase 6 | Complete |
 | TERM-06 | Phase 6 | Pending |
 | TERM-07 | Phase 6 | Pending |
 | JSON-01 | Phase 7 | Pending |
