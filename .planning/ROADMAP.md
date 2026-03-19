@@ -98,11 +98,11 @@ Plans:
   2. Bridge 3 reuses Bridge 2 data (OpenAPI result) rather than re-fetching
   3. Bridge 3 outputs a detection inventory (detected/not_detected) with no numeric score
   4. Scanner orchestrates bridges sequentially (1 then 2 then 3) with concurrent checks within each bridge
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
+- [ ] 05-01-PLAN.md -- 4 check modules (API presence, developer docs, SDK references, webhook support) with tests
+- [ ] 05-02-PLAN.md -- Bridge 3 orchestrator with detection inventory (score: null), barrel export
 
 ### Phase 6: Terminal Rendering and Output Stubs
 **Goal**: Users see polished, color-coded terminal output for all 5 bridges when running a scan
