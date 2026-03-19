@@ -1,5 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+// --- Hoisted mocks (available in vi.mock factories) ---
+const { mockScan, mockFormatScanOutput } = vi.hoisted(() => ({
+  mockScan: vi.fn(),
+  mockFormatScanOutput: vi.fn(() => "formatted output"),
+}));
+
+vi.mock("../../core/scan.js", () => ({
+  scan: mockScan,
+}));
+
+vi.mock("../../core/version.js", () => ({
+  getVersion: vi.fn(() => "0.1.0"),
+}));
+
+vi.mock("../../render/format-scan.js", () => ({
+  formatScanOutput: mockFormatScanOutput,
+}));
+
 // --- Mock ScanResult for controlled test data ---
 const mockScanResult = {
   version: "0.1.0",
@@ -57,35 +75,20 @@ const mockScanResult = {
   ] as const,
 };
 
-// --- Mocks (before imports) ---
-const mockScan = vi.fn().mockResolvedValue(mockScanResult);
-vi.mock("../../core/scan.js", () => ({
-  scan: mockScan,
-}));
-
-vi.mock("../../core/version.js", () => ({
-  getVersion: vi.fn(() => "0.1.0"),
-}));
-
-const mockFormatScanOutput = vi.fn(() => "formatted output");
-vi.mock("../../render/format-scan.js", () => ({
-  formatScanOutput: mockFormatScanOutput,
-}));
-
 // --- Import after mocks ---
 import { buildProgram } from "../index.js";
 
 describe("CLI", () => {
   let stdoutSpy: ReturnType<typeof vi.spyOn>;
   let stderrSpy: ReturnType<typeof vi.spyOn>;
-  let savedExitCode: number | undefined;
+  let savedExitCode: typeof process.exitCode;
 
   beforeEach(() => {
     vi.clearAllMocks();
     stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     savedExitCode = process.exitCode;
-    process.exitCode = undefined;
+    process.exitCode = undefined as unknown as number;
     mockScan.mockResolvedValue(mockScanResult);
   });
 
@@ -119,7 +122,7 @@ describe("CLI", () => {
       // CommanderError expected for --version with exitOverride
     }
 
-    const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join("");
+    const output = stdoutSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
     expect(output).toContain("0.1.0");
   });
 
@@ -130,7 +133,7 @@ describe("CLI", () => {
     const program = createProgram();
     await program.parseAsync(["node", "milieu", "scan", "not-a-url"]);
 
-    const stderrOutput = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    const stderrOutput = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
     expect(stderrOutput).toContain("Invalid URL");
     expect(process.exitCode).toBe(1);
   });
@@ -140,7 +143,7 @@ describe("CLI", () => {
     const program = createProgram();
     await program.parseAsync(["node", "milieu", "scan", "https://example.com", "--json"]);
 
-    const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join("");
+    const output = stdoutSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
     const parsed = JSON.parse(output.trim());
     expect(parsed.overallScore).toBe(74);
     expect(parsed.version).toBe("0.1.0");
@@ -160,7 +163,7 @@ describe("CLI", () => {
       "--pretty",
     ]);
 
-    const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join("");
+    const output = stdoutSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
     // Pretty JSON has newlines and indentation
     expect(output).toContain("  ");
     expect(output).toContain("\n");
@@ -248,13 +251,13 @@ describe("CLI", () => {
     const program = createProgram();
     await program.parseAsync(["node", "milieu", "scan", "bad-url", "--json"]);
 
-    const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join("");
+    const output = stdoutSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
     const parsed = JSON.parse(output.trim());
     expect(parsed.error).toContain("Invalid URL");
     expect(parsed.version).toBe("0.1.0");
     expect(process.exitCode).toBe(1);
     // Error should go to stdout (not stderr) in JSON mode
-    const stderrOutput = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    const stderrOutput = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
     expect(stderrOutput).toBe("");
   });
 });
