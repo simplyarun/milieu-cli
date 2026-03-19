@@ -114,11 +114,11 @@ Plans:
   3. Verbose mode (--verbose) shows individual check details with status indicators per check
   4. Bridges 4-5 appear with "not_evaluated" status and neutral messaging -- no hints about future features
   5. Spinner shows progress during scan, NO_COLOR is respected, scan timestamp and per-bridge timing are shown
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
+- [ ] 06-01-PLAN.md -- Bridge 4-5 stubs, color utility with NO_COLOR, progress bar, status symbols
+- [ ] 06-02-PLAN.md -- Bridge formatting, verbose mode, full scan output, scan orchestrator with spinner
 
 ### Phase 7: CLI Integration and JSON Output
 **Goal**: Users can run `milieu scan <url>` with all flags and get either terminal or JSON output
