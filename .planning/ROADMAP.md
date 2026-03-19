@@ -130,7 +130,7 @@ Plans:
   3. --timeout configures per-request timeout, --threshold N exits non-zero if score < N, --quiet suppresses terminal output
   4. Invalid URL produces helpful error message and exit code 1
   5. JSON output schema is treated as versioned public API surface
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 07-01-PLAN.md -- Version module (single source of truth), ScanOptions.silent, scan.ts refactor, install commander
@@ -192,7 +192,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 4. Bridge 2 (Standards) | 3/3 | Complete | 2026-03-19 |
 | 5. Bridge 3 (Separation) and Scoring | 0/2 | Not started | - |
 | 6. Terminal Rendering and Output Stubs | 0/2 | Not started | - |
-| 7. CLI Integration and JSON Output | 0/2 | Not started | - |
+| 7. CLI Integration and JSON Output | 1/2 | In Progress|  |
 | 8. Programmatic API | 0/1 | Not started | - |
 | 9. Testing | 0/2 | Not started | - |
 | 10. Packaging and Publishing | 0/1 | Not started | - |

@@ -68,8 +68,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **JSON-01**: --json flag outputs complete ScanResult object
 - [ ] **JSON-02**: --json --pretty outputs formatted JSON
-- [ ] **JSON-03**: JSON schema includes version field for API stability
-- [ ] **JSON-04**: JSON output is the public contract — schema treated as versioned API surface
+- [x] **JSON-03**: JSON schema includes version field for API stability
+- [x] **JSON-04**: JSON output is the public contract — schema treated as versioned API surface
 
 ### CLI
 
@@ -180,8 +180,8 @@ Deferred to future release. Tracked but not in current roadmap.
 | TERM-07 | Phase 6 | Complete |
 | JSON-01 | Phase 7 | Pending |
 | JSON-02 | Phase 7 | Pending |
-| JSON-03 | Phase 7 | Pending |
-| JSON-04 | Phase 7 | Pending |
+| JSON-03 | Phase 7 | Complete |
+| JSON-04 | Phase 7 | Complete |
 | CLI-01 | Phase 7 | Pending |
 | CLI-02 | Phase 7 | Pending |
 | CLI-03 | Phase 7 | Pending |
