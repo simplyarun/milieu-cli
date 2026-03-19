@@ -77,6 +77,12 @@ export async function runReachabilityBridge(
     timeout: ctx.options.timeout,
   });
 
+  // Store page body for Bridge 2 (JSON-LD, Schema.org extraction)
+  if (pageResponse.ok) {
+    ctx.shared.pageBody = pageResponse.body;
+    ctx.shared.pageHeaders = pageResponse.headers;
+  }
+
   // 3. HTTP status check (no HTTP call -- uses pageResponse)
   const httpStatusCheck = checkHttpStatus(pageResponse);
 
