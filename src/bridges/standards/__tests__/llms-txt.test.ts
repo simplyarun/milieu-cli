@@ -44,9 +44,9 @@ describe("checkLlmsTxt", () => {
     mockHttpGet.mockResolvedValue(makeSuccess("# My Site\n\nSome content here"));
     const result = await checkLlmsTxt("https://example.com");
     expect(result.status).toBe("pass");
-    expect(result.detail).toBe("llms.txt found (30 bytes)");
+    expect(result.detail).toBe("llms.txt found (28 bytes)");
     expect(result.data).toEqual({
-      sizeBytes: 30,
+      sizeBytes: 28,
       firstLine: "# My Site",
     });
   });
