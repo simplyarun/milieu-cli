@@ -30,8 +30,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Standards (Bridge 2)
 
-- [ ] **STND-01**: User can see whether an OpenAPI spec exists (9 paths probed in order), with version and endpoint count
-- [ ] **STND-02**: OpenAPI detection validates response contains `openapi` or `swagger` key with correct Content-Type (not HTML docs pages)
+- [x] **STND-01**: User can see whether an OpenAPI spec exists (9 paths probed in order), with version and endpoint count
+- [x] **STND-02**: OpenAPI detection validates response contains `openapi` or `swagger` key with correct Content-Type (not HTML docs pages)
 - [ ] **STND-03**: User can see whether llms.txt exists at domain root (HTTP 200, non-empty, report size and first line)
 - [ ] **STND-04**: User can see whether llms-full.txt exists at domain root
 - [ ] **STND-05**: User can see whether MCP endpoint exists at /.well-known/mcp.json (valid JSON with MCP configuration)
@@ -154,8 +154,8 @@ Deferred to future release. Tracked but not in current roadmap.
 | REACH-07 | Phase 3 | Complete |
 | REACH-08 | Phase 3 | Pending |
 | REACH-09 | Phase 3 | Pending |
-| STND-01 | Phase 4 | Pending |
-| STND-02 | Phase 4 | Pending |
+| STND-01 | Phase 4 | Complete |
+| STND-02 | Phase 4 | Complete |
 | STND-03 | Phase 4 | Pending |
 | STND-04 | Phase 4 | Pending |
 | STND-05 | Phase 4 | Pending |
