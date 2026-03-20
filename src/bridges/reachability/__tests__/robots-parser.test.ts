@@ -133,6 +133,80 @@ describe("parseRobotsTxt", () => {
     );
     expect(result.sitemaps).toHaveLength(2);
   });
+
+  it("handles whitespace around colon in directive", () => {
+    const result = parseRobotsTxt("User-agent : *\nDisallow : /secret");
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0].userAgents).toEqual(["*"]);
+    expect(result.groups[0].rules).toEqual([
+      { type: "disallow", path: "/secret" },
+    ]);
+  });
+
+  it("handles blank lines between groups", () => {
+    const result = parseRobotsTxt(
+      "User-agent: a\nDisallow: /x\n\n\nUser-agent: b\nDisallow: /y",
+    );
+    expect(result.groups).toHaveLength(2);
+    expect(result.groups[0].userAgents).toEqual(["a"]);
+    expect(result.groups[1].userAgents).toEqual(["b"]);
+  });
+
+  it("handles comment-only lines between directives", () => {
+    const result = parseRobotsTxt(
+      "User-agent: *\n# Block the secret\nDisallow: /secret",
+    );
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0].rules).toHaveLength(1);
+    expect(result.groups[0].rules[0].path).toBe("/secret");
+  });
+
+  it("handles very long robots.txt with 50+ rules", () => {
+    const lines = ["User-agent: *"];
+    for (let i = 0; i < 50; i++) {
+      lines.push(`Disallow: /path-${i}`);
+    }
+    const result = parseRobotsTxt(lines.join("\n"));
+    expect(result.ruleCount).toBe(50);
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0].rules).toHaveLength(50);
+  });
+
+  it("handles rules without preceding User-agent", () => {
+    const result = parseRobotsTxt("Disallow: /orphan");
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0].userAgents).toEqual([]);
+    expect(result.groups[0].rules).toEqual([
+      { type: "disallow", path: "/orphan" },
+    ]);
+  });
+
+  it("handles consecutive Sitemap lines mixed with groups", () => {
+    const result = parseRobotsTxt(
+      "Sitemap: https://a.com/s.xml\nUser-agent: *\nDisallow: /\nSitemap: https://b.com/s.xml",
+    );
+    expect(result.sitemaps).toEqual([
+      "https://a.com/s.xml",
+      "https://b.com/s.xml",
+    ]);
+    expect(result.groups).toHaveLength(1);
+  });
+
+  it("handles mixed case Sitemap directive", () => {
+    const result = parseRobotsTxt(
+      "SITEMAP: https://example.com/sitemap.xml",
+    );
+    expect(result.sitemaps).toEqual(["https://example.com/sitemap.xml"]);
+  });
+
+  it("handles tab characters as whitespace in values", () => {
+    const result = parseRobotsTxt("User-agent:\t*\nDisallow:\t/path");
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0].userAgents).toEqual(["*"]);
+    expect(result.groups[0].rules).toEqual([
+      { type: "disallow", path: "/path" },
+    ]);
+  });
 });
 
 describe("matchesPath", () => {
@@ -170,5 +244,30 @@ describe("matchesPath", () => {
 
   it("matches prefix paths", () => {
     expect(matchesPath("/a/b", "/a/b/c")).toBe(true);
+  });
+
+  it("matches wildcard in middle of path", () => {
+    expect(matchesPath("/foo/*/bar", "/foo/anything/bar")).toBe(true);
+  });
+
+  it("matches multiple wildcards", () => {
+    expect(matchesPath("/a/*/b/*", "/a/x/b/y")).toBe(true);
+  });
+
+  it("matches file extension wildcard", () => {
+    expect(matchesPath("/*.json", "/data.json")).toBe(true);
+  });
+
+  it("matches file extension wildcard with $ anchor", () => {
+    expect(matchesPath("/*.json$", "/data.json")).toBe(true);
+    expect(matchesPath("/*.json$", "/data.json/extra")).toBe(false);
+  });
+
+  it("matches path with query string", () => {
+    expect(matchesPath("/search", "/search?q=test")).toBe(true);
+  });
+
+  it("does not match when pattern has more segments", () => {
+    expect(matchesPath("/a/b/c", "/a/b")).toBe(false);
   });
 });
