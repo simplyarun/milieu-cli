@@ -1,78 +1,86 @@
 # milieu-cli
 
-Measure how legible your product is to AI agents. A Lighthouse for the agentic web.
+API is the new product UI. Find out if AI agents can discover, use, and integrate your product.
 
-Find out whether AI agents can discover, understand, and integrate with your product — from robots.txt policies to OpenAPI specs to structured data.
-
-Runs reproducible checks across 5 bridges of machine legibility against any public URL. No AI, no API keys, no config. Same site state, same score, every time.
-
-## Quick start
+A Lighthouse for the agentic web. No API keys required.
 
 ```bash
 npx milieu-cli scan stripe.com
 ```
 
-After install, `milieu` is available as a short alias:
-
 ```bash
-npm install -g milieu-cli
-milieu scan stripe.com
+# Gate your pipeline on agent-readiness
+milieu scan api.mycompany.com --threshold 70
 ```
-
-> **Note:** `npx milieu-cli` is for one-off use. After global install, both `milieu scan` and `milieu-cli scan` work.
 
 ## What it checks
 
-| Bridge | What it measures | Checks | Score |
-|--------|------------------|--------|-------|
-| **Bridge 1: Reachability** | HTTPS, HTTP status, RFC 9309 robots.txt, 6 AI crawler policies (GPTBot, ClaudeBot, CCBot, Googlebot, Bingbot, PerplexityBot), meta robots, X-Robots-Tag | 11 | 0-100 |
-| **Bridge 2: Standards** | OpenAPI (9-path probe), llms.txt, llms-full.txt, MCP endpoint, JSON-LD, Schema.org, security.txt, ai-plugin.json | 8 | 0-100 |
-| **Bridge 3: Separation** | API presence, developer docs, SDK references, webhook support | 4 | Unscored — detection only |
-| **Bridge 4: Schema** | Not yet evaluated | — | — |
-| **Bridge 5: Context** | Not yet evaluated | — | — |
+milieu scans your site from an AI agent's perspective, answering five questions:
 
-Bridge 3 intentionally produces a detection inventory (detected / not detected) rather than a numeric score — presence of separation signals is meaningful without ranking them. Bridges 4-5 are visible in output but not yet evaluated.
+| | Agent question | What milieu checks | Score |
+|---|---|---|---|
+| **Bridge 1** | **Can agents find my API?** | HTTPS, HTTP status, robots.txt (RFC 9309), per-bot crawler policies (GPTBot, ClaudeBot, CCBot, Googlebot, Bingbot, PerplexityBot), meta robots, X-Robots-Tag | 0-100 |
+| **Bridge 2** | **Can agents understand what my API does?** | OpenAPI spec (9-path probe), llms.txt, llms-full.txt, MCP endpoint, JSON-LD, Schema.org, security.txt, ai-plugin.json | 0-100 |
+| **Bridge 3** | **Can agents connect to my API?** | API endpoints, developer docs, SDK/package references, webhook support | Detection only |
+| **Bridge 4** | **Can agents use my API correctly?** | Not yet evaluated | — |
+| **Bridge 5** | **Can agents trust the context?** | Not yet evaluated | — |
 
-## Scoring
+### Crawler policies
 
-The **overall score** is the average of all scored bridges (currently Bridges 1 and 2). Bridge 3 is excluded from the average because it has no numeric score.
+The single most actionable finding for most sites: are you blocking AI agents? milieu checks your robots.txt for policies on six specific bots:
 
-Each check within a scored bridge contributes: **pass = 1 point**, **partial = 0.5 points**, **fail = 0 points**. The bridge score is `(points / total_checks) * 100`.
+- **GPTBot** (OpenAI) · **ClaudeBot** (Anthropic) · **CCBot** (Common Crawl)
+- **Googlebot** (Google) · **Bingbot** (Microsoft) · **PerplexityBot** (Perplexity)
 
-A "partial" result means the signal was detected but incomplete — for example, an OpenAPI spec served as YAML (detected but not fully parseable without a YAML library) or a robots.txt with a valid `User-agent` line but no `Allow`/`Disallow` rules.
+Each policy is checked individually — you might be allowing Googlebot but blocking GPTBot without realizing it. Use `--verbose` to see per-bot results.
+
+## Install
+
+```bash
+npx milieu-cli scan stripe.com        # one-off, no install
+npm install -g milieu-cli              # global install
+milieu scan stripe.com                 # short alias after install
+```
+
+> Both `milieu` and `milieu-cli` work as commands after global install.
+
+## CI/CD integration
+
+Track agent-readiness over time and prevent regressions:
+
+```bash
+# Fail the build if score drops below 70
+milieu scan api.mycompany.com --threshold 70 --quiet
+
+# Capture structured results for dashboards
+milieu scan api.mycompany.com --json > milieu-report.json
+
+# Pretty-print for debugging
+milieu scan api.mycompany.com --json --pretty
+```
+
+Exit codes: `0` = score meets threshold (or no threshold set), `1` = score below threshold or scan error.
 
 ## Options
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--json` | Output raw JSON | off |
+| `--json` | Output raw JSON to stdout | off |
 | `--pretty` | Pretty-print JSON (use with --json) | off |
 | `--verbose` | Show individual check details | off |
 | `--timeout <ms>` | Per-request timeout in milliseconds | 10000 |
 | `--threshold <n>` | Exit non-zero if overall score < n | off |
 | `--quiet` | Suppress terminal output | off |
 
-## JSON output
+## How scoring works
 
-```bash
-milieu scan stripe.com --json --pretty
-```
+The **overall score** is the average of scored bridges (currently Bridges 1 and 2). Bridge 3 reports detection status only and is excluded from the average.
 
-Returns the complete `ScanResult` object. JSON output is a versioned public API surface.
+Each check within a scored bridge contributes: **pass = 1**, **partial = 0.5**, **fail = 0**. Bridge score = `(points / total_checks) * 100`.
 
-## CI/CD integration
+A "partial" means the signal exists but is incomplete — an OpenAPI spec served as YAML (detected but not fully parseable), or a robots.txt with valid structure but no explicit allow/disallow rules.
 
-Use `--threshold` and `--json` to gate deployments on machine legibility:
-
-```bash
-# Fail the build if score drops below 70
-milieu scan mysite.com --threshold 70 --quiet
-
-# Capture JSON for dashboards or artifacts
-milieu scan mysite.com --json > milieu-report.json
-```
-
-Exit codes: `0` = score meets threshold (or no threshold set), `1` = score below threshold or scan error.
+All checks are reproducible: same site state produces the same score every time.
 
 ## Programmatic API
 
@@ -93,7 +101,7 @@ console.log(result.overallScoreLabel); // "pass" | "partial" | "fail"
 console.log(result.bridges);           // 5-element tuple of BridgeResult
 ```
 
-> **Note:** `result.bridges` always returns 5 elements. Bridges 1-2 have numeric scores. Bridge 3 has `score: null` (detection inventory). Bridges 4-5 have `score: null` (not yet evaluated). Code that maps over bridge scores should handle `null`:
+> **Note:** `result.bridges` always returns 5 elements. Bridges 1-2 have numeric scores. Bridge 3 has `score: null` (detection inventory). Bridges 4-5 have `score: null` (not yet evaluated). Handle nulls when mapping:
 >
 > ```typescript
 > const scoredBridges = result.bridges.filter(b => b.score !== null);
