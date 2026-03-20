@@ -158,11 +158,11 @@ Plans:
   2. OpenAPI detection, JSON-LD parsing, and URL normalization each have dedicated unit test suites
   3. Integration tests use recorded HTTP fixtures -- no live URLs are called in CI
   4. All tests pass in CI with `npm test`
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 09-01: TBD
-- [ ] 09-02: TBD
+- [ ] 09-01-PLAN.md -- Expand unit tests for robots.txt RFC 9309 edge cases, OpenAPI detection, and JSON-LD parsing
+- [ ] 09-02-PLAN.md -- Integration tests with recorded HTTP fixtures, CI readiness verification
 
 ### Phase 10: Packaging and Publishing
 **Goal**: Tool is published to npm and works via npx with zero friction
