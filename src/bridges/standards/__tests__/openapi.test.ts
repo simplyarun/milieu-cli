@@ -345,4 +345,200 @@ describe("checkOpenApi", () => {
       expect(call[1]).toMatchObject({ timeout: 5000 });
     }
   });
+
+  it("returns partial for Swagger 2.0 YAML spec", async () => {
+    const yamlBody = `swagger: "2.0"
+info:
+  title: Test
+paths:
+  /users:
+    get:
+      summary: List`;
+
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/api-docs")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "text/yaml" },
+          body: yamlBody,
+        });
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("partial");
+    expect(result.check.data).toMatchObject({
+      specType: "swagger",
+      version: "2.0",
+    });
+    expect(result.detected).toBe(true);
+  });
+
+  it("returns fail for non-JSON non-YAML response body", async () => {
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/openapi.json")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "text/plain" },
+          body: "This is not a spec",
+        });
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("fail");
+    expect(result.detected).toBe(false);
+  });
+
+  it("returns fail for JSON that starts with { but is not valid JSON", async () => {
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/openapi.json")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "text/plain" },
+          body: "{ invalid json :::",
+        });
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("fail");
+    expect(result.detected).toBe(false);
+  });
+
+  it("handles empty paths object in JSON spec", async () => {
+    const body = makeOpenApiJson("3.0.0", {});
+
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/openapi.json")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "application/json" },
+          body,
+        });
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("pass");
+    expect(result.check.data).toMatchObject({ endpointCount: 0 });
+  });
+
+  it("returns correct endpointCount from YAML spec", async () => {
+    const yamlBody = `openapi: "3.0.0"
+info:
+  title: Test
+paths:
+  /users:
+    get:
+      summary: List users
+  /items:
+    get:
+      summary: List items
+  /orders:
+    post:
+      summary: Create order`;
+
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/api-docs")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "application/yaml" },
+          body: yamlBody,
+        });
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("partial");
+    expect(result.check.data).toMatchObject({ endpointCount: 3 });
+  });
+
+  it("handles application/vnd.oai.openapi Content-Type as YAML", async () => {
+    const yamlBody = `openapi: "3.1.0"
+info:
+  title: Test
+paths:
+  /data:
+    get:
+      summary: Get data`;
+
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/openapi.json")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "application/vnd.oai.openapi" },
+          body: yamlBody,
+        });
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("partial");
+    expect(result.check.data).toMatchObject({
+      specType: "openapi",
+      version: "3.1.0",
+    });
+    expect(result.detected).toBe(true);
+  });
+
+  it("uses first valid spec found in path order", async () => {
+    const body = makeOpenApiJson("3.0.0", { "/test": {} });
+
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/openapi.json")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "application/json" },
+          body,
+        });
+      }
+      if (url.endsWith("/swagger.json")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "application/json" },
+          body: makeSwaggerJson("2.0", { "/alt": {} }),
+        });
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.data).toMatchObject({ path: "/openapi.json" });
+  });
+
+  it("handles application/x-yaml Content-Type as YAML", async () => {
+    const yamlBody = `openapi: "3.0.1"
+info:
+  title: Test
+paths:
+  /health:
+    get:
+      summary: Health check`;
+
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/api-docs")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "application/x-yaml" },
+          body: yamlBody,
+        });
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("partial");
+    expect(result.check.data).toMatchObject({
+      specType: "openapi",
+      version: "3.0.1",
+    });
+    expect(result.detected).toBe(true);
+  });
 });
