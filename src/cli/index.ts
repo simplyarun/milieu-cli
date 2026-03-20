@@ -69,13 +69,16 @@ export function buildProgram(): Command {
   return program;
 }
 
-// Only run when executed directly (not imported for testing)
-const isDirectRun =
-  process.argv[1] &&
-  (process.argv[1].endsWith("/cli/index.js") ||
-    process.argv[1].endsWith("/cli/index.ts"));
+// Run when executed directly — resolves symlinks so npx works
+import { fileURLToPath } from "node:url";
+import { realpathSync } from "node:fs";
 
-if (isDirectRun) {
-  const program = buildProgram();
-  await program.parseAsync(process.argv);
+try {
+  const entry = process.argv[1] ? realpathSync(process.argv[1]) : "";
+  if (entry === fileURLToPath(import.meta.url)) {
+    const program = buildProgram();
+    await program.parseAsync(process.argv);
+  }
+} catch {
+  // Not the main module (e.g., imported for testing)
 }
