@@ -1,7 +1,7 @@
 {
   "name": "milieu-cli",
   "version": "0.1.0",
-  "description": "Measure how legible your product is to AI agents",
+  "description": "Check if AI agents can discover, understand, and use your API",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -30,20 +30,27 @@
     "node": ">=18"
   },
   "license": "Apache-2.0",
-  "author": "Arun",
+  "author": "Arun <arun@simplyarun.com>",
   "keywords": [
     "ai",
     "ai-agents",
     "llm",
-    "seo",
+    "api",
+    "api-readiness",
+    "agent-readiness",
+    "agentic-web",
+    "lighthouse",
     "cli",
-    "scanner",
+    "website-scanner",
+    "developer-tools",
     "robots-txt",
     "llms-txt",
     "openapi",
+    "mcp",
+    "json-ld",
     "schema-org",
-    "content-score",
-    "web-standards"
+    "web-standards",
+    "machine-readable"
   ],
   "repository": {
     "type": "git",
