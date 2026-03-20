@@ -4,12 +4,12 @@ milestone: v1.0
 milestone_name: milestone
 status: unknown
 stopped_at: Completed 07-02-PLAN.md
-last_updated: "2026-03-20T03:00:28.420Z"
+last_updated: "2026-03-20T17:24:45.212Z"
 progress:
   total_phases: 10
-  completed_phases: 7
-  total_plans: 16
-  completed_plans: 16
+  completed_phases: 8
+  total_plans: 17
+  completed_plans: 17
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-17)
 
 **Core value:** First credible, deterministic measurement layer for AI agent readiness -- a Lighthouse for the agentic web
-**Current focus:** Phase 07 — cli-integration-and-json-output
+**Current focus:** Phase 08 — programmatic-api
 
 ## Current Position
 
-Phase: 07 (cli-integration-and-json-output) — COMPLETE
-Plan: 2 of 2 (done)
+Phase: 08 (programmatic-api) — COMPLETE
+Plan: 1 of 1 (done)
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Plan: 2 of 2 (done)
 | Phase 06 P02 | 3min | 2 tasks | 10 files |
 | Phase 07 P01 | 2min | 2 tasks | 8 files |
 | Phase 07 P02 | 4min | 1 tasks | 2 files |
+| Phase 08 P01 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -101,6 +102,8 @@ Recent decisions affecting current work:
 - [Phase 07]: buildProgram() pattern for testable CLI -- exports function, tests call exitOverride()
 - [Phase 07]: vi.hoisted() for mock variable hoisting in vitest vi.mock factories
 - [Phase 07]: JSON mode errors output structured JSON error to stdout (not text to stderr) for pipe consumers
+- [Phase 08]: vi.hoisted() required for mock variables used in vi.mock factories (vitest hoists vi.mock calls)
+- [Phase 08]: Core barrel wildcard re-export propagates both value and type exports correctly
 
 ### Pending Todos
 
@@ -113,6 +116,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T23:38:18.339Z
-Stopped at: Completed 07-02-PLAN.md
+Last session: 2026-03-20T17:23:38Z
+Stopped at: Completed 08-01-PLAN.md
 Resume file: None

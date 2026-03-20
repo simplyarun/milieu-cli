@@ -82,9 +82,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Programmatic API
 
-- [ ] **API-01**: `import { scan } from "milieu-cli"` returns typed ScanResult
-- [ ] **API-02**: scan() accepts options object (timeout, verbose)
-- [ ] **API-03**: All types exported for TypeScript consumers
+- [x] **API-01**: `import { scan } from "milieu-cli"` returns typed ScanResult
+- [x] **API-02**: scan() accepts options object (timeout, verbose)
+- [x] **API-03**: All types exported for TypeScript consumers
 
 ### Testing
 
@@ -188,9 +188,9 @@ Deferred to future release. Tracked but not in current roadmap.
 | CLI-04 | Phase 7 | Complete |
 | CLI-05 | Phase 7 | Complete |
 | CLI-06 | Phase 7 | Complete |
-| API-01 | Phase 8 | Pending |
-| API-02 | Phase 8 | Pending |
-| API-03 | Phase 8 | Pending |
+| API-01 | Phase 8 | Complete |
+| API-02 | Phase 8 | Complete |
+| API-03 | Phase 8 | Complete |
 | TEST-01 | Phase 9 | Pending |
 | TEST-02 | Phase 9 | Pending |
 | TEST-03 | Phase 9 | Pending |
