@@ -21,7 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 7: CLI Integration and JSON Output** - Commander setup, all CLI flags, JSON output as versioned public API
 - [ ] **Phase 8: Programmatic API** - Library export with typed scan() function and full type exports
 - [ ] **Phase 9: Testing** - Unit tests for core parsers, integration tests with recorded HTTP fixtures
-- [ ] **Phase 10: Packaging and Publishing** - npm publish config, ESM packaging, shebang, dependency audit
+- [x] **Phase 10: Packaging and Publishing** - npm publish config, ESM packaging, shebang, dependency audit (completed 2026-03-20)
 
 ## Phase Details
 
@@ -196,4 +196,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 7. CLI Integration and JSON Output | 1/2 | In Progress|  |
 | 8. Programmatic API | 0/1 | Not started | - |
 | 9. Testing | 0/2 | Not started | - |
-| 10. Packaging and Publishing | 2/2 | Complete | 2026-03-20 |
+| 10. Packaging and Publishing | 2/2 | Complete    | 2026-03-20 |
