@@ -19,11 +19,13 @@ milieu scans your site from an AI agent's perspective, answering five questions:
 
 | | Agent question | What milieu checks | Score |
 |---|---|---|---|
-| **Bridge 1** | **Can agents find my API?** | HTTPS, HTTP status, robots.txt (RFC 9309), per-bot crawler policies (GPTBot, ClaudeBot, CCBot, Googlebot, Bingbot, PerplexityBot), meta robots, X-Robots-Tag | 0-100 |
-| **Bridge 2** | **Can agents understand what my API does?** | OpenAPI spec (9-path probe), llms.txt, llms-full.txt, MCP endpoint, JSON-LD, Schema.org, security.txt, ai-plugin.json | 0-100 |
-| **Bridge 3** | **Can agents connect to my API?** | API endpoints, developer docs, SDK/package references, webhook support | Detection only |
+| **Bridge 1** | **Can agents access my site?** | HTTPS, HTTP status, robots.txt (RFC 9309), per-bot crawler policies (GPTBot, ClaudeBot, CCBot, Googlebot, Bingbot, PerplexityBot), meta robots, X-Robots-Tag | 0-100 |
+| **Bridge 2** | **Can agents understand what my API does?** | OpenAPI spec, llms.txt, llms-full.txt, MCP endpoint, JSON-LD, Schema.org, security.txt, ai-plugin.json | 0-100 |
+| **Bridge 3** | **Is my API surface visible?** | API endpoints, developer docs, SDK/package references, webhook support | Detection only* |
 | **Bridge 4** | **Can agents use my API correctly?** | Not yet evaluated | — |
 | **Bridge 5** | **Can agents trust the context?** | Not yet evaluated | — |
+
+\*Bridge 3 reports what's present rather than scoring quality — a detection inventory of whether your API surface is discoverable by agents.
 
 ### Crawler policies
 
