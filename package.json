@@ -6,7 +6,8 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "milieu": "./dist/cli/index.js"
+    "milieu": "./dist/cli/index.js",
+    "milieu-cli": "./dist/cli/index.js"
   },
   "exports": {
     ".": {
@@ -29,6 +30,29 @@
     "node": ">=18"
   },
   "license": "Apache-2.0",
+  "author": "Arun",
+  "keywords": [
+    "ai",
+    "ai-agents",
+    "llm",
+    "seo",
+    "cli",
+    "scanner",
+    "robots-txt",
+    "llms-txt",
+    "openapi",
+    "schema-org",
+    "content-score",
+    "web-standards"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/simplyarun/milieu-content-score-cli.git"
+  },
+  "homepage": "https://github.com/simplyarun/milieu-content-score-cli#readme",
+  "bugs": {
+    "url": "https://github.com/simplyarun/milieu-content-score-cli/issues"
+  },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "tsx": "^4",
