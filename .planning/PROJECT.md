@@ -26,6 +26,7 @@ Provide the first credible, deterministic measurement layer for AI agent readine
 - ✓ CLI Integration: commander with `milieu scan <url>`, --json/--pretty/--timeout/--threshold/--verbose/--quiet flags, JSON output as versioned API, process.exitCode for CI, error handling — Validated in Phase 7 (2026-03-20)
 - ✓ Programmatic API: `import { scan } from "milieu-cli"` with typed ScanResult, options passthrough, all types exported (CheckStatus, Check, BridgeResult, ScanResult, ScanOptions) — Validated in Phase 8 (2026-03-20)
 - ✓ Testing: 408 tests across 29 files — 40 robots.txt (RFC 9309), 23 OpenAPI, 19 JSON-LD, 10 integration with HTTP fixtures, zero network access — Validated in Phase 9 (2026-03-20)
+- ✓ Packaging: tsconfig.build.json (test exclusion), prepublishOnly hook, 155 files / 52.6 kB tarball, zero test artifacts, README rewritten, npm metadata complete — Validated in Phase 10 (2026-03-20). Publish pending human action.
 
 ### Active
 
@@ -94,4 +95,4 @@ Key strategic considerations:
 | JSON output as public API contract | Enables ecosystem tooling (CI/CD, dashboards) without coupling to CLI | — Pending |
 
 ---
-*Last updated: 2026-03-20 after Phase 9 completion*
+*Last updated: 2026-03-20 after Phase 10 completion — all milestone phases complete*
