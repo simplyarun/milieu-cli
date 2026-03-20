@@ -115,4 +115,4 @@ console.log(result.bridges);           // 5-element tuple of BridgeResult
 
 ## License
 
-MIT
+Apache-2.0
