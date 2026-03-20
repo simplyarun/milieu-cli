@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-03-20T19:32:11.530Z"
+stopped_at: Completed 10-01-PLAN.md
+last_updated: "2026-03-20T20:23:01.856Z"
 progress:
   total_phases: 10
   completed_phases: 9
-  total_plans: 19
-  completed_plans: 19
+  total_plans: 21
+  completed_plans: 20
 ---
 
 # Project State
@@ -19,11 +19,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-17)
 
 **Core value:** First credible, deterministic measurement layer for AI agent readiness -- a Lighthouse for the agentic web
-**Current focus:** Phase 09 — testing
+**Current focus:** Phase 10 — packaging-and-publishing
 
 ## Current Position
 
-Phase: 09 (testing) — COMPLETE
+Phase: 10 (packaging-and-publishing) — EXECUTING
 Plan: 2 of 2
 
 ## Performance Metrics
@@ -64,6 +64,7 @@ Plan: 2 of 2
 | Phase 08 P01 | 3min | 2 tasks | 2 files |
 | Phase 09 P02 | 2min | 1 tasks | 2 files |
 | Phase 09 P01 | 2min | 2 tasks | 3 files |
+| Phase 10 P01 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -109,6 +110,8 @@ Recent decisions affecting current work:
 - [Phase 09]: Fixture responder pattern: createFixtureResponder maps URL+method to recorded HttpResponse -- reusable for future integration tests
 - [Phase 09]: Integration test mock boundary: httpGet and validateDns only -- all bridge logic runs un-mocked for realistic coverage
 - [Phase 09]: Plan base count for OpenAPI was 16 but actual was 15 -- added extra test to meet 23+ threshold
+- [Phase 10-01]: tsconfig.build.json extends base tsconfig.json -- single source of truth for compilerOptions
+- [Phase 10-01]: Both prepublishOnly and prepack hooks added for double safety on publish and pack operations
 
 ### Pending Todos
 
@@ -121,6 +124,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-20T18:05:49.122Z
-Stopped at: Completed 09-01-PLAN.md
+Last session: 2026-03-20T20:23:01.854Z
+Stopped at: Completed 10-01-PLAN.md
 Resume file: None

@@ -97,10 +97,10 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Packaging
 
 - [ ] **PKG-01**: Published to npm as `milieu-cli`
-- [ ] **PKG-02**: ESM-only package with .d.ts type declarations
+- [x] **PKG-02**: ESM-only package with .d.ts type declarations
 - [ ] **PKG-03**: 3 runtime dependencies only: commander, chalk, ora
-- [ ] **PKG-04**: Shebang in entry point for npx execution
-- [ ] **PKG-05**: package.json exports field and files whitelist correctly configured
+- [x] **PKG-04**: Shebang in entry point for npx execution
+- [x] **PKG-05**: package.json exports field and files whitelist correctly configured
 
 ## v2 Requirements
 
@@ -197,10 +197,10 @@ Deferred to future release. Tracked but not in current roadmap.
 | TEST-04 | Phase 9 | Complete |
 | TEST-05 | Phase 9 | Complete |
 | PKG-01 | Phase 10 | Pending |
-| PKG-02 | Phase 10 | Pending |
+| PKG-02 | Phase 10 | Complete |
 | PKG-03 | Phase 10 | Pending |
-| PKG-04 | Phase 10 | Pending |
-| PKG-05 | Phase 10 | Pending |
+| PKG-04 | Phase 10 | Complete |
+| PKG-05 | Phase 10 | Complete |
 
 **Coverage:**
 - v1 requirements: 62 total
