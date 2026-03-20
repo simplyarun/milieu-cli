@@ -144,10 +144,10 @@ Plans:
   1. `import { scan } from "milieu-cli"` returns a typed ScanResult
   2. scan() accepts an options object (timeout, verbose) matching CLI flag behavior
   3. All types (CheckStatus, Check, BridgeResult, ScanResult) are exported for TypeScript consumers
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 08-01: TBD
+- [ ] 08-01-PLAN.md -- Verify package entry point exports, add programmatic API contract integration tests
 
 ### Phase 9: Testing
 **Goal**: Core parsing logic and scan behavior are verified by automated tests that run without network access
