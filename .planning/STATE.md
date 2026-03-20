@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-03-20T17:32:11.705Z"
+stopped_at: Completed 09-02-PLAN.md
+last_updated: "2026-03-20T18:05:14.696Z"
 progress:
   total_phases: 10
-  completed_phases: 8
-  total_plans: 17
-  completed_plans: 17
+  completed_phases: 9
+  total_plans: 19
+  completed_plans: 19
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-17)
 
 **Core value:** First credible, deterministic measurement layer for AI agent readiness -- a Lighthouse for the agentic web
-**Current focus:** Phase 08 — programmatic-api
+**Current focus:** Phase 09 — testing
 
 ## Current Position
 
-Phase: 08 (programmatic-api) — COMPLETE
-Plan: 1 of 1 (done)
+Phase: 09 (testing) — COMPLETE
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -62,6 +62,7 @@ Plan: 1 of 1 (done)
 | Phase 07 P01 | 2min | 2 tasks | 8 files |
 | Phase 07 P02 | 4min | 1 tasks | 2 files |
 | Phase 08 P01 | 3min | 2 tasks | 2 files |
+| Phase 09 P02 | 2min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,8 @@ Recent decisions affecting current work:
 - [Phase 07]: JSON mode errors output structured JSON error to stdout (not text to stderr) for pipe consumers
 - [Phase 08]: vi.hoisted() required for mock variables used in vi.mock factories (vitest hoists vi.mock calls)
 - [Phase 08]: Core barrel wildcard re-export propagates both value and type exports correctly
+- [Phase 09]: Fixture responder pattern: createFixtureResponder maps URL+method to recorded HttpResponse -- reusable for future integration tests
+- [Phase 09]: Integration test mock boundary: httpGet and validateDns only -- all bridge logic runs un-mocked for realistic coverage
 
 ### Pending Todos
 
@@ -116,6 +119,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-20T17:23:38Z
-Stopped at: Completed 08-01-PLAN.md
+Last session: 2026-03-20T18:05:14.694Z
+Stopped at: Completed 09-02-PLAN.md
 Resume file: None

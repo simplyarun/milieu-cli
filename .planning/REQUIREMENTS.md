@@ -91,8 +91,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **TEST-01**: Unit tests for robots.txt parsing (20+ edge cases per RFC 9309)
 - [ ] **TEST-02**: Unit tests for OpenAPI detection and version extraction
 - [ ] **TEST-03**: Unit tests for JSON-LD parsing
-- [ ] **TEST-04**: Unit tests for URL normalization
-- [ ] **TEST-05**: Integration tests use recorded HTTP fixtures (no live URLs in CI)
+- [x] **TEST-04**: Unit tests for URL normalization
+- [x] **TEST-05**: Integration tests use recorded HTTP fixtures (no live URLs in CI)
 
 ### Packaging
 
@@ -194,8 +194,8 @@ Deferred to future release. Tracked but not in current roadmap.
 | TEST-01 | Phase 9 | Pending |
 | TEST-02 | Phase 9 | Pending |
 | TEST-03 | Phase 9 | Pending |
-| TEST-04 | Phase 9 | Pending |
-| TEST-05 | Phase 9 | Pending |
+| TEST-04 | Phase 9 | Complete |
+| TEST-05 | Phase 9 | Complete |
 | PKG-01 | Phase 10 | Pending |
 | PKG-02 | Phase 10 | Pending |
 | PKG-03 | Phase 10 | Pending |
