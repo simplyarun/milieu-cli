@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: unknown
-stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-03-20T20:23:01.856Z"
+status: complete
+stopped_at: Completed 10-02-PLAN.md (checkpoint: human-verify pending)
+last_updated: "2026-03-20T20:35:12Z"
 progress:
   total_phases: 10
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 21
-  completed_plans: 20
+  completed_plans: 21
 ---
 
 # Project State
@@ -23,8 +23,8 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 
 ## Current Position
 
-Phase: 10 (packaging-and-publishing) — EXECUTING
-Plan: 2 of 2
+Phase: 10 (packaging-and-publishing) — COMPLETE (checkpoint pending)
+Plan: 2 of 2 (complete)
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Plan: 2 of 2
 | Phase 09 P02 | 2min | 1 tasks | 2 files |
 | Phase 09 P01 | 2min | 2 tasks | 3 files |
 | Phase 10 P01 | 2min | 2 tasks | 3 files |
+| Phase 10 P02 | 8min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -112,6 +113,9 @@ Recent decisions affecting current work:
 - [Phase 09]: Plan base count for OpenAPI was 16 but actual was 15 -- added extra test to meet 23+ threshold
 - [Phase 10-01]: tsconfig.build.json extends base tsconfig.json -- single source of truth for compilerOptions
 - [Phase 10-01]: Both prepublishOnly and prepack hooks added for double safety on publish and pack operations
+- [Phase 10-02]: milieu-cli bin alias added alongside milieu for belt-and-suspenders npx resolution
+- [Phase 10-02]: README rewritten with 5-bridge architecture, programmatic API section, and options table
+- [Phase 10-02]: 155 files in tarball accepted -- source maps inflate count but zero test artifacts
 
 ### Pending Todos
 
@@ -124,6 +128,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-20T20:23:01.854Z
-Stopped at: Completed 10-01-PLAN.md
+Last session: 2026-03-20T20:35:12Z
+Stopped at: Completed 10-02-PLAN.md (checkpoint: human-verify pending)
 Resume file: None

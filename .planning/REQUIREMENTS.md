@@ -9,7 +9,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Foundation
 
-- [ ] **FOUND-01**: Tool is published as `milieu-cli` npm package with `milieu scan <url>` as primary command
+- [x] **FOUND-01**: Tool is published as `milieu-cli` npm package with `milieu scan <url>` as primary command
 - [x] **FOUND-02**: All type definitions (CheckStatus, Check, BridgeResult, ScanResult) are defined before implementation
 - [x] **FOUND-03**: HTTP client returns discriminated union errors (dns, timeout, ssrf_blocked, http_error, bot_protected) instead of null
 - [x] **FOUND-04**: URL normalization handles missing protocol, trailing slashes, and domain extraction
@@ -96,9 +96,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Packaging
 
-- [ ] **PKG-01**: Published to npm as `milieu-cli`
+- [x] **PKG-01**: Published to npm as `milieu-cli`
 - [x] **PKG-02**: ESM-only package with .d.ts type declarations
-- [ ] **PKG-03**: 3 runtime dependencies only: commander, chalk, ora
+- [x] **PKG-03**: 3 runtime dependencies only: commander, chalk, ora
 - [x] **PKG-04**: Shebang in entry point for npx execution
 - [x] **PKG-05**: package.json exports field and files whitelist correctly configured
 
@@ -139,7 +139,7 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 | Phase 10 | Pending |
+| FOUND-01 | Phase 10 | Complete |
 | FOUND-02 | Phase 1 | Complete |
 | FOUND-03 | Phase 2 | Complete |
 | FOUND-04 | Phase 2 | Complete |
@@ -196,9 +196,9 @@ Deferred to future release. Tracked but not in current roadmap.
 | TEST-03 | Phase 9 | Complete |
 | TEST-04 | Phase 9 | Complete |
 | TEST-05 | Phase 9 | Complete |
-| PKG-01 | Phase 10 | Pending |
+| PKG-01 | Phase 10 | Complete |
 | PKG-02 | Phase 10 | Complete |
-| PKG-03 | Phase 10 | Pending |
+| PKG-03 | Phase 10 | Complete |
 | PKG-04 | Phase 10 | Complete |
 | PKG-05 | Phase 10 | Complete |
 

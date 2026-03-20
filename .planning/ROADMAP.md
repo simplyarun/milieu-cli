@@ -174,11 +174,11 @@ Plans:
   3. Exactly 3 runtime dependencies: commander, chalk, ora
   4. package.json exports field, files whitelist, and shebang are correctly configured
   5. `npm pack --dry-run` shows only intended files
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 10-01-PLAN.md -- Clean build pipeline (tsconfig.build.json excluding tests, updated scripts, prepublishOnly), packaging verification tests
-- [ ] 10-02-PLAN.md -- Package metadata (keywords, repository, bin alias), README rewrite for 5-bridge architecture, npx tarball smoke test
+- [x] 10-01-PLAN.md -- Clean build pipeline (tsconfig.build.json excluding tests, updated scripts, prepublishOnly), packaging verification tests
+- [x] 10-02-PLAN.md -- Package metadata (keywords, repository, bin alias), README rewrite for 5-bridge architecture, npx tarball smoke test
 
 ## Progress
 
@@ -196,4 +196,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 7. CLI Integration and JSON Output | 1/2 | In Progress|  |
 | 8. Programmatic API | 0/1 | Not started | - |
 | 9. Testing | 0/2 | Not started | - |
-| 10. Packaging and Publishing | 1/2 | In Progress|  |
+| 10. Packaging and Publishing | 2/2 | Complete | 2026-03-20 |
