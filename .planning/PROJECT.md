@@ -24,6 +24,7 @@ Provide the first credible, deterministic measurement layer for AI agent readine
 - ✓ Bridge 3 (Separation): Detection inventory (not scored) — API presence, developer docs, SDK/package references, webhook support. Reuses Bridge 1/2 shared context. score: null — Validated in Phase 5 (2026-03-19)
 - ✓ Terminal Rendering: chalk+ora, NO_COLOR support, 12-char progress bars, color-coded status (green/yellow/red/cyan/dim), verbose mode, Bridge 4-5 stubs, scan orchestrator with spinner — Validated in Phase 6 (2026-03-19)
 - ✓ CLI Integration: commander with `milieu scan <url>`, --json/--pretty/--timeout/--threshold/--verbose/--quiet flags, JSON output as versioned API, process.exitCode for CI, error handling — Validated in Phase 7 (2026-03-20)
+- ✓ Programmatic API: `import { scan } from "milieu-cli"` with typed ScanResult, options passthrough, all types exported (CheckStatus, Check, BridgeResult, ScanResult, ScanOptions) — Validated in Phase 8 (2026-03-20)
 
 ### Active
 
@@ -92,4 +93,4 @@ Key strategic considerations:
 | JSON output as public API contract | Enables ecosystem tooling (CI/CD, dashboards) without coupling to CLI | — Pending |
 
 ---
-*Last updated: 2026-03-20 after Phase 7 completion*
+*Last updated: 2026-03-20 after Phase 8 completion*
