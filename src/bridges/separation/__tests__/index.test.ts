@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Check, CheckStatus, ScanContext } from "../../../core/types.js";
+import type { Check, CheckStatus, ContentSource, ScanContext } from "../../../core/types.js";
+import type { DeveloperDocsResult } from "../developer-docs.js";
 
 // Mock all 4 check modules
 vi.mock("../api-presence.js", () => ({
@@ -29,6 +30,16 @@ function makeCheck(status: CheckStatus, id = "test_check"): Check {
   return { id, label: "Test Check", status };
 }
 
+function makeDevDocsResult(
+  status: CheckStatus,
+  pages: ContentSource[] = [],
+): DeveloperDocsResult {
+  return {
+    check: makeCheck(status, "developer_docs"),
+    pages,
+  };
+}
+
 function makeCtx(overrides?: Partial<ScanContext>): ScanContext {
   return {
     url: "https://example.com",
@@ -40,12 +51,12 @@ function makeCtx(overrides?: Partial<ScanContext>): ScanContext {
   };
 }
 
-function setupAllPass(): void {
+function setupAllPass(devDocsPages: ContentSource[] = []): void {
   vi.mocked(checkApiPresence).mockReturnValue(
     makeCheck("pass", "api_presence"),
   );
   vi.mocked(checkDeveloperDocs).mockResolvedValue(
-    makeCheck("pass", "developer_docs"),
+    makeDevDocsResult("pass", devDocsPages),
   );
   vi.mocked(checkSdkReferences).mockReturnValue(
     makeCheck("pass", "sdk_references"),
@@ -60,7 +71,7 @@ function setupAllFail(): void {
     makeCheck("fail", "api_presence"),
   );
   vi.mocked(checkDeveloperDocs).mockResolvedValue(
-    makeCheck("fail", "developer_docs"),
+    makeDevDocsResult("fail"),
   );
   vi.mocked(checkSdkReferences).mockReturnValue(
     makeCheck("fail", "sdk_references"),
@@ -118,32 +129,42 @@ describe("runSeparationBridge", () => {
     await runSeparationBridge(ctx);
     expect(checkApiPresence).toHaveBeenCalledWith(
       true,
-      expect.any(String),
+      expect.any(Array),
       expect.any(Object),
     );
   });
 
-  it("passes ctx.shared.pageBody to checkApiPresence, checkSdkReferences, checkWebhookSupport, and checkDeveloperDocs", async () => {
+  it("passes ContentSource[] to checkApiPresence, checkSdkReferences, and checkWebhookSupport", async () => {
     setupAllPass();
     const ctx = makeCtx({ shared: { pageBody: "<html>test</html>" } });
     await runSeparationBridge(ctx);
 
-    // checkApiPresence: 2nd arg is pageBody
+    // All three pure-function checks receive the same ContentSource[] array
+    const expectedSources: ContentSource[] = [
+      { content: "<html>test</html>", source: "homepage" },
+    ];
+
+    // checkApiPresence: 2nd arg is ContentSource[]
     expect(checkApiPresence).toHaveBeenCalledWith(
       expect.anything(),
-      "<html>test</html>",
+      expectedSources,
       expect.any(Object),
     );
-    // checkDeveloperDocs: 2nd arg is pageBody
+    // checkSdkReferences: 1st arg is ContentSource[]
+    expect(checkSdkReferences).toHaveBeenCalledWith(expectedSources);
+    // checkWebhookSupport: 1st arg is ContentSource[]
+    expect(checkWebhookSupport).toHaveBeenCalledWith(expectedSources);
+  });
+
+  it("still passes pageBody to checkDeveloperDocs as 2nd argument", async () => {
+    setupAllPass();
+    const ctx = makeCtx({ shared: { pageBody: "<html>test</html>" } });
+    await runSeparationBridge(ctx);
     expect(checkDeveloperDocs).toHaveBeenCalledWith(
       expect.any(String),
       "<html>test</html>",
       expect.anything(),
     );
-    // checkSdkReferences: 1st arg is pageBody
-    expect(checkSdkReferences).toHaveBeenCalledWith("<html>test</html>");
-    // checkWebhookSupport: 1st arg is pageBody
-    expect(checkWebhookSupport).toHaveBeenCalledWith("<html>test</html>");
   });
 
   it("passes ctx.shared.pageHeaders to checkApiPresence as third argument", async () => {
@@ -153,7 +174,7 @@ describe("runSeparationBridge", () => {
     await runSeparationBridge(ctx);
     expect(checkApiPresence).toHaveBeenCalledWith(
       expect.anything(),
-      expect.any(String),
+      expect.any(Array),
       headers,
     );
   });
@@ -184,13 +205,9 @@ describe("runSeparationBridge", () => {
     setupAllPass();
     const ctx = makeCtx(); // shared: {} -- no pageBody
     await runSeparationBridge(ctx);
-    expect(checkApiPresence).toHaveBeenCalledWith(
-      expect.anything(),
-      "",
-      expect.any(Object),
-    );
-    expect(checkSdkReferences).toHaveBeenCalledWith("");
-    expect(checkWebhookSupport).toHaveBeenCalledWith("");
+    // Empty pageBody means no homepage ContentSource is added
+    expect(checkSdkReferences).toHaveBeenCalledWith([]);
+    expect(checkWebhookSupport).toHaveBeenCalledWith([]);
     expect(checkDeveloperDocs).toHaveBeenCalledWith(
       expect.any(String),
       "",
@@ -204,7 +221,7 @@ describe("runSeparationBridge", () => {
     await runSeparationBridge(ctx);
     expect(checkApiPresence).toHaveBeenCalledWith(
       expect.anything(),
-      expect.any(String),
+      expect.any(Array),
       {},
     );
   });
@@ -215,7 +232,7 @@ describe("runSeparationBridge", () => {
     await runSeparationBridge(ctx);
     expect(checkApiPresence).toHaveBeenCalledWith(
       false,
-      expect.any(String),
+      expect.any(Array),
       expect.any(Object),
     );
   });
@@ -227,17 +244,57 @@ describe("runSeparationBridge", () => {
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
   });
 
-  it("does NOT modify ctx.shared (no writes)", async () => {
-    setupAllPass();
+  // --- ContentSource assembly tests ---
+
+  it("assembles ContentSource[] with homepage, llmsTxtBody, and devDocs pages", async () => {
+    const devPages: ContentSource[] = [
+      { content: "docs content", source: "/docs" },
+    ];
+    setupAllPass(devPages);
     const ctx = makeCtx({
       shared: {
-        openApiDetected: true,
-        pageBody: "<html></html>",
-        pageHeaders: { "content-type": "text/html" },
+        pageBody: "<html>homepage</html>",
+        llmsTxtBody: "llms.txt content",
       },
     });
-    const sharedBefore = { ...ctx.shared };
     await runSeparationBridge(ctx);
-    expect(ctx.shared).toEqual(sharedBefore);
+
+    const expectedSources: ContentSource[] = [
+      { content: "<html>homepage</html>", source: "homepage" },
+      { content: "llms.txt content", source: "llms.txt" },
+      { content: "docs content", source: "/docs" },
+    ];
+
+    expect(checkSdkReferences).toHaveBeenCalledWith(expectedSources);
+    expect(checkWebhookSupport).toHaveBeenCalledWith(expectedSources);
+    expect(checkApiPresence).toHaveBeenCalledWith(
+      expect.anything(),
+      expectedSources,
+      expect.any(Object),
+    );
+  });
+
+  it("omits llmsTxtBody from ContentSource[] when null", async () => {
+    setupAllPass();
+    const ctx = makeCtx({
+      shared: { pageBody: "<html>homepage</html>" },
+    });
+    await runSeparationBridge(ctx);
+
+    const expectedSources: ContentSource[] = [
+      { content: "<html>homepage</html>", source: "homepage" },
+    ];
+
+    expect(checkSdkReferences).toHaveBeenCalledWith(expectedSources);
+  });
+
+  it("stores devDocsBodies in ctx.shared", async () => {
+    const devPages: ContentSource[] = [
+      { content: "docs body", source: "/docs" },
+    ];
+    setupAllPass(devPages);
+    const ctx = makeCtx();
+    await runSeparationBridge(ctx);
+    expect(ctx.shared.devDocsBodies).toEqual(devPages);
   });
 });
