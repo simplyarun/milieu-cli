@@ -1,14 +1,14 @@
 # milieu-cli
 
-The API is the new product UI. Your customers are no longer just humans — they're AI agents, LLM pipelines, and automated workflows. These customers don't browse your marketing site or read your docs the way people do. They parse your machine-readable signals, probe your endpoints, and decide in milliseconds whether your product is usable.
+The API is the new product UI. Your customers are no longer just humans. They're AI agents, LLM pipelines, and automated workflows. These customers don't browse your marketing site or read your docs the way people do. They parse your machine-readable signals, probe your endpoints, and decide in milliseconds whether your product is usable.
 
-We've spent decades perfecting UI design for humans. Now we need the same rigor for the interface AI agents actually see: your product's **milieu**.
+As an industry, we've spent decades perfecting UI & UX design for humans. Now we need the same rigor for the interface AI agents actually see: your product's **milieu**.
 
 ## What is milieu?
 
 *Milieu* is the totality of machine-readable signals that surround your product — the environment an AI agent encounters when it tries to discover, understand, and integrate with what you've built. It's not any single file or endpoint. It's robots.txt and OpenAPI specs and llms.txt and JSON-LD and developer docs and SDK references, all working together. It's the difference between a product that AI agents can use and one they walk past.
 
-Good UI design made products usable for humans. Good milieu design makes products usable for agents.
+Good design made products usable for humans. Good milieu design makes products usable for agents.
 
 milieu-cli measures this. It scans your site and tells you what AI agents can actually see.
 
@@ -23,7 +23,7 @@ milieu scan api.mycompany.com --threshold 70
 
 ## The 5 Bridges
 
-milieu evaluates your product through five progressive bridges — each one represents a layer of machine legibility that AI agents need, from "can I reach you?" to "can I trust you?"
+Milieu evaluates your product through five progressive bridges. Each one represents a layer of machine legibility that AI agents need, from "can I reach you?" to "can I trust you?"
 
 | | Bridge | Question | What milieu checks | Score |
 |---|---|---|---|---|
@@ -72,7 +72,7 @@ Track agent-readiness over time and prevent regressions:
 # Fail the build if score drops below 70
 milieu scan api.mycompany.com --threshold 70 --quiet
 
-# Capture structured results for dashboards
+# Capture structured results
 milieu scan api.mycompany.com --json > milieu-report.json
 
 # Pretty-print for debugging
@@ -95,7 +95,7 @@ Exit codes: `0` = score meets threshold (or no threshold set), `1` = score below
 
 ### Check explanations
 
-In `--verbose` mode, non-passing checks include a "why this matters" explanation — a plain-language sentence describing what the result means for AI agents. These explanations are status-aware: a failing robots.txt check tells you agents have no crawling guidance, while a passing one confirms your guidance is clear.
+In `--verbose` mode, non-passing checks include a "why this matters" explanation, a plain-language sentence describing what the result means for AI agents. These explanations are status-aware: a failing robots.txt check tells you agents have no crawling guidance, while a passing one confirms your guidance is clear.
 
 These explanations also appear in `--json` output as a `why` field on every check, designed for both human readers and LLMs generating recommendations.
 
@@ -105,7 +105,7 @@ The **overall score** is the average of scored bridges (currently Bridges 1 and 
 
 Each check within a scored bridge contributes: **pass = 1**, **partial = 0.5**, **fail = 0**. Bridge score = `(points / total_checks) * 100`.
 
-A "partial" means the signal exists but is incomplete — an OpenAPI spec served as YAML (detected but not fully parseable), or a robots.txt with valid structure but no explicit allow/disallow rules.
+A "partial" means the signal exists but is incomplete: an OpenAPI spec served as YAML (detected but not fully parseable), or a robots.txt with valid structure but no explicit allow/disallow rules.
 
 All checks are reproducible: same site state produces the same score every time.
 
