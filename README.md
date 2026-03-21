@@ -88,6 +88,7 @@ Exit codes: `0` = score meets threshold (or no threshold set), `1` = score below
 | `--json` | Output raw JSON to stdout | off |
 | `--pretty` | Pretty-print JSON (use with --json) | off |
 | `--verbose` | Show individual check details with explanations | off |
+| `--explain-all` | Show explanations on all checks, not just failures (use with --verbose) | off |
 | `--timeout <ms>` | Per-request timeout in milliseconds | 10000 |
 | `--threshold <n>` | Exit non-zero if overall score < n | off |
 | `--quiet` | Suppress terminal output | off |

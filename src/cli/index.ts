@@ -22,6 +22,7 @@ export function buildProgram(): Command {
     .option("--timeout <ms>", "Per-request timeout in milliseconds", "10000")
     .option("--threshold <score>", "Exit non-zero if overall score below threshold")
     .option("--verbose", "Show individual check details")
+    .option("--explain-all", "Show explanations on all checks, not just failures (use with --verbose)")
     .option("--quiet", "Suppress terminal output")
     .action(
       async (
@@ -31,6 +32,7 @@ export function buildProgram(): Command {
         const jsonMode = Boolean(opts.json);
         const quiet = Boolean(opts.quiet);
         const verbose = Boolean(opts.verbose);
+        const explainAll = Boolean(opts.explainAll);
         const timeout = Number(opts.timeout) || 10_000;
         const threshold =
           opts.threshold !== undefined ? Number(opts.threshold) : undefined;
@@ -55,7 +57,7 @@ export function buildProgram(): Command {
               : JSON.stringify(result);
             process.stdout.write(output + "\n");
           } else if (!quiet) {
-            console.log(formatScanOutput(result, verbose));
+            console.log(formatScanOutput(result, verbose, explainAll));
           }
 
           if (threshold !== undefined && result.overallScore < threshold) {

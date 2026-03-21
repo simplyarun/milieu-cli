@@ -25,6 +25,7 @@ function scoreColorFn(
 export function formatScanOutput(
   result: ScanResult,
   verbose: boolean,
+  explainAll = false,
 ): string {
   const lines: string[] = [];
 
@@ -38,7 +39,7 @@ export function formatScanOutput(
   for (const bridge of result.bridges) {
     lines.push(formatBridge(bridge, verbose));
     if (verbose && bridge.checks.length > 0) {
-      lines.push(formatVerboseChecks(bridge.checks));
+      lines.push(formatVerboseChecks(bridge.checks, explainAll));
     }
   }
 
