@@ -1,4 +1,4 @@
-import type { BridgeResult, Check, ScanContext } from "../../core/types.js";
+import type { BridgeResult, Check, ContentSource, ScanContext } from "../../core/types.js";
 import { checkApiPresence } from "./api-presence.js";
 import { checkDeveloperDocs } from "./developer-docs.js";
 import { checkSdkReferences } from "./sdk-references.js";
@@ -14,8 +14,12 @@ import { checkWebhookSupport } from "./webhook-support.js";
  * Unlike Bridges 1-2, Bridge 3 is a detection inventory with NO scoring.
  * Returns score: null and scoreLabel: null.
  *
- * Reads from ctx.shared (openApiDetected, pageBody, pageHeaders) set by
- * Bridges 1 and 2. Does NOT write to ctx.shared.
+ * Reads from ctx.shared (openApiDetected, pageBody, pageHeaders, llmsTxtBody)
+ * set by Bridges 1 and 2. Writes ctx.shared.devDocsBodies with fetched
+ * developer documentation page bodies.
+ *
+ * Assembles ContentSource[] from homepage body, llms.txt body, and developer
+ * docs page bodies, then passes to all three pure-function checks.
  */
 export async function runSeparationBridge(
   ctx: ScanContext,
@@ -27,6 +31,7 @@ export async function runSeparationBridge(
   const pageHeaders =
     (ctx.shared.pageHeaders as Record<string, string>) ?? {};
   const openApiDetected = (ctx.shared.openApiDetected as boolean) ?? false;
+  const llmsTxtBody = (ctx.shared.llmsTxtBody as string | undefined) ?? null;
 
   // Fire async developer docs probe first (non-blocking)
   const devDocsPromise = checkDeveloperDocs(
@@ -35,18 +40,27 @@ export async function runSeparationBridge(
     ctx.options.timeout,
   );
 
-  // Run 3 synchronous pure-function checks
-  const apiPresenceCheck = checkApiPresence(openApiDetected, pageBody, pageHeaders);
-  const sdkRefsCheck = checkSdkReferences(pageBody);
-  const webhookCheck = checkWebhookSupport(pageBody);
+  // Await async check (need pages for content sources)
+  const devDocsResult = await devDocsPromise;
 
-  // Await async check
-  const devDocsCheck = await devDocsPromise;
+  // Store dev docs pages in shared context for downstream bridges
+  ctx.shared.devDocsBodies = devDocsResult.pages;
+
+  // Assemble content sources from all available bodies
+  const contentSources: ContentSource[] = [];
+  if (pageBody) contentSources.push({ content: pageBody, source: "homepage" });
+  if (llmsTxtBody) contentSources.push({ content: llmsTxtBody, source: "llms.txt" });
+  contentSources.push(...devDocsResult.pages);
+
+  // Run 3 synchronous pure-function checks with assembled content sources
+  const apiPresenceCheck = checkApiPresence(openApiDetected, contentSources, pageHeaders);
+  const sdkRefsCheck = checkSdkReferences(contentSources);
+  const webhookCheck = checkWebhookSupport(contentSources);
 
   // Assemble checks array in order
   const checks: Check[] = [
     apiPresenceCheck,
-    devDocsCheck,
+    devDocsResult.check,
     sdkRefsCheck,
     webhookCheck,
   ];
