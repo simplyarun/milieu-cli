@@ -35,17 +35,17 @@ describe("checkLlmsTxt", () => {
 
   it("returns Check with id 'llms_txt' and label 'llms.txt'", async () => {
     mockHttpGet.mockResolvedValue(make404());
-    const result = await checkLlmsTxt("https://example.com");
-    expect(result.id).toBe("llms_txt");
-    expect(result.label).toBe("llms.txt");
+    const { check } = await checkLlmsTxt("https://example.com");
+    expect(check.id).toBe("llms_txt");
+    expect(check.label).toBe("llms.txt");
   });
 
   it("returns pass with size and firstLine when body starts with H1", async () => {
     mockHttpGet.mockResolvedValue(makeSuccess("# My Site\n\nSome content here"));
-    const result = await checkLlmsTxt("https://example.com");
-    expect(result.status).toBe("pass");
-    expect(result.detail).toBe("llms.txt found (28 bytes)");
-    expect(result.data).toEqual({
+    const { check } = await checkLlmsTxt("https://example.com");
+    expect(check.status).toBe("pass");
+    expect(check.detail).toBe("llms.txt found (28 bytes)");
+    expect(check.data).toEqual({
       sizeBytes: 28,
       firstLine: "# My Site",
     });
@@ -53,44 +53,69 @@ describe("checkLlmsTxt", () => {
 
   it("returns partial when body does NOT start with H1", async () => {
     mockHttpGet.mockResolvedValue(makeSuccess("No heading here\nJust text"));
-    const result = await checkLlmsTxt("https://example.com");
-    expect(result.status).toBe("partial");
-    expect(result.detail).toBe("llms.txt found but missing H1 header");
+    const { check } = await checkLlmsTxt("https://example.com");
+    expect(check.status).toBe("partial");
+    expect(check.detail).toBe("llms.txt found but missing H1 header");
   });
 
   it("returns fail on HTTP 404", async () => {
     mockHttpGet.mockResolvedValue(make404());
-    const result = await checkLlmsTxt("https://example.com");
-    expect(result.status).toBe("fail");
-    expect(result.detail).toBe("No llms.txt found");
+    const { check } = await checkLlmsTxt("https://example.com");
+    expect(check.status).toBe("fail");
+    expect(check.detail).toBe("No llms.txt found");
   });
 
   it("returns fail on empty body", async () => {
     mockHttpGet.mockResolvedValue(makeSuccess(""));
-    const result = await checkLlmsTxt("https://example.com");
-    expect(result.status).toBe("fail");
-    expect(result.detail).toBe("No llms.txt found");
+    const { check } = await checkLlmsTxt("https://example.com");
+    expect(check.status).toBe("fail");
+    expect(check.detail).toBe("No llms.txt found");
   });
 
   it("returns fail on whitespace-only body", async () => {
     mockHttpGet.mockResolvedValue(makeSuccess("   \n  \n  "));
-    const result = await checkLlmsTxt("https://example.com");
-    expect(result.status).toBe("fail");
-    expect(result.detail).toBe("No llms.txt found");
+    const { check } = await checkLlmsTxt("https://example.com");
+    expect(check.status).toBe("fail");
+    expect(check.detail).toBe("No llms.txt found");
   });
 
   it("calculates byte size correctly for multi-byte chars", async () => {
     // "# Cafe" is 7 ASCII bytes
     mockHttpGet.mockResolvedValue(makeSuccess("# Cafe"));
-    const result = await checkLlmsTxt("https://example.com");
-    expect(result.status).toBe("pass");
-    expect((result.data as { sizeBytes: number }).sizeBytes).toBe(6);
+    const { check } = await checkLlmsTxt("https://example.com");
+    expect(check.status).toBe("pass");
+    expect((check.data as { sizeBytes: number }).sizeBytes).toBe(6);
   });
 
   it("passes timeout to httpGet", async () => {
     mockHttpGet.mockResolvedValue(make404());
     await checkLlmsTxt("https://example.com", 5000);
     expect(mockHttpGet).toHaveBeenCalledWith("https://example.com/llms.txt", { timeout: 5000 });
+  });
+
+  it("returns body content on success", async () => {
+    const content = "# My Site\n\nSome content here";
+    mockHttpGet.mockResolvedValue(makeSuccess(content));
+    const { body } = await checkLlmsTxt("https://example.com");
+    expect(body).toBe(content);
+  });
+
+  it("returns null body on 404", async () => {
+    mockHttpGet.mockResolvedValue(make404());
+    const { body } = await checkLlmsTxt("https://example.com");
+    expect(body).toBeNull();
+  });
+
+  it("returns null body on empty response", async () => {
+    mockHttpGet.mockResolvedValue(makeSuccess(""));
+    const { body } = await checkLlmsTxt("https://example.com");
+    expect(body).toBeNull();
+  });
+
+  it("returns null body on whitespace-only response", async () => {
+    mockHttpGet.mockResolvedValue(makeSuccess("   \n  \n  "));
+    const { body } = await checkLlmsTxt("https://example.com");
+    expect(body).toBeNull();
   });
 });
 

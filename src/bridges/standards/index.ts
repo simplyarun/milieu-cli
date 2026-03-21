@@ -39,6 +39,7 @@ function calculateScore(checks: Check[]): {
  *   - 2 synchronous HTML-based checks (JSON-LD, Schema.org) using ctx.shared.pageBody from Bridge 1
  *
  * Stores ctx.shared.openApiDetected for Bridge 3 consumption.
+ * Stores ctx.shared.llmsTxtBody for downstream consumption.
  */
 export async function runStandardsBridge(
   ctx: ScanContext,
@@ -51,7 +52,7 @@ export async function runStandardsBridge(
   // Run all independent HTTP probes in parallel
   const [
     openApiResult,
-    llmsTxtCheck,
+    llmsTxtResult,
     llmsFullTxtCheck,
     mcpCheck,
     securityTxtCheck,
@@ -71,11 +72,12 @@ export async function runStandardsBridge(
 
   // Store OpenAPI detection result for Bridge 3
   ctx.shared.openApiDetected = openApiResult.detected;
+  ctx.shared.llmsTxtBody = llmsTxtResult.body;
 
   // Collect all 8 checks in order
   const checks: Check[] = [
     openApiResult.check,
-    llmsTxtCheck,
+    llmsTxtResult.check,
     llmsFullTxtCheck,
     mcpCheck,
     jsonLdCheck,
