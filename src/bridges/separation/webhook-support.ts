@@ -1,37 +1,73 @@
-import type { Check } from "../../core/types.js";
+import type { Check, ContentSource } from "../../core/types.js";
+
+/** HTML patterns for webhook detection */
+const HTML_PATTERNS: { pattern: RegExp; signal: string }[] = [
+  {
+    pattern: /<a\s[^>]*href=["'][^"']*webhook[^"']*["']/gi,
+    signal: "webhook link",
+  },
+  {
+    pattern: /<a\s[^>]*>[^<]*webhook[^<]*<\/a>/gi,
+    signal: "webhook link text",
+  },
+  {
+    pattern: /<h[1-6][^>]*>[^<]*webhook[^<]*<\/h[1-6]>/gi,
+    signal: "webhook heading",
+  },
+];
+
+/** Markdown patterns for webhook detection */
+const MARKDOWN_PATTERNS: { pattern: RegExp; signal: string }[] = [
+  { pattern: /\[.*webhook.*\]\(/gi, signal: "webhook link (markdown)" },
+  { pattern: /^#{1,6}\s+.*webhook/gim, signal: "webhook heading (markdown)" },
+];
 
 /**
- * Detect webhook support signals in HTML content.
+ * Detect webhook support signals across multiple content sources.
  *
- * Scans for "webhook" keyword in three specific locations:
- * 1. Link hrefs containing "webhook"
- * 2. Link text containing "webhook"
- * 3. Headings (h1-h6) containing "webhook"
+ * Scans for "webhook" keyword in:
+ * 1. HTML link hrefs containing "webhook"
+ * 2. HTML link text containing "webhook"
+ * 3. HTML headings (h1-h6) containing "webhook"
+ * 4. Markdown links containing "webhook"
+ * 5. Markdown headings containing "webhook"
  *
  * Avoids matching arbitrary paragraph text to reduce false positives
  * from blog content or incidental mentions.
  *
  * Pure function -- no HTTP calls.
  */
-export function checkWebhookSupport(html: string): Check {
+export function checkWebhookSupport(sources: ContentSource[]): Check {
   const id = "webhook_support";
   const label = "Webhook Support";
 
   const signals: string[] = [];
+  const signalSources: string[] = [];
 
-  // Check for links containing "webhook" in href
-  if (/<a\s[^>]*href=["'][^"']*webhook[^"']*["']/gi.test(html)) {
-    signals.push("webhook link");
-  }
+  for (const { content, source } of sources) {
+    let sourceContributed = false;
 
-  // Check for "webhook" in link text
-  if (/<a\s[^>]*>[^<]*webhook[^<]*<\/a>/gi.test(html)) {
-    signals.push("webhook link text");
-  }
+    // HTML patterns
+    for (const { pattern, signal } of HTML_PATTERNS) {
+      pattern.lastIndex = 0;
+      if (!signals.includes(signal) && pattern.test(content)) {
+        signals.push(signal);
+        sourceContributed = true;
+      }
+    }
 
-  // Check for "webhook" in headings
-  if (/<h[1-6][^>]*>[^<]*webhook[^<]*<\/h[1-6]>/gi.test(html)) {
-    signals.push("webhook heading");
+    // Markdown patterns
+    for (const { pattern, signal } of MARKDOWN_PATTERNS) {
+      pattern.lastIndex = 0;
+      if (!signals.includes(signal) && pattern.test(content)) {
+        signals.push(signal);
+        sourceContributed = true;
+      }
+    }
+
+    if (sourceContributed && !signalSources.includes(source)) {
+      signalSources.push(source);
+    }
   }
 
   if (signals.length === 0) {
@@ -43,11 +79,14 @@ export function checkWebhookSupport(html: string): Check {
     };
   }
 
+  const sourceAttr =
+    signalSources.length > 0 ? ` in ${signalSources.join(", ")}` : "";
+
   return {
     id,
     label,
     status: "pass",
-    detail: `Webhook support detected: ${signals.join(", ")}`,
-    data: { signals },
+    detail: `Webhook support detected${sourceAttr}: ${signals.join(", ")}`,
+    data: { signals, sources: signalSources },
   };
 }
