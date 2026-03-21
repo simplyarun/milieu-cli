@@ -67,10 +67,14 @@ Exit codes: `0` = score meets threshold (or no threshold set), `1` = score below
 |------|-------------|---------|
 | `--json` | Output raw JSON to stdout | off |
 | `--pretty` | Pretty-print JSON (use with --json) | off |
-| `--verbose` | Show individual check details | off |
+| `--verbose` | Show individual check details with explanations | off |
 | `--timeout <ms>` | Per-request timeout in milliseconds | 10000 |
 | `--threshold <n>` | Exit non-zero if overall score < n | off |
 | `--quiet` | Suppress terminal output | off |
+
+### Check explanations
+
+In `--verbose` mode, non-passing checks include a "why this matters" explanation — a plain-language sentence describing what the result means for AI agents. These explanations also appear in `--json` output as a `why` field on every check, for both human readers and LLMs generating recommendations.
 
 ## How scoring works
 
