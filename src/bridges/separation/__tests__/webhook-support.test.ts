@@ -88,4 +88,33 @@ describe("checkWebhookSupport", () => {
     expect(result.detail).toContain("in homepage, /docs");
     expect(result.data?.sources).toEqual(["homepage", "/docs"]);
   });
+
+  // --- Structured data patterns (JSON state, JS config) ---
+
+  it("returns pass when webhook path found in JSON state", () => {
+    const json = '{"type":"link","text":"Webhooks","href":"/connect/webhooks"}';
+    const result = checkWebhookSupport(sources(json, "/docs"));
+    expect(result.status).toBe("pass");
+    expect(result.data?.signals).toContain("webhook path");
+  });
+
+  it("returns pass when webhook path found in double-quoted JSON value", () => {
+    const json = '{"href":"/billing/subscriptions/webhooks","text":"Webhooks"}';
+    const result = checkWebhookSupport(sources(json));
+    expect(result.status).toBe("pass");
+    expect(result.data?.signals).toContain("webhook path");
+  });
+
+  it("returns pass when webhook path uses unicode-escaped slashes", () => {
+    const json = '{"href":"\\u002Fconnect\\u002Fwebhooks","text":"Webhooks"}';
+    const result = checkWebhookSupport(sources(json));
+    expect(result.status).toBe("pass");
+    expect(result.data?.signals).toContain("webhook path");
+  });
+
+  it("does not match webhook in plain prose without URL path", () => {
+    const prose = "We support webhook integrations for real-time updates.";
+    const result = checkWebhookSupport(sources(prose));
+    expect(result.status).toBe("fail");
+  });
 });
