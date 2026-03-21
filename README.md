@@ -18,7 +18,7 @@ npx milieu-cli scan stripe.com
 
 ```bash
 # Gate your pipeline on agent-readiness
-milieu scan api.mycompany.com --threshold 70
+milieu scan api.example.com --threshold 70
 ```
 
 ## The 5 Bridges
