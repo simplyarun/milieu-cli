@@ -1,4 +1,4 @@
-import type { Check } from "../../core/types.js";
+import type { Check, ContentSource } from "../../core/types.js";
 
 /** Registry detection pattern with URL and optional install command regex */
 interface RegistryPattern {
@@ -13,6 +13,10 @@ const REGISTRY_PATTERNS: RegistryPattern[] = [
     name: "npm",
     urlPattern: /npmjs\.com\/package\//i,
     installPattern: /npm\s+install\s+\S/i,
+  },
+  {
+    name: "npm (CDN)",
+    urlPattern: /cdn\.jsdelivr\.net\/npm\/|unpkg\.com\//i,
   },
   {
     name: "PyPI",
@@ -39,29 +43,45 @@ const REGISTRY_PATTERNS: RegistryPattern[] = [
     urlPattern: /rubygems\.org\/gems\//i,
     installPattern: /gem\s+install\s+\S/i,
   },
+  {
+    name: "Packagist",
+    urlPattern: /packagist\.org\/packages\//i,
+    installPattern: /composer\s+require\s+\S/i,
+  },
+  {
+    name: "Crates.io",
+    urlPattern: /crates\.io\/crates\//i,
+    installPattern: /cargo\s+add\s+\S/i,
+  },
 ];
 
 /**
- * Detect SDK/package references in HTML content.
+ * Detect SDK/package references across multiple content sources.
  *
  * Scans for package registry URLs (npmjs.com, pypi.org, etc.) and
  * install commands (npm install, pip install, etc.). Returns deduplicated
- * list of detected registries.
+ * list of detected registries with source attribution.
  *
  * Pure function -- no HTTP calls.
  */
-export function checkSdkReferences(html: string): Check {
+export function checkSdkReferences(sources: ContentSource[]): Check {
   const id = "sdk_references";
   const label = "SDK/Package References";
 
   const detected: string[] = [];
+  const detectedSources: string[] = [];
 
-  for (const registry of REGISTRY_PATTERNS) {
-    if (registry.urlPattern.test(html)) {
-      if (!detected.includes(registry.name)) detected.push(registry.name);
-    }
-    if (registry.installPattern && registry.installPattern.test(html)) {
-      if (!detected.includes(registry.name)) detected.push(registry.name);
+  for (const { content, source } of sources) {
+    for (const registry of REGISTRY_PATTERNS) {
+      if (detected.includes(registry.name)) continue;
+      const matched =
+        registry.urlPattern.test(content) ||
+        (registry.installPattern !== undefined &&
+          registry.installPattern.test(content));
+      if (matched) {
+        detected.push(registry.name);
+        if (!detectedSources.includes(source)) detectedSources.push(source);
+      }
     }
   }
 
@@ -74,11 +94,14 @@ export function checkSdkReferences(html: string): Check {
     };
   }
 
+  const sourceAttr =
+    detectedSources.length > 0 ? ` in ${detectedSources.join(", ")}` : "";
+
   return {
     id,
     label,
     status: "pass",
-    detail: `SDK references detected: ${detected.join(", ")}`,
-    data: { registries: detected },
+    detail: `SDK references detected${sourceAttr}: ${detected.join(", ")}`,
+    data: { registries: detected, sources: detectedSources },
   };
 }
