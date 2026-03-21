@@ -984,4 +984,164 @@ SwaggerUIBundle({ url: defaultUrl })`;
       }
     }
   });
+
+  // --- Webhook/Callback extraction ---
+
+  it("returns hasWebhooks true for OpenAPI 3.1 spec with top-level webhooks", async () => {
+    const spec = JSON.stringify({
+      openapi: "3.1.0",
+      info: { title: "Test" },
+      paths: {},
+      webhooks: {
+        orderStatusChanged: {
+          post: { summary: "Order status update" },
+        },
+      },
+    });
+    mockHttpGet.mockResolvedValue(make404());
+    mockHttpGet.mockResolvedValueOnce(makeSuccess({ body: spec }));
+    const result = await checkOpenApi("https://example.com");
+    expect(result.hasWebhooks).toBe(true);
+    expect(result.hasCallbacks).toBe(false);
+  });
+
+  it("returns hasWebhooks false when webhooks key is empty object", async () => {
+    const spec = JSON.stringify({
+      openapi: "3.1.0",
+      info: { title: "Test" },
+      paths: {},
+      webhooks: {},
+    });
+    mockHttpGet.mockResolvedValue(make404());
+    mockHttpGet.mockResolvedValueOnce(makeSuccess({ body: spec }));
+    const result = await checkOpenApi("https://example.com");
+    expect(result.hasWebhooks).toBe(false);
+  });
+
+  it("returns hasWebhooks false for OpenAPI 3.0 spec without webhooks key", async () => {
+    const spec = makeOpenApiJson("3.0.3", { "/users": { get: {} } });
+    mockHttpGet.mockResolvedValue(make404());
+    mockHttpGet.mockResolvedValueOnce(makeSuccess({ body: spec }));
+    const result = await checkOpenApi("https://example.com");
+    expect(result.hasWebhooks).toBe(false);
+  });
+
+  it("returns hasCallbacks true when any operation has callbacks", async () => {
+    const spec = JSON.stringify({
+      openapi: "3.0.3",
+      info: { title: "Test" },
+      paths: {
+        "/subscribe": {
+          post: {
+            summary: "Subscribe",
+            callbacks: {
+              onEvent: {
+                "{$request.body#/callbackUrl}": {
+                  post: { summary: "Event notification" },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    mockHttpGet.mockResolvedValue(make404());
+    mockHttpGet.mockResolvedValueOnce(makeSuccess({ body: spec }));
+    const result = await checkOpenApi("https://example.com");
+    expect(result.hasCallbacks).toBe(true);
+  });
+
+  it("returns hasCallbacks false when no operations have callbacks", async () => {
+    const spec = makeOpenApiJson("3.0.3", {
+      "/users": { get: { summary: "List" } },
+    });
+    mockHttpGet.mockResolvedValue(make404());
+    mockHttpGet.mockResolvedValueOnce(makeSuccess({ body: spec }));
+    const result = await checkOpenApi("https://example.com");
+    expect(result.hasCallbacks).toBe(false);
+  });
+
+  it("returns both hasWebhooks and hasCallbacks true when spec has both", async () => {
+    const spec = JSON.stringify({
+      openapi: "3.1.0",
+      info: { title: "Test" },
+      paths: {
+        "/subscribe": {
+          post: {
+            callbacks: { onEvent: {} },
+          },
+        },
+      },
+      webhooks: {
+        newOrder: { post: { summary: "New order" } },
+      },
+    });
+    mockHttpGet.mockResolvedValue(make404());
+    mockHttpGet.mockResolvedValueOnce(makeSuccess({ body: spec }));
+    const result = await checkOpenApi("https://example.com");
+    expect(result.hasWebhooks).toBe(true);
+    expect(result.hasCallbacks).toBe(true);
+  });
+
+  it("detects webhooks in YAML spec via top-level webhooks key", async () => {
+    const yaml = `openapi: "3.1.0"
+info:
+  title: Test
+paths:
+  /users:
+    get:
+      summary: List
+webhooks:
+  newOrder:
+    post:
+      summary: New order`;
+    mockHttpGet.mockResolvedValue(make404());
+    mockHttpGet.mockResolvedValueOnce(
+      makeSuccess({
+        body: yaml,
+        headers: { "content-type": "application/yaml" },
+      }),
+    );
+    const result = await checkOpenApi("https://example.com");
+    expect(result.hasWebhooks).toBe(true);
+  });
+
+  it("detects callbacks in YAML spec via indented callbacks key", async () => {
+    const yaml = `openapi: "3.0.3"
+info:
+  title: Test
+paths:
+  /subscribe:
+    post:
+      summary: Subscribe
+      callbacks:
+        onEvent:
+          '{$request.body#/callbackUrl}':
+            post:
+              summary: Event`;
+    mockHttpGet.mockResolvedValue(make404());
+    mockHttpGet.mockResolvedValueOnce(
+      makeSuccess({
+        body: yaml,
+        headers: { "content-type": "application/yaml" },
+      }),
+    );
+    const result = await checkOpenApi("https://example.com");
+    expect(result.hasCallbacks).toBe(true);
+  });
+
+  it("returns hasWebhooks false and hasCallbacks false for protected spec", async () => {
+    mockHttpGet.mockResolvedValue(make404());
+    mockHttpGet.mockResolvedValueOnce(make401());
+    const result = await checkOpenApi("https://example.com");
+    expect(result.hasWebhooks).toBe(false);
+    expect(result.hasCallbacks).toBe(false);
+  });
+
+  it("returns hasWebhooks false and hasCallbacks false when no spec found", async () => {
+    mockHttpGet.mockResolvedValue(make404());
+    const result = await checkOpenApi("https://example.com");
+    expect(result.hasWebhooks).toBe(false);
+    expect(result.hasCallbacks).toBe(false);
+  });
 });

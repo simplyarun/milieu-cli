@@ -54,6 +54,8 @@ function setupAllPass(): void {
   vi.mocked(checkOpenApi).mockResolvedValue({
     check: makeCheck("pass", "openapi_spec"),
     detected: true,
+    hasWebhooks: false,
+    hasCallbacks: false,
   });
   vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: "# Example\n\nContent here" });
   vi.mocked(checkLlmsFullTxt).mockResolvedValue(
@@ -74,6 +76,8 @@ function setupAllFail(): void {
   vi.mocked(checkOpenApi).mockResolvedValue({
     check: makeCheck("fail", "openapi_spec"),
     detected: false,
+    hasWebhooks: false,
+    hasCallbacks: false,
   });
   vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("fail", "llms_txt"), body: null });
   vi.mocked(checkLlmsFullTxt).mockResolvedValue(
@@ -136,6 +140,8 @@ describe("runStandardsBridge", () => {
     vi.mocked(checkOpenApi).mockResolvedValue({
       check: makeCheck("pass", "openapi_spec"),
       detected: true,
+      hasWebhooks: false,
+      hasCallbacks: false,
     });
     vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: "# Example\n\nContent here" });
     vi.mocked(checkLlmsFullTxt).mockResolvedValue(
@@ -170,6 +176,8 @@ describe("runStandardsBridge", () => {
     vi.mocked(checkOpenApi).mockResolvedValue({
       check: makeCheck("pass", "openapi_spec"),
       detected: true,
+      hasWebhooks: false,
+      hasCallbacks: false,
     });
     vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: "# Example\n\nContent here" });
     vi.mocked(checkLlmsFullTxt).mockResolvedValue(
@@ -246,5 +254,34 @@ describe("runStandardsBridge", () => {
     const ctx = makeCtx();
     await runStandardsBridge(ctx);
     expect(ctx.shared.llmsTxtBody).toBeNull();
+  });
+
+  it("stores openApiHasWebhooks and openApiHasCallbacks in ctx.shared", async () => {
+    vi.mocked(checkOpenApi).mockResolvedValue({
+      check: makeCheck("pass", "openapi_spec"),
+      detected: true,
+      hasWebhooks: true,
+      hasCallbacks: true,
+    });
+    vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: null });
+    vi.mocked(checkLlmsFullTxt).mockResolvedValue(makeCheck("pass", "llms_full_txt"));
+    vi.mocked(checkMcpEndpoint).mockResolvedValue(makeCheck("pass", "mcp_endpoint"));
+    vi.mocked(checkJsonLd).mockReturnValue(makeCheck("pass", "json_ld"));
+    vi.mocked(checkSchemaOrg).mockReturnValue(makeCheck("pass", "schema_org"));
+    vi.mocked(checkSecurityTxt).mockResolvedValue(makeCheck("pass", "security_txt"));
+    vi.mocked(checkAiPlugin).mockResolvedValue(makeCheck("pass", "ai_plugin"));
+
+    const ctx = makeCtx();
+    await runStandardsBridge(ctx);
+    expect(ctx.shared.openApiHasWebhooks).toBe(true);
+    expect(ctx.shared.openApiHasCallbacks).toBe(true);
+  });
+
+  it("stores false for webhook flags when no spec found", async () => {
+    setupAllFail();
+    const ctx = makeCtx();
+    await runStandardsBridge(ctx);
+    expect(ctx.shared.openApiHasWebhooks).toBe(false);
+    expect(ctx.shared.openApiHasCallbacks).toBe(false);
   });
 });

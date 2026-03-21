@@ -72,6 +72,8 @@ export async function runStandardsBridge(
 
   // Store OpenAPI detection result for Bridge 3
   ctx.shared.openApiDetected = openApiResult.detected;
+  ctx.shared.openApiHasWebhooks = openApiResult.hasWebhooks;
+  ctx.shared.openApiHasCallbacks = openApiResult.hasCallbacks;
   ctx.shared.llmsTxtBody = llmsTxtResult.body;
 
   // Collect all 8 checks in order

@@ -121,8 +121,8 @@ export const CHECK_EXPLANATIONS: Record<string, ExplanationEntry> = {
     default: "SDK and package references tell AI agents which languages your API supports and how to get started.",
   },
   webhook_support: {
-    pass: "Your webhook support lets AI agents build reactive workflows that respond to events in real-time.",
-    fail: "Without webhook signals, AI agents must poll your API for changes — a slower, less efficient integration pattern.",
+    pass: "AI agents can see your webhook support — they'll build reactive workflows that respond to your events in real-time.",
+    fail: "No webhook signals found in your OpenAPI spec, standards headers, or documentation — AI agents must poll your API for changes.",
     default: "Webhooks enable AI agents to receive real-time events instead of polling your API.",
   },
 };

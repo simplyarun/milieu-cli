@@ -152,8 +152,10 @@ describe("runSeparationBridge", () => {
     );
     // checkSdkReferences: 1st arg is ContentSource[]
     expect(checkSdkReferences).toHaveBeenCalledWith(expectedSources);
-    // checkWebhookSupport: 1st arg is ContentSource[]
-    expect(checkWebhookSupport).toHaveBeenCalledWith(expectedSources);
+    // checkWebhookSupport: 1st arg is ContentSource[], 2nd is options
+    expect(checkWebhookSupport).toHaveBeenCalledWith(expectedSources, expect.objectContaining({
+      pageHeaders: expect.any(Object),
+    }));
   });
 
   it("still passes pageBody to checkDeveloperDocs as 2nd argument", async () => {
@@ -207,7 +209,7 @@ describe("runSeparationBridge", () => {
     await runSeparationBridge(ctx);
     // Empty pageBody means no homepage ContentSource is added
     expect(checkSdkReferences).toHaveBeenCalledWith([]);
-    expect(checkWebhookSupport).toHaveBeenCalledWith([]);
+    expect(checkWebhookSupport).toHaveBeenCalledWith([], expect.any(Object));
     expect(checkDeveloperDocs).toHaveBeenCalledWith(
       expect.any(String),
       "",
@@ -266,7 +268,7 @@ describe("runSeparationBridge", () => {
     ];
 
     expect(checkSdkReferences).toHaveBeenCalledWith(expectedSources);
-    expect(checkWebhookSupport).toHaveBeenCalledWith(expectedSources);
+    expect(checkWebhookSupport).toHaveBeenCalledWith(expectedSources, expect.any(Object));
     expect(checkApiPresence).toHaveBeenCalledWith(
       expect.anything(),
       expectedSources,
@@ -286,6 +288,40 @@ describe("runSeparationBridge", () => {
     ];
 
     expect(checkSdkReferences).toHaveBeenCalledWith(expectedSources);
+  });
+
+  it("passes OpenAPI webhook flags and pageHeaders to checkWebhookSupport", async () => {
+    setupAllPass();
+    const ctx = makeCtx({
+      shared: {
+        pageBody: "<html>test</html>",
+        pageHeaders: { link: '<https://hub.example.com>; rel="hub"' },
+        openApiHasWebhooks: true,
+        openApiHasCallbacks: false,
+      },
+    });
+    await runSeparationBridge(ctx);
+    expect(checkWebhookSupport).toHaveBeenCalledWith(
+      expect.any(Array),
+      {
+        pageHeaders: { link: '<https://hub.example.com>; rel="hub"' },
+        openApiHasWebhooks: true,
+        openApiHasCallbacks: false,
+      },
+    );
+  });
+
+  it("defaults OpenAPI webhook flags to false when not in shared context", async () => {
+    setupAllPass();
+    const ctx = makeCtx(); // shared: {} — no OpenAPI flags
+    await runSeparationBridge(ctx);
+    expect(checkWebhookSupport).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({
+        openApiHasWebhooks: false,
+        openApiHasCallbacks: false,
+      }),
+    );
   });
 
   it("stores devDocsBodies in ctx.shared", async () => {
