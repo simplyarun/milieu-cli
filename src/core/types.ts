@@ -15,6 +15,8 @@ export interface Check {
   detail?: string;
   /** Optional structured data for JSON output (e.g., crawler directives, schema types) */
   data?: Record<string, unknown>;
+  /** Why this check result matters for AI agent readiness */
+  why?: string;
 }
 
 // === Content Source ===
