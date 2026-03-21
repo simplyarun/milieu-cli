@@ -55,7 +55,7 @@ function setupAllPass(): void {
     check: makeCheck("pass", "openapi_spec"),
     detected: true,
   });
-  vi.mocked(checkLlmsTxt).mockResolvedValue(makeCheck("pass", "llms_txt"));
+  vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: "# Example\n\nContent here" });
   vi.mocked(checkLlmsFullTxt).mockResolvedValue(
     makeCheck("pass", "llms_full_txt"),
   );
@@ -75,7 +75,7 @@ function setupAllFail(): void {
     check: makeCheck("fail", "openapi_spec"),
     detected: false,
   });
-  vi.mocked(checkLlmsTxt).mockResolvedValue(makeCheck("fail", "llms_txt"));
+  vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("fail", "llms_txt"), body: null });
   vi.mocked(checkLlmsFullTxt).mockResolvedValue(
     makeCheck("fail", "llms_full_txt"),
   );
@@ -137,7 +137,7 @@ describe("runStandardsBridge", () => {
       check: makeCheck("pass", "openapi_spec"),
       detected: true,
     });
-    vi.mocked(checkLlmsTxt).mockResolvedValue(makeCheck("pass", "llms_txt"));
+    vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: "# Example\n\nContent here" });
     vi.mocked(checkLlmsFullTxt).mockResolvedValue(
       makeCheck("pass", "llms_full_txt"),
     );
@@ -171,7 +171,7 @@ describe("runStandardsBridge", () => {
       check: makeCheck("pass", "openapi_spec"),
       detected: true,
     });
-    vi.mocked(checkLlmsTxt).mockResolvedValue(makeCheck("pass", "llms_txt"));
+    vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: "# Example\n\nContent here" });
     vi.mocked(checkLlmsFullTxt).mockResolvedValue(
       makeCheck("partial", "llms_full_txt"),
     );
@@ -232,5 +232,19 @@ describe("runStandardsBridge", () => {
     const result = await runStandardsBridge(makeCtx());
     expect(typeof result.durationMs).toBe("number");
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("stores llmsTxtBody in ctx.shared when llms.txt has content", async () => {
+    setupAllPass();
+    const ctx = makeCtx();
+    await runStandardsBridge(ctx);
+    expect(ctx.shared.llmsTxtBody).toBe("# Example\n\nContent here");
+  });
+
+  it("stores null llmsTxtBody in ctx.shared when llms.txt not found", async () => {
+    setupAllFail();
+    const ctx = makeCtx();
+    await runStandardsBridge(ctx);
+    expect(ctx.shared.llmsTxtBody).toBeNull();
   });
 });
