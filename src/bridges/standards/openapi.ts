@@ -8,12 +8,18 @@ import { httpGet } from "../../utils/http-client.js";
 export interface OpenApiResult {
   check: Check;
   detected: boolean;
+  /** OpenAPI 3.1+ top-level `webhooks` key found */
+  hasWebhooks: boolean;
+  /** OpenAPI 3.0+ `callbacks` found in any operation */
+  hasCallbacks: boolean;
 }
 
 interface OpenApiInfo {
   version: string;
   specType: "openapi" | "swagger";
   endpointCount: number;
+  hasWebhooks: boolean;
+  hasCallbacks: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +148,29 @@ function extractJsonInfo(body: string): OpenApiInfo | null {
     const endpointCount = parsed.paths
       ? Object.keys(parsed.paths).length
       : 0;
-    return { version, specType, endpointCount };
+
+    // OpenAPI 3.1+ top-level webhooks
+    const hasWebhooks =
+      parsed.webhooks != null &&
+      typeof parsed.webhooks === "object" &&
+      Object.keys(parsed.webhooks).length > 0;
+
+    // OpenAPI 3.0+ callbacks in any operation
+    let hasCallbacks = false;
+    if (parsed.paths && typeof parsed.paths === "object") {
+      for (const pathItem of Object.values(parsed.paths)) {
+        if (!pathItem || typeof pathItem !== "object") continue;
+        for (const op of Object.values(pathItem as Record<string, unknown>)) {
+          if (op && typeof op === "object" && "callbacks" in op) {
+            hasCallbacks = true;
+            break;
+          }
+        }
+        if (hasCallbacks) break;
+      }
+    }
+
+    return { version, specType, endpointCount, hasWebhooks, hasCallbacks };
   } catch {
     return null;
   }
@@ -157,10 +185,19 @@ function extractYamlInfo(body: string): OpenApiInfo | null {
 
   // Count paths in YAML (lines that start with / at indent level 2)
   const pathMatches = body.match(/^ {2}\/\S+:/gm);
+
+  // Top-level webhooks key (OpenAPI 3.1+)
+  const hasWebhooks = /^webhooks:/m.test(body);
+
+  // Callbacks nested under operations (indented 6+ spaces)
+  const hasCallbacks = /^ {6,}callbacks:/m.test(body);
+
   return {
     version: versionMatch[2],
     specType: versionMatch[1] as "openapi" | "swagger",
     endpointCount: pathMatches?.length ?? 0,
+    hasWebhooks,
+    hasCallbacks,
   };
 }
 
@@ -323,6 +360,8 @@ export async function checkOpenApi(
             },
           },
           detected: true,
+          hasWebhooks: info.hasWebhooks,
+          hasCallbacks: info.hasCallbacks,
         };
       }
     }
@@ -343,6 +382,8 @@ export async function checkOpenApi(
           },
         },
         detected: true,
+        hasWebhooks: yamlInfo.hasWebhooks,
+        hasCallbacks: yamlInfo.hasCallbacks,
       };
     }
   }
@@ -440,6 +481,8 @@ export async function checkOpenApi(
               },
             },
             detected: true,
+            hasWebhooks: info.hasWebhooks,
+            hasCallbacks: info.hasCallbacks,
           };
         }
       }
@@ -460,6 +503,8 @@ export async function checkOpenApi(
             },
           },
           detected: true,
+          hasWebhooks: yamlInfo.hasWebhooks,
+          hasCallbacks: yamlInfo.hasCallbacks,
         };
       }
     }
@@ -478,6 +523,8 @@ export async function checkOpenApi(
           data: { protected: true, path: SPEC_PATHS[i] },
         },
         detected: true,
+        hasWebhooks: false,
+        hasCallbacks: false,
       };
     }
   }
@@ -491,5 +538,7 @@ export async function checkOpenApi(
       detail: "No OpenAPI spec found",
     },
     detected: false,
+    hasWebhooks: false,
+    hasCallbacks: false,
   };
 }
