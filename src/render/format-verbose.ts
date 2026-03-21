@@ -7,7 +7,11 @@ export function formatVerboseChecks(checks: Check[]): string {
     .map((check) => {
       const symbol = statusSymbol(check.status);
       const detail = check.detail ? dim(` (${check.detail})`) : "";
-      return `    ${symbol} ${check.label}${detail}`;
+      const why =
+        check.why && check.status !== "pass"
+          ? `\n      ${dim(check.why)}`
+          : "";
+      return `    ${symbol} ${check.label}${detail}${why}`;
     })
     .join("\n");
 }
