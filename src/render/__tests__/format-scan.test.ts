@@ -88,11 +88,11 @@ const mockScanResult: ScanResult = {
 describe("formatScanOutput", () => {
   it("TERM-01: contains all 5 bridges", () => {
     const output = stripAnsi(formatScanOutput(mockScanResult, false));
-    expect(output).toContain("Bridge 1");
-    expect(output).toContain("Bridge 2");
-    expect(output).toContain("Bridge 3");
-    expect(output).toContain("Bridge 4");
-    expect(output).toContain("Bridge 5");
+    expect(output).toContain("Reachability:");
+    expect(output).toContain("Standards:");
+    expect(output).toContain("Separation:");
+    expect(output).toContain("Schema:");
+    expect(output).toContain("Context:");
   });
 
   it("TERM-06: formats timestamp as YYYY-MM-DD HH:mm:ss (not raw ISO)", () => {
