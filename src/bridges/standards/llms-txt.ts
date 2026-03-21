@@ -1,6 +1,11 @@
 import type { Check } from "../../core/types.js";
 import { httpGet } from "../../utils/http-client.js";
 
+export interface LlmsTxtResult {
+  check: Check;
+  body: string | null;
+}
+
 /**
  * Check for llms.txt at the domain root.
  *
@@ -10,18 +15,18 @@ import { httpGet } from "../../utils/http-client.js";
 export async function checkLlmsTxt(
   baseUrl: string,
   timeout?: number,
-): Promise<Check> {
+): Promise<LlmsTxtResult> {
   const id = "llms_txt";
   const label = "llms.txt";
 
   const result = await httpGet(`${baseUrl}/llms.txt`, { timeout });
 
   if (!result.ok) {
-    return { id, label, status: "fail", detail: "No llms.txt found" };
+    return { check: { id, label, status: "fail", detail: "No llms.txt found" }, body: null };
   }
 
   if (result.body.trim().length === 0) {
-    return { id, label, status: "fail", detail: "No llms.txt found" };
+    return { check: { id, label, status: "fail", detail: "No llms.txt found" }, body: null };
   }
 
   const sizeBytes = new TextEncoder().encode(result.body).byteLength;
@@ -29,20 +34,26 @@ export async function checkLlmsTxt(
 
   if (/^#\s+\S/.test(firstLine)) {
     return {
-      id,
-      label,
-      status: "pass",
-      detail: `llms.txt found (${sizeBytes} bytes)`,
-      data: { sizeBytes, firstLine },
+      check: {
+        id,
+        label,
+        status: "pass",
+        detail: `llms.txt found (${sizeBytes} bytes)`,
+        data: { sizeBytes, firstLine },
+      },
+      body: result.body,
     };
   }
 
   return {
-    id,
-    label,
-    status: "partial",
-    detail: "llms.txt found but missing H1 header",
-    data: { sizeBytes, firstLine },
+    check: {
+      id,
+      label,
+      status: "partial",
+      detail: "llms.txt found but missing H1 header",
+      data: { sizeBytes, firstLine },
+    },
+    body: result.body,
   };
 }
 
