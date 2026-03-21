@@ -33,7 +33,10 @@ const mockScanResult = {
       status: "evaluated",
       score: 85,
       scoreLabel: "pass",
-      checks: [],
+      checks: [
+        { id: "https_available", label: "HTTPS Available", status: "pass" as const },
+        { id: "robots_txt", label: "robots.txt", status: "fail" as const, detail: "No robots.txt found" },
+      ],
       durationMs: 200,
     },
     {
@@ -72,7 +75,7 @@ const mockScanResult = {
       checks: [],
       durationMs: 0,
     },
-  ] as const,
+  ],
 };
 
 // --- Import after mocks ---
@@ -89,7 +92,7 @@ describe("CLI", () => {
     stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     savedExitCode = process.exitCode;
     process.exitCode = undefined as unknown as number;
-    mockScan.mockResolvedValue(mockScanResult);
+    mockScan.mockImplementation(() => Promise.resolve(structuredClone(mockScanResult)));
   });
 
   afterEach(() => {
@@ -259,5 +262,44 @@ describe("CLI", () => {
     // Error should go to stdout (not stderr) in JSON mode
     const stderrOutput = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
     expect(stderrOutput).toBe("");
+  });
+
+  // Test 12: --json output includes why field on checks
+  it("--json output includes why field on checks", async () => {
+    const program = createProgram();
+    await program.parseAsync(["node", "milieu", "scan", "https://example.com", "--json"]);
+
+    const output = stdoutSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
+    const parsed = JSON.parse(output.trim());
+    const robotsCheck = parsed.bridges[0].checks.find(
+      (c: { id: string }) => c.id === "robots_txt",
+    );
+    expect(robotsCheck).toBeDefined();
+    expect(typeof robotsCheck.why).toBe("string");
+    expect(robotsCheck.why.length).toBeGreaterThan(0);
+  });
+
+  // Test 13: --json why field is status-aware
+  it("--json why field is status-aware", async () => {
+    const program = createProgram();
+    await program.parseAsync(["node", "milieu", "scan", "https://example.com", "--json"]);
+
+    const output = stdoutSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
+    const parsed = JSON.parse(output.trim());
+    const robotsCheck = parsed.bridges[0].checks.find(
+      (c: { id: string }) => c.id === "robots_txt",
+    );
+    // robots_txt has status "fail", so why should contain the fail-specific text
+    expect(robotsCheck.why).toContain("no guidance");
+  });
+
+  // Test 14: library scan() result does NOT include why field
+  it("library scan() result does NOT include why field", () => {
+    const raw = structuredClone(mockScanResult);
+    for (const bridge of raw.bridges) {
+      for (const check of bridge.checks) {
+        expect((check as Record<string, unknown>).why).toBeUndefined();
+      }
+    }
   });
 });

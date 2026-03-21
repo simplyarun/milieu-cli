@@ -2,6 +2,7 @@
 import { Command } from "commander";
 import { scan } from "../core/scan.js";
 import { getVersion } from "../core/version.js";
+import { resolveExplanation } from "../core/explanations.js";
 import { formatScanOutput } from "../render/format-scan.js";
 
 export function buildProgram(): Command {
@@ -40,6 +41,13 @@ export function buildProgram(): Command {
             verbose,
             silent: jsonMode || quiet,
           });
+
+          // Attach "why this matters" explanations to each check
+          for (const bridge of result.bridges) {
+            for (const check of bridge.checks) {
+              check.why = resolveExplanation(check.id, check.status);
+            }
+          }
 
           if (jsonMode) {
             const output = opts.pretty
