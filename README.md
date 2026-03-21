@@ -1,8 +1,16 @@
 # milieu-cli
 
-API is the new product UI. Find out if AI agents can discover, use, and integrate your product.
+The API is the new product UI. Your customers are no longer just humans — they're AI agents, LLM pipelines, and automated workflows. These customers don't browse your marketing site or read your docs the way people do. They parse your machine-readable signals, probe your endpoints, and decide in milliseconds whether your product is usable.
 
-A Lighthouse for the agentic web. No API keys required.
+We've spent decades perfecting UI design for humans. Now we need the same rigor for the interface AI agents actually see: your product's **milieu**.
+
+## What is milieu?
+
+*Milieu* is the totality of machine-readable signals that surround your product — the environment an AI agent encounters when it tries to discover, understand, and integrate with what you've built. It's not any single file or endpoint. It's robots.txt and OpenAPI specs and llms.txt and JSON-LD and developer docs and SDK references, all working together. It's the difference between a product that AI agents can use and one they walk past.
+
+Good UI design made products usable for humans. Good milieu design makes products usable for agents.
+
+milieu-cli measures this. It scans your site and tells you what AI agents can actually see.
 
 ```bash
 npx milieu-cli scan stripe.com
@@ -13,17 +21,29 @@ npx milieu-cli scan stripe.com
 milieu scan api.mycompany.com --threshold 70
 ```
 
-## What it checks
+## The 5 Bridges
 
-| | Question | What milieu checks | Score |
-|---|---|---|---|
-| **Bridge 1: Reachability** | **Is my site accessible to AI agents?** | HTTPS, HTTP status, robots.txt (RFC 9309), per-bot crawler policies (GPTBot, ClaudeBot, CCBot, Googlebot, Bingbot, PerplexityBot), meta robots, X-Robots-Tag | 0–100 |
-| **Bridge 2: Standards** | **Does my site publish machine-readable standards?** | OpenAPI spec, llms.txt, llms-full.txt, MCP endpoint, JSON-LD, Schema.org, security.txt, ai-plugin.json | 0–100 |
-| **Bridge 3: Separation** | **Does my site expose API infrastructure?** | API endpoints, developer docs, SDK/package references, webhook support | Detection only* |
-| **Bridge 4: Schema** | **Can agents use the APIs correctly?** | Planned | — |
-| **Bridge 5: Context** | **Can agents trust and leverage the context?** | Planned | — |
+milieu evaluates your product through five progressive bridges — each one represents a layer of machine legibility that AI agents need, from "can I reach you?" to "can I trust you?"
+
+| | Bridge | Question | What milieu checks | Score |
+|---|---|---|---|---|
+| 1 | **Reachability** | **Can agents reach you?** | HTTPS, HTTP status, robots.txt (RFC 9309), per-bot crawler policies (GPTBot, ClaudeBot, CCBot, Googlebot, Bingbot, PerplexityBot), meta robots, X-Robots-Tag | 0–100 |
+| 2 | **Standards** | **Can agents read you?** | OpenAPI spec, llms.txt, llms-full.txt, MCP endpoint, JSON-LD, Schema.org, security.txt, ai-plugin.json | 0–100 |
+| 3 | **Separation** | **Can agents integrate with you?** | API endpoints, developer docs, SDK/package references, webhook support | Detection only* |
+| 4 | **Schema** | **Can agents use you correctly?** | Planned | — |
+| 5 | **Context** | **Can agents trust you?** | Planned | — |
 
 *Bridge 3 reports what's present rather than scoring quality.
+
+The bridges are progressive: there's no point checking your OpenAPI spec (Bridge 2) if agents can't even reach your site (Bridge 1). There's no point looking for SDK references (Bridge 3) if you don't publish machine-readable standards (Bridge 2). Each bridge builds on the last.
+
+**Bridge 1 — Reachability** is the front door. Can AI agents get to your content at all? Are you blocking specific crawlers without realizing it? This is the most actionable bridge for most sites — many are unknowingly blocking GPTBot or ClaudeBot in their robots.txt.
+
+**Bridge 2 — Standards** is the shared language. Do you speak the protocols AI agents understand? OpenAPI specs, llms.txt, MCP endpoints, structured data — these are the machine-readable standards that let agents go beyond scraping your HTML.
+
+**Bridge 3 — Separation** is the developer surface. Do you have a clear API boundary? Developer docs? SDKs? Webhooks? This is where agents look to determine if your product is something they can build with, not just read from.
+
+**Bridges 4-5 — Schema and Context** are deeper evaluations of whether your APIs are well-designed and whether agents can trust the data. These require analysis beyond automated checks.
 
 ### Crawler policies
 
@@ -74,7 +94,9 @@ Exit codes: `0` = score meets threshold (or no threshold set), `1` = score below
 
 ### Check explanations
 
-In `--verbose` mode, non-passing checks include a "why this matters" explanation — a plain-language sentence describing what the result means for AI agents. These explanations also appear in `--json` output as a `why` field on every check, for both human readers and LLMs generating recommendations.
+In `--verbose` mode, non-passing checks include a "why this matters" explanation — a plain-language sentence describing what the result means for AI agents. These explanations are status-aware: a failing robots.txt check tells you agents have no crawling guidance, while a passing one confirms your guidance is clear.
+
+These explanations also appear in `--json` output as a `why` field on every check, designed for both human readers and LLMs generating recommendations.
 
 ## How scoring works
 
@@ -110,6 +132,16 @@ console.log(result.bridges);           // 5-element tuple of BridgeResult
 > ```typescript
 > const scoredBridges = result.bridges.filter(b => b.score !== null);
 > ```
+
+Check explanations are available as a separate export for library consumers:
+
+```typescript
+import { resolveExplanation } from "milieu-cli";
+
+// Get the status-aware explanation for a check
+const why = resolveExplanation("robots_txt", "fail");
+// → "Without robots.txt, AI agents have no guidance on what they can access..."
+```
 
 ## Requirements
 
