@@ -21,7 +21,7 @@ describe("formatBridge", () => {
       durationMs: 230,
     };
     const output = stripAnsi(formatBridge(bridge, false));
-    expect(output).toContain("Bridge 1: Reachability");
+    expect(output).toContain("Reachability: Is my site accessible to AI agents?");
     expect(output).toContain("85");
     expect(output).toContain("(230ms)");
   });
@@ -37,7 +37,7 @@ describe("formatBridge", () => {
       durationMs: 1450,
     };
     const output = stripAnsi(formatBridge(bridge, false));
-    expect(output).toContain("Bridge 2: Standards");
+    expect(output).toContain("Standards: Does my site publish machine-readable standards?");
     expect(output).toContain("42");
     expect(output).toContain("(1450ms)");
   });
@@ -58,7 +58,7 @@ describe("formatBridge", () => {
       durationMs: 320,
     };
     const output = stripAnsi(formatBridge(bridge, false));
-    expect(output).toContain("Bridge 3: Separation");
+    expect(output).toContain("Separation: Does my site expose API infrastructure?");
     expect(output).toContain("3 of 4 signals detected");
     expect(output).toContain("(320ms)");
   });
@@ -76,7 +76,7 @@ describe("formatBridge", () => {
         "Schema quality assessment requires deeper analysis beyond automated checks.",
     };
     const output = stripAnsi(formatBridge(bridge, false));
-    expect(output).toContain("Bridge 4: Schema");
+    expect(output).toContain("Schema: Can agents use the APIs correctly?");
     expect(output).toContain("not evaluated");
     expect(output).not.toContain("ms");
   });
@@ -94,7 +94,7 @@ describe("formatBridge", () => {
         "Context evaluation requires deeper analysis beyond automated checks.",
     };
     const output = stripAnsi(formatBridge(bridge, false));
-    expect(output).toContain("Bridge 5: Context");
+    expect(output).toContain("Context: Can agents trust and leverage the context?");
     expect(output).toContain("not evaluated");
     expect(output).not.toContain("ms");
   });

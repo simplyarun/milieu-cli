@@ -40,6 +40,30 @@ function make404(): HttpFailure {
   };
 }
 
+function make401(): HttpFailure {
+  return {
+    ok: false,
+    error: {
+      kind: "http_error",
+      message: "HTTP 401 Unauthorized",
+      statusCode: 401,
+      url: "https://example.com",
+    },
+  };
+}
+
+function make403(): HttpFailure {
+  return {
+    ok: false,
+    error: {
+      kind: "http_error",
+      message: "HTTP 403 Forbidden",
+      statusCode: 403,
+      url: "https://example.com",
+    },
+  };
+}
+
 function makeOpenApiJson(version = "3.1.0", paths: Record<string, unknown> = {}): string {
   return JSON.stringify({ openapi: version, info: { title: "Test" }, paths });
 }
@@ -191,7 +215,7 @@ describe("checkOpenApi", () => {
     expect(result.detected).toBe(false);
   });
 
-  it('returns fail with "No OpenAPI spec found" when all 9 paths return 404', async () => {
+  it('returns fail with "No OpenAPI spec found" when all paths return 404', async () => {
     mockHttpGet.mockResolvedValue(make404());
 
     const result = await checkOpenApi("https://example.com");
@@ -269,16 +293,16 @@ describe("checkOpenApi", () => {
     expect(result.detected).toBe(true);
   });
 
-  it("probes exactly 9 paths", async () => {
+  it("probes exactly 24 paths", async () => {
     mockHttpGet.mockResolvedValue(make404());
 
     await checkOpenApi("https://example.com");
 
-    // httpGet should be called exactly 9 times (one per path)
-    expect(mockHttpGet).toHaveBeenCalledTimes(9);
+    // httpGet should be called exactly 24 times (17 spec + 7 doc UI)
+    expect(mockHttpGet).toHaveBeenCalledTimes(24);
   });
 
-  it("fires all 9 requests in parallel via Promise.all", async () => {
+  it("fires all 24 requests in parallel via Promise.all", async () => {
     const callOrder: string[] = [];
     let resolveCount = 0;
 
@@ -291,9 +315,9 @@ describe("checkOpenApi", () => {
 
     await checkOpenApi("https://example.com");
 
-    // All 9 calls were initiated
-    expect(callOrder).toHaveLength(9);
-    expect(resolveCount).toBe(9);
+    // All 24 calls were initiated
+    expect(callOrder).toHaveLength(24);
+    expect(resolveCount).toBe(24);
   });
 
   it("rejects application/xhtml+xml Content-Type as HTML", async () => {
@@ -540,5 +564,424 @@ paths:
       version: "3.0.1",
     });
     expect(result.detected).toBe(true);
+  });
+
+  // --- 401/403 Detection Tests ---
+
+  it("returns partial with protected:true for 401 on spec path", async () => {
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/openapi.json")) {
+        return make401();
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("partial");
+    expect(result.detected).toBe(true);
+    expect(result.check.data).toMatchObject({
+      protected: true,
+      path: "/openapi.json",
+    });
+    expect(result.check.detail).toContain("authentication");
+  });
+
+  it("returns partial with protected:true for 403 on spec path", async () => {
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/swagger.json")) {
+        return make403();
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("partial");
+    expect(result.detected).toBe(true);
+    expect(result.check.data).toMatchObject({
+      protected: true,
+      path: "/swagger.json",
+    });
+  });
+
+  it("direct spec hit wins over 401 on another path", async () => {
+    const body = makeOpenApiJson("3.0.0", { "/test": {} });
+
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/openapi.json")) {
+        return make401();
+      }
+      if (url.endsWith("/swagger.json")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "application/json" },
+          body,
+        });
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("pass");
+    expect(result.check.data).toMatchObject({ path: "/swagger.json" });
+    expect(result.check.data).not.toHaveProperty("protected");
+  });
+
+  it("401 on doc UI path (/docs) is NOT reported as protected", async () => {
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/docs")) {
+        return {
+          ok: false,
+          error: {
+            kind: "http_error" as const,
+            message: "HTTP 401 Unauthorized",
+            statusCode: 401,
+            url,
+          },
+        };
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("fail");
+    expect(result.detected).toBe(false);
+  });
+
+  it("bot-protected 403 (Cloudflare) is NOT reported as protected", async () => {
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/openapi.json")) {
+        return {
+          ok: false,
+          error: {
+            kind: "bot_protected" as const,
+            message: "Bot protection detected",
+            statusCode: 403,
+            url,
+          },
+        };
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("fail");
+    expect(result.detected).toBe(false);
+  });
+
+  // --- HTML Spec Extraction Tests ---
+
+  it("extracts spec URL from Swagger UI HTML and returns pass", async () => {
+    const swaggerHtml = `<!DOCTYPE html>
+<html><head><title>Swagger UI</title></head>
+<body>
+<script>
+SwaggerUIBundle({ url: "/v1/api-spec.json", dom_id: "#swagger-ui" })
+</script>
+</body></html>`;
+
+    const specBody = makeOpenApiJson("3.1.0", { "/users": {}, "/items": {} });
+
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/docs")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "text/html" },
+          body: swaggerHtml,
+        });
+      }
+      if (url.endsWith("/v1/api-spec.json")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "application/json" },
+          body: specBody,
+        });
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("pass");
+    expect(result.detected).toBe(true);
+    expect(result.check.data).toMatchObject({
+      version: "3.1.0",
+      endpointCount: 2,
+      path: "/v1/api-spec.json",
+    });
+  });
+
+  it("extracts spec URL from ReDoc HTML with spec-url attribute", async () => {
+    const redocHtml = `<!DOCTYPE html>
+<html><body>
+<redoc spec-url="/api/v2/openapi.yaml"></redoc>
+</body></html>`;
+
+    const yamlBody = `openapi: "3.0.2"
+info:
+  title: Test
+paths:
+  /data:
+    get:
+      summary: Get data`;
+
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/redoc")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "text/html" },
+          body: redocHtml,
+        });
+      }
+      if (url.endsWith("/api/v2/openapi.yaml")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "application/yaml" },
+          body: yamlBody,
+        });
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("partial");
+    expect(result.detected).toBe(true);
+    expect(result.check.data).toMatchObject({
+      version: "3.0.2",
+      path: "/api/v2/openapi.yaml",
+    });
+  });
+
+  it("HTML with no extractable URL continues to Phase 4/5", async () => {
+    const plainHtml = `<!DOCTYPE html>
+<html><body><h1>API Documentation</h1><p>No spec here</p></body></html>`;
+
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/docs")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "text/html" },
+          body: plainHtml,
+        });
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("fail");
+    expect(result.detected).toBe(false);
+  });
+
+  it("extracted URL matching already-probed path is skipped (no duplicate fetch)", async () => {
+    // Swagger UI HTML that references /openapi.json (already in SPEC_PATHS)
+    const swaggerHtml = `<!DOCTYPE html>
+<script>SwaggerUIBundle({ url: "/openapi.json" })</script>`;
+
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/docs")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "text/html" },
+          body: swaggerHtml,
+        });
+      }
+      return make404();
+    });
+
+    await checkOpenApi("https://example.com");
+
+    // Should only have the initial 24 calls, no secondary fetch for /openapi.json
+    expect(mockHttpGet).toHaveBeenCalledTimes(24);
+  });
+
+  it("cross-origin extracted URL is rejected, not fetched", async () => {
+    const swaggerHtml = `<!DOCTYPE html>
+<script>SwaggerUIBundle({ url: "https://other-host.com/openapi.json" })</script>`;
+
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/docs")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "text/html" },
+          body: swaggerHtml,
+        });
+      }
+      return make404();
+    });
+
+    await checkOpenApi("https://example.com");
+
+    // No secondary fetch -- only the 24 primary probes
+    expect(mockHttpGet).toHaveBeenCalledTimes(24);
+  });
+
+  it("max 3 secondary fetches enforced", async () => {
+    const swaggerHtml = `<!DOCTYPE html>
+<script>
+SwaggerUIBundle({ url: "/custom1/spec.json" })
+swaggerUrl: "/custom2/spec.json"
+"/custom3/openapi.json"
+"/custom4/swagger.yaml"
+"/custom5/openapi.yaml"
+</script>`;
+
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/docs")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "text/html" },
+          body: swaggerHtml,
+        });
+      }
+      return make404();
+    });
+
+    await checkOpenApi("https://example.com");
+
+    // 24 primary + 3 secondary (capped)
+    expect(mockHttpGet).toHaveBeenCalledTimes(27);
+  });
+
+  // --- Path Expansion Tests ---
+
+  it("finds YAML spec at /openapi.yaml", async () => {
+    const yamlBody = `openapi: "3.0.0"
+info:
+  title: YAML Test
+paths:
+  /test:
+    get:
+      summary: Test`;
+
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/openapi.yaml")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "application/yaml" },
+          body: yamlBody,
+        });
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("partial");
+    expect(result.check.data).toMatchObject({
+      version: "3.0.0",
+      path: "/openapi.yaml",
+    });
+    expect(result.detected).toBe(true);
+  });
+
+  it("fetches external swagger config script and extracts spec URL", async () => {
+    // HTML references an external swagger-initializer.js (no inline spec URL)
+    const swaggerHtml = `<!DOCTYPE html>
+<html><body>
+<script src="./swagger-ui-bundle.js"></script>
+<script src="./swagger-initializer.js"></script>
+</body></html>`;
+
+    // The JS file contains the spec URL
+    const initializerJs = `window.onload = function() {
+  SwaggerUIBundle({ url: "/v2/custom-spec.json", dom_id: "#swagger-ui" })
+}`;
+
+    const specBody = makeOpenApiJson("3.0.0", { "/pets": {} });
+
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/docs")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "text/html" },
+          body: swaggerHtml,
+        });
+      }
+      if (url.endsWith("/swagger-initializer.js")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "application/javascript" },
+          body: initializerJs,
+        });
+      }
+      if (url.endsWith("/v2/custom-spec.json")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "application/json" },
+          body: specBody,
+        });
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("pass");
+    expect(result.detected).toBe(true);
+    expect(result.check.data).toMatchObject({
+      version: "3.0.0",
+      path: "/v2/custom-spec.json",
+    });
+  });
+
+  it("extracts full URL from external script (e.g. petstore pattern)", async () => {
+    const swaggerHtml = `<!DOCTYPE html>
+<html><body>
+<script src="./swagger-initializer.js"></script>
+</body></html>`;
+
+    // Petstore-style: full URL in a variable
+    const initializerJs = `const defaultUrl = "https://example.com/v2/swagger.json";
+SwaggerUIBundle({ url: defaultUrl })`;
+
+    const specBody = makeSwaggerJson("2.0", { "/pets": {}, "/users": {} });
+
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/docs")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "text/html" },
+          body: swaggerHtml,
+        });
+      }
+      if (url.endsWith("/swagger-initializer.js")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "application/javascript" },
+          body: initializerJs,
+        });
+      }
+      if (url.endsWith("/v2/swagger.json")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "application/json" },
+          body: specBody,
+        });
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("pass");
+    expect(result.detected).toBe(true);
+    expect(result.check.data).toMatchObject({
+      specType: "swagger",
+      version: "2.0",
+    });
+  });
+
+  it("sends correct Accept headers for spec vs doc UI paths", async () => {
+    mockHttpGet.mockResolvedValue(make404());
+
+    await checkOpenApi("https://example.com");
+
+    for (const call of mockHttpGet.mock.calls) {
+      const url = call[0] as string;
+      const opts = call[1] as { headers?: Record<string, string> };
+      const path = new URL(url).pathname;
+
+      const docUiPaths = ["/", "/swagger-ui.html", "/swagger-ui/", "/docs", "/redoc", "/api/docs", "/documentation"];
+      if (docUiPaths.includes(path)) {
+        expect(opts.headers?.Accept).toBe("text/html, */*");
+      } else {
+        expect(opts.headers?.Accept).toBe("application/json, application/yaml, */*");
+      }
+    }
   });
 });
