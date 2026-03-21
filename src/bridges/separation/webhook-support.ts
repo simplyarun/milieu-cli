@@ -22,6 +22,12 @@ const MARKDOWN_PATTERNS: { pattern: RegExp; signal: string }[] = [
   { pattern: /^#{1,6}\s+.*webhook/gim, signal: "webhook heading (markdown)" },
 ];
 
+/** Structured data patterns — catches webhook paths in JSON state, JS config, etc. */
+const STRUCTURED_PATTERNS: { pattern: RegExp; signal: string }[] = [
+  // Matches "/path/webhooks" or "\\u002Fpath\\u002Fwebhooks" in JSON/JS
+  { pattern: /["'](?:\/|\\u002[Ff])[^"']*webhook[^"']*["']/gi, signal: "webhook path" },
+];
+
 /**
  * Detect webhook support signals across multiple content sources.
  *
@@ -31,6 +37,7 @@ const MARKDOWN_PATTERNS: { pattern: RegExp; signal: string }[] = [
  * 3. HTML headings (h1-h6) containing "webhook"
  * 4. Markdown links containing "webhook"
  * 5. Markdown headings containing "webhook"
+ * 6. URL paths containing "webhook" in structured data (JSON state, JS config)
  *
  * Avoids matching arbitrary paragraph text to reduce false positives
  * from blog content or incidental mentions.
@@ -58,6 +65,15 @@ export function checkWebhookSupport(sources: ContentSource[]): Check {
 
     // Markdown patterns
     for (const { pattern, signal } of MARKDOWN_PATTERNS) {
+      pattern.lastIndex = 0;
+      if (!signals.includes(signal) && pattern.test(content)) {
+        signals.push(signal);
+        sourceContributed = true;
+      }
+    }
+
+    // Structured data patterns (JSON state, JS config)
+    for (const { pattern, signal } of STRUCTURED_PATTERNS) {
       pattern.lastIndex = 0;
       if (!signals.includes(signal) && pattern.test(content)) {
         signals.push(signal);
