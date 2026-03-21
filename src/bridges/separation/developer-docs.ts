@@ -70,9 +70,10 @@ export async function checkDeveloperDocs(
   const reachablePaths: string[] = [];
   const pages: ContentSource[] = [];
   for (let i = 0; i < DOC_PATHS.length; i++) {
-    if (results[i].ok) {
+    const response = results[i];
+    if (response.ok) {
       reachablePaths.push(DOC_PATHS[i]);
-      pages.push({ content: results[i].body, source: DOC_PATHS[i] });
+      pages.push({ content: response.body, source: DOC_PATHS[i] });
     }
   }
 
