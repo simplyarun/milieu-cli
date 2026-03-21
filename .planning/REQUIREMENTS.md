@@ -18,15 +18,15 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Reachability (Bridge 1)
 
-- [ ] **REACH-01**: User can see whether HTTPS is available for the target domain (HEAD request, SSL validity)
-- [ ] **REACH-02**: User can see HTTP status of target URL with redirect tracking (200/301/302/4xx/5xx)
-- [ ] **REACH-03**: User can see whether robots.txt exists, is parseable, and how many rules it contains
+- [x] **REACH-01**: User can see whether HTTPS is available for the target domain (HEAD request, SSL validity)
+- [x] **REACH-02**: User can see HTTP status of target URL with redirect tracking (200/301/302/4xx/5xx)
+- [x] **REACH-03**: User can see whether robots.txt exists, is parseable, and how many rules it contains
 - [x] **REACH-04**: User can see per-AI-crawler policy for GPTBot, ClaudeBot, CCBot, Googlebot, Bingbot, PerplexityBot (allowed/partial/blocked)
 - [x] **REACH-05**: robots.txt parser is RFC 9309 compliant (BOM stripping, CRLF, group boundaries, Allow/Disallow precedence, wildcard rules, empty Disallow semantics)
 - [x] **REACH-06**: User can see meta robots tags from HTML head (noindex, nofollow detection)
 - [x] **REACH-07**: User can see X-Robots-Tag HTTP response header directives
-- [ ] **REACH-08**: Bridge 1 score calculated as (passed_checks / total_checks * 100) with pass/partial/fail status
-- [ ] **REACH-09**: If target is completely unreachable (DNS failure, connection refused), scan aborts with clear error — no further bridges attempted
+- [x] **REACH-08**: Bridge 1 score calculated as (passed_checks / total_checks * 100) with pass/partial/fail status
+- [x] **REACH-09**: If target is completely unreachable (DNS failure, connection refused), scan aborts with clear error — no further bridges attempted
 
 ### Standards (Bridge 2)
 
@@ -145,15 +145,15 @@ Deferred to future release. Tracked but not in current roadmap.
 | FOUND-04 | Phase 2 | Complete |
 | FOUND-05 | Phase 2 | Complete |
 | FOUND-06 | Phase 2 | Complete |
-| REACH-01 | Phase 3 | Pending |
-| REACH-02 | Phase 3 | Pending |
-| REACH-03 | Phase 3 | Pending |
+| REACH-01 | Phase 3 | Complete |
+| REACH-02 | Phase 3 | Complete |
+| REACH-03 | Phase 3 | Complete |
 | REACH-04 | Phase 3 | Complete |
 | REACH-05 | Phase 3 | Complete |
 | REACH-06 | Phase 3 | Complete |
 | REACH-07 | Phase 3 | Complete |
-| REACH-08 | Phase 3 | Pending |
-| REACH-09 | Phase 3 | Pending |
+| REACH-08 | Phase 3 | Complete |
+| REACH-09 | Phase 3 | Complete |
 | STND-01 | Phase 4 | Complete |
 | STND-02 | Phase 4 | Complete |
 | STND-03 | Phase 4 | Complete |
