@@ -2,3 +2,7 @@ node_modules/
 dist/
 *.tsbuildinfo
 .DS_Store
+
+# Internal planning docs — never commit publicly
+.planning/
+docs/superpowers/
