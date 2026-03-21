@@ -17,6 +17,16 @@ export interface Check {
   data?: Record<string, unknown>;
 }
 
+// === Content Source ===
+
+/** A text content blob with its source label, used for multi-source signal scanning */
+export interface ContentSource {
+  /** The text content to scan */
+  content: string;
+  /** Human-readable source label (e.g., "homepage", "llms.txt", "/docs") */
+  source: string;
+}
+
 // === Bridge Types ===
 
 /** Bridge identifiers (1-5) */
