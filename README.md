@@ -4,6 +4,19 @@ The API is the new product UI. Your customers are no longer just humans. They're
 
 As an industry, we've spent decades perfecting UI & UX design for humans. Now we need the same rigor for the interface AI agents actually see: your product's **milieu**.
 
+## Table of contents
+
+- [What is milieu?](#what-is-milieu)
+- [Quick start](#quick-start)
+- [The 5 Bridges](#the-5-bridges)
+- [Install](#install)
+- [CI/CD integration](#cicd-integration)
+- [Options](#options)
+- [How scoring works](#how-scoring-works)
+- [Programmatic API](#programmatic-api)
+- [Requirements](#requirements)
+- [License](#license)
+
 ## What is milieu?
 
 *Milieu* is the totality of machine-readable signals that surround your product — the environment an AI agent encounters when it tries to discover, understand, and integrate with what you've built. It's not any single file or endpoint. It's robots.txt and OpenAPI specs and llms.txt and JSON-LD and developer docs and SDK references, all working together. It's the difference between a product that AI agents can use and one they walk past.
@@ -20,6 +33,39 @@ npx milieu-cli scan petstore.swagger.io
 # Gate your pipeline on agent-readiness
 milieu scan api.example.com --threshold 70
 ```
+
+## Quick start
+
+Run your first scan in under a minute:
+
+```bash
+npx milieu-cli scan petstore.swagger.io
+```
+
+No config, no API keys. You'll get a scored report showing what AI agents can see when they visit that site.
+
+### Example sites to try
+
+Each of these exercises different parts of the scanner:
+
+```bash
+# The classic OpenAPI demo — Swagger spec at a well-known path
+npx milieu-cli scan petstore.swagger.io
+
+# Rich structured data — JSON-LD and Schema.org markup
+npx milieu-cli scan schema.org
+
+# Minimal API service — clean reachability, few standards signals
+npx milieu-cli scan httpbin.org
+```
+
+Add `--verbose` to any scan to see individual check results and explanations:
+
+```bash
+npx milieu-cli scan petstore.swagger.io --verbose
+```
+
+Once you've seen how these score, scan your own site and compare.
 
 ## The 5 Bridges
 
@@ -63,39 +109,6 @@ milieu scan petstore.swagger.io           # short alias after install
 ```
 
 > Both `milieu` and `milieu-cli` work as commands after global install.
-
-## Quick start
-
-Run your first scan in under a minute:
-
-```bash
-npx milieu-cli scan petstore.swagger.io
-```
-
-No config, no API keys. You'll get a scored report showing what AI agents can see when they visit that site.
-
-### Example sites to try
-
-Each of these exercises different parts of the scanner:
-
-```bash
-# The classic OpenAPI demo — Swagger spec at a well-known path
-npx milieu-cli scan petstore.swagger.io
-
-# Rich structured data — JSON-LD and Schema.org markup
-npx milieu-cli scan schema.org
-
-# Minimal API service — clean reachability, few standards signals
-npx milieu-cli scan httpbin.org
-```
-
-Add `--verbose` to any scan to see individual check results and explanations:
-
-```bash
-npx milieu-cli scan petstore.swagger.io --verbose
-```
-
-Once you've seen how these score, scan your own site and compare.
 
 ## CI/CD integration
 
