@@ -192,6 +192,7 @@ export async function checkSitemap(
   let isIndex = false;
   let childTotal = 0;
   let childFailed = 0;
+  let hitUrlLimit = false;
 
   for (let i = 0; i < responses.length; i++) {
     const response = responses[i];
@@ -227,12 +228,14 @@ export async function checkSitemap(
             childResponse.body,
             MAX_URLS_PER_SITEMAP,
           );
+          if (childLocs.length >= MAX_URLS_PER_SITEMAP) hitUrlLimit = true;
           allUrls.push(...childLocs);
         }
       }
     } else {
       // Regular sitemap
       const locs = extractLocs(response.body, MAX_URLS_PER_SITEMAP);
+      if (locs.length >= MAX_URLS_PER_SITEMAP) hitUrlLimit = true;
       allUrls.push(...locs);
     }
   }
@@ -276,7 +279,7 @@ export async function checkSitemap(
       id,
       label,
       status: "pass",
-      detail: `Sitemap found with ${allUrls.length} URLs${apiNote}`,
+      detail: `Sitemap found with ${allUrls.length}${hitUrlLimit ? "+" : ""} URLs${apiNote}`,
       data: { totalUrls: allUrls.length, apiRelevantUrls, sitemapPaths },
     },
     urls: allUrls,

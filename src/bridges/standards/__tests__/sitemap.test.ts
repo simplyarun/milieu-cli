@@ -122,6 +122,20 @@ describe("checkSitemap", () => {
     expect(result.check.detail).toContain("3 URLs");
   });
 
+  it("shows '+' in detail when URL extraction hits the cap", async () => {
+    // Generate a sitemap with more than 1000 URLs
+    const urls = Array.from({ length: 1001 }, (_, i) => `https://example.com/page${i}`);
+    const sitemap = makeSitemap(urls);
+    mockHttpGet.mockResolvedValue(make404());
+    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    mockHttpGet.mockResolvedValueOnce(makeSuccess(sitemap));
+
+    const result = await checkSitemap("https://example.com", []);
+    expect(result.check.status).toBe("pass");
+    expect(result.check.detail).toContain("1000+");
+    expect(result.check.detail).toContain("URLs");
+  });
+
   it("returns partial when sitemap exists but has no URLs", async () => {
     const emptySitemap = '<?xml version="1.0"?><urlset></urlset>';
     mockHttpGet.mockResolvedValue(make404());
