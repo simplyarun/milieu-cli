@@ -25,6 +25,9 @@ vi.mock("../well-known.js", () => ({
 vi.mock("../graphql.js", () => ({
   checkGraphql: vi.fn(),
 }));
+vi.mock("../sitemap.js", () => ({
+  checkSitemap: vi.fn(),
+}));
 
 import { runStandardsBridge } from "../index.js";
 import { checkOpenApi } from "../openapi.js";
@@ -34,6 +37,7 @@ import { checkJsonLd } from "../json-ld.js";
 import { checkSchemaOrg } from "../schema-org.js";
 import { checkSecurityTxt, checkAiPlugin } from "../well-known.js";
 import { checkGraphql } from "../graphql.js";
+import { checkSitemap } from "../sitemap.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -65,6 +69,11 @@ function setupAllPass(): void {
     check: makeCheck("pass", "graphql_endpoint"),
     detected: true,
   });
+  vi.mocked(checkSitemap).mockResolvedValue({
+    check: makeCheck("pass", "sitemap"),
+    urls: ["https://example.com/page1"],
+    apiRelevantUrls: [],
+  });
   vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: "# Example\n\nContent here" });
   vi.mocked(checkLlmsFullTxt).mockResolvedValue(
     makeCheck("pass", "llms_full_txt"),
@@ -90,6 +99,11 @@ function setupAllFail(): void {
   vi.mocked(checkGraphql).mockResolvedValue({
     check: makeCheck("fail", "graphql_endpoint"),
     detected: false,
+  });
+  vi.mocked(checkSitemap).mockResolvedValue({
+    check: makeCheck("fail", "sitemap"),
+    urls: [],
+    apiRelevantUrls: [],
   });
   vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("fail", "llms_txt"), body: null });
   vi.mocked(checkLlmsFullTxt).mockResolvedValue(
@@ -123,14 +137,15 @@ describe("runStandardsBridge", () => {
     expect(result.status).toBe("evaluated");
   });
 
-  it("includes all 9 checks in result.checks array", async () => {
+  it("includes all 10 checks in result.checks array", async () => {
     setupAllPass();
     const result = await runStandardsBridge(makeCtx());
-    expect(result.checks).toHaveLength(9);
+    expect(result.checks).toHaveLength(10);
     const ids = result.checks.map((c) => c.id);
     expect(ids).toEqual([
       "openapi_spec",
       "graphql_endpoint",
+      "sitemap",
       "llms_txt",
       "llms_full_txt",
       "mcp_endpoint",
@@ -148,8 +163,8 @@ describe("runStandardsBridge", () => {
     expect(result.scoreLabel).toBe("pass");
   });
 
-  it("returns score 44 and scoreLabel partial when 4 pass + 5 fail", async () => {
-    // First 4 pass, rest fail (9 checks total: 4/9 = 44%)
+  it("returns score 40 and scoreLabel partial when 4 pass + 6 fail", async () => {
+    // First 4 pass, rest fail (10 checks total: 4/10 = 40%)
     vi.mocked(checkOpenApi).mockResolvedValue({
       check: makeCheck("pass", "openapi_spec"),
       detected: true,
@@ -160,9 +175,14 @@ describe("runStandardsBridge", () => {
       check: makeCheck("pass", "graphql_endpoint"),
       detected: true,
     });
+    vi.mocked(checkSitemap).mockResolvedValue({
+      check: makeCheck("pass", "sitemap"),
+      urls: [],
+      apiRelevantUrls: [],
+    });
     vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: "# Example\n\nContent here" });
     vi.mocked(checkLlmsFullTxt).mockResolvedValue(
-      makeCheck("pass", "llms_full_txt"),
+      makeCheck("fail", "llms_full_txt"),
     );
     vi.mocked(checkMcpEndpoint).mockResolvedValue(
       makeCheck("fail", "mcp_endpoint"),
@@ -177,7 +197,7 @@ describe("runStandardsBridge", () => {
     );
 
     const result = await runStandardsBridge(makeCtx());
-    expect(result.score).toBe(44);
+    expect(result.score).toBe(40);
     expect(result.scoreLabel).toBe("partial");
   });
 
@@ -188,8 +208,8 @@ describe("runStandardsBridge", () => {
     expect(result.scoreLabel).toBe("fail");
   });
 
-  it("returns score 33 and scoreLabel fail for 2 pass + 2 partial + 5 fail", async () => {
-    // 2 pass (2 points) + 2 partial (1 point) + 5 fail (0) = 3/9 = 33.3 => 33
+  it("returns score 30 and scoreLabel fail for 2 pass + 2 partial + 6 fail", async () => {
+    // 2 pass (2 points) + 2 partial (1 point) + 6 fail (0) = 3/10 = 30%
     vi.mocked(checkOpenApi).mockResolvedValue({
       check: makeCheck("pass", "openapi_spec"),
       detected: true,
@@ -199,6 +219,11 @@ describe("runStandardsBridge", () => {
     vi.mocked(checkGraphql).mockResolvedValue({
       check: makeCheck("fail", "graphql_endpoint"),
       detected: false,
+    });
+    vi.mocked(checkSitemap).mockResolvedValue({
+      check: makeCheck("fail", "sitemap"),
+      urls: [],
+      apiRelevantUrls: [],
     });
     vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: "# Example\n\nContent here" });
     vi.mocked(checkLlmsFullTxt).mockResolvedValue(
@@ -217,7 +242,7 @@ describe("runStandardsBridge", () => {
     );
 
     const result = await runStandardsBridge(makeCtx());
-    expect(result.score).toBe(33);
+    expect(result.score).toBe(30);
     expect(result.scoreLabel).toBe("fail");
   });
 
@@ -284,6 +309,8 @@ describe("runStandardsBridge", () => {
       hasWebhooks: true,
       hasCallbacks: true,
     });
+    vi.mocked(checkGraphql).mockResolvedValue({ check: makeCheck("pass", "graphql_endpoint"), detected: true });
+    vi.mocked(checkSitemap).mockResolvedValue({ check: makeCheck("pass", "sitemap"), urls: [], apiRelevantUrls: [] });
     vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: null });
     vi.mocked(checkLlmsFullTxt).mockResolvedValue(makeCheck("pass", "llms_full_txt"));
     vi.mocked(checkMcpEndpoint).mockResolvedValue(makeCheck("pass", "mcp_endpoint"));

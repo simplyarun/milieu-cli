@@ -64,6 +64,12 @@ export const CHECK_EXPLANATIONS: Record<string, ExplanationEntry> = {
     "X-Robots-Tag headers apply indexing restrictions at the server level, affecting all AI agents regardless of page content.",
 
   // Bridge 2: Standards
+  sitemap: {
+    pass: "Your XML sitemap helps AI agents discover all your pages and API resources efficiently without crawling.",
+    fail: "Without a sitemap, AI agents must crawl your site blindly — they may miss important pages and API resources.",
+    partial: "Your sitemap exists but contains no URLs — AI agents can't use it to discover your content.",
+    default: "An XML sitemap gives AI agents a complete map of your site's pages and resources.",
+  },
   graphql_endpoint: {
     pass: "Your GraphQL endpoint with introspection lets AI agents discover your entire API schema and build queries automatically.",
     fail: "No GraphQL endpoint found — if you offer a GraphQL API, AI agents can't discover it.",

@@ -92,6 +92,9 @@ export async function runReachabilityBridge(
     ctx.options.timeout,
   );
 
+  // Store sitemap URLs for Bridge 2 consumption
+  ctx.shared.robotsSitemaps = robotsResult.parsed?.sitemaps ?? [];
+
   // 5. Crawler policies (uses parsed robots.txt data)
   let targetPath: string;
   try {

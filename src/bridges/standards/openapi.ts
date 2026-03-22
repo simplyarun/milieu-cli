@@ -306,12 +306,16 @@ function isProtectedResponse(response: HttpResponse): boolean {
  * Probe 19 common OpenAPI / Swagger spec paths in parallel, then try
  * extracting spec URLs from HTML doc pages, and finally detect protected specs.
  *
+ * Optionally accepts sitemap-discovered API URLs as additional candidates
+ * to probe in Phase 3b (secondary validation).
+ *
  * Returns a Check with id "openapi_spec" and a boolean indicating whether
  * any valid spec was detected (for ctx.shared.openApiDetected).
  */
 export async function checkOpenApi(
   baseUrl: string,
   timeout?: number,
+  sitemapCandidateUrls: string[] = [],
 ): Promise<OpenApiResult> {
   const id = "openapi_spec";
   const label = "OpenAPI Spec";
@@ -443,6 +447,13 @@ export async function checkOpenApi(
           specCandidateUrls.push(url);
         }
       }
+    }
+  }
+
+  // Merge sitemap-discovered API URLs into candidates (deduplicated)
+  for (const url of sitemapCandidateUrls) {
+    if (!allProbedUrls.has(url) && !specCandidateUrls.includes(url)) {
+      specCandidateUrls.push(url);
     }
   }
 
