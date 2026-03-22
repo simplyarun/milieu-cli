@@ -1,3 +1,4 @@
+import { gunzipSync } from "node:zlib";
 import type { Check } from "../../core/types.js";
 import { httpGet } from "../../utils/http-client.js";
 
@@ -17,8 +18,12 @@ export interface SitemapResult {
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Standard sitemap paths to probe */
-const SITEMAP_PATHS = ["/sitemap.xml", "/sitemap_index.xml"] as const;
+/** Standard sitemap paths to probe (includes .gz variants) */
+const SITEMAP_PATHS = [
+  "/sitemap.xml",
+  "/sitemap_index.xml",
+  "/sitemap.xml.gz",
+] as const;
 
 /** Max body size for sitemap responses (1MB) */
 const MAX_BODY_BYTES = 1_048_576;
@@ -85,6 +90,58 @@ function filterSameOrigin(urls: string[], baseUrl: string): string[] {
   });
 }
 
+/** Check if a URL points to a gzipped sitemap */
+function isGzUrl(url: string): boolean {
+  try {
+    return new URL(url).pathname.endsWith(".gz");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Fetch a sitemap body, handling .gz decompression transparently.
+ *
+ * For .gz URLs: fetches raw bytes and decompresses with zlib.
+ * For normal URLs: delegates to httpGet as before.
+ */
+async function fetchSitemapBody(
+  url: string,
+  timeout?: number,
+): Promise<{ ok: true; body: string } | { ok: false }> {
+  if (!isGzUrl(url)) {
+    const response = await httpGet(url, {
+      timeout,
+      maxBodyBytes: MAX_BODY_BYTES,
+      headers: { Accept: "application/xml, text/xml, */*" },
+    });
+    if (!response.ok) return { ok: false };
+    return { ok: true, body: response.body };
+  }
+
+  // For .gz URLs, httpGet's response.text() mangles binary data.
+  // Fetch raw bytes and decompress with zlib instead.
+  try {
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(timeout ?? 10_000),
+      redirect: "follow",
+      headers: {
+        "User-Agent": "milieu-cli/0.1.0",
+        Accept: "application/xml, application/gzip, */*",
+      },
+    });
+    if (!response.ok) return { ok: false };
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length > MAX_BODY_BYTES) return { ok: false };
+
+    const decompressed = gunzipSync(buffer);
+    return { ok: true, body: decompressed.toString("utf-8") };
+  } catch {
+    return { ok: false };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -125,19 +182,16 @@ export async function checkSitemap(
   }
 
   // Probe all sitemap URLs in parallel
+  const probeUrlArray = [...probeUrls];
   const responses = await Promise.all(
-    [...probeUrls].map((url) =>
-      httpGet(url, {
-        timeout,
-        maxBodyBytes: MAX_BODY_BYTES,
-        headers: { Accept: "application/xml, text/xml, */*" },
-      }),
-    ),
+    probeUrlArray.map((url) => fetchSitemapBody(url, timeout)),
   );
 
-  const probeUrlArray = [...probeUrls];
   let allUrls: string[] = [];
   const sitemapPaths: string[] = [];
+  let isIndex = false;
+  let childTotal = 0;
+  let childFailed = 0;
 
   for (let i = 0; i < responses.length; i++) {
     const response = responses[i];
@@ -150,25 +204,25 @@ export async function checkSitemap(
     sitemapPaths.push(probePath);
 
     if (isSitemapIndex(response.body)) {
+      isIndex = true;
       // Sitemap index — follow child sitemaps
       const childUrls = filterSameOrigin(
         extractLocs(response.body, MAX_CHILD_SITEMAPS),
         baseUrl,
       );
 
+      childTotal += childUrls.length;
+
       if (childUrls.length > 0) {
         const childResponses = await Promise.all(
-          childUrls.map((url) =>
-            httpGet(url, {
-              timeout,
-              maxBodyBytes: MAX_BODY_BYTES,
-              headers: { Accept: "application/xml, text/xml, */*" },
-            }),
-          ),
+          childUrls.map((url) => fetchSitemapBody(url, timeout)),
         );
 
         for (const childResponse of childResponses) {
-          if (!childResponse.ok) continue;
+          if (!childResponse.ok) {
+            childFailed++;
+            continue;
+          }
           const childLocs = extractLocs(
             childResponse.body,
             MAX_URLS_PER_SITEMAP,
@@ -197,13 +251,16 @@ export async function checkSitemap(
   }
 
   if (allUrls.length === 0) {
+    let detail: string;
+    if (isIndex && childTotal > 0 && childFailed > 0) {
+      detail = `Sitemap index found at ${sitemapPaths.join(", ")} with ${childTotal} child sitemap(s), but ${childFailed === childTotal ? "all" : `${childFailed}/${childTotal}`} failed to fetch`;
+    } else if (isIndex && childTotal === 0) {
+      detail = `Sitemap index found at ${sitemapPaths.join(", ")} but references no child sitemaps`;
+    } else {
+      detail = `Sitemap found at ${sitemapPaths.join(", ")} but contains no URLs`;
+    }
     return {
-      check: {
-        id,
-        label,
-        status: "partial",
-        detail: `Sitemap found at ${sitemapPaths.join(", ")} but contains no URLs`,
-      },
+      check: { id, label, status: "partial", detail },
       urls: [],
       apiRelevantUrls: [],
     };
