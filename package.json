@@ -19,7 +19,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && chmod +x dist/cli/index.js",
     "dev": "tsx src/index.ts",
     "test": "vitest run --reporter=verbose",
     "typecheck": "tsc --noEmit",
