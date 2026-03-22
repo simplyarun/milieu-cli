@@ -74,7 +74,7 @@ Milieu evaluates your product through five progressive bridges. Each one represe
 | | Bridge | Question | What milieu checks | Score |
 |---|---|---|---|---|
 | 1 | **Reachability** | **Can agents reach you?** | HTTPS, HTTP status, robots.txt (RFC 9309), per-bot crawler policies (GPTBot, ClaudeBot, CCBot, Googlebot, Bingbot, PerplexityBot), meta robots, X-Robots-Tag | 0–100 |
-| 2 | **Standards** | **Can agents read you?** | OpenAPI spec, llms.txt, llms-full.txt, MCP endpoint, JSON-LD, Schema.org, security.txt, ai-plugin.json | 0–100 |
+| 2 | **Standards** | **Can agents read you?** | OpenAPI spec, GraphQL introspection, XML sitemap, markdown content negotiation, llms.txt, llms-full.txt, MCP endpoint, JSON-LD, Schema.org, security.txt, ai-plugin.json | 0–100 |
 | 3 | **Separation** | **Can agents integrate with you?** | API endpoints, developer docs, SDK/package references, webhook support | Detection only* |
 | 4 | **Schema** | **Can agents use you correctly?** | Planned | — |
 | 5 | **Context** | **Can agents trust you?** | Planned | — |
@@ -85,7 +85,7 @@ The bridges are progressive: there's no point checking your OpenAPI spec (Bridge
 
 **Bridge 1 — Reachability** is the front door. Can AI agents get to your content at all? Are you blocking specific crawlers without realizing it? This is the most actionable bridge for most sites — many are unknowingly blocking GPTBot or ClaudeBot in their robots.txt.
 
-**Bridge 2 — Standards** is the shared language. Do you speak the protocols AI agents understand? OpenAPI specs, llms.txt, MCP endpoints, structured data — these are the machine-readable standards that let agents go beyond scraping your HTML.
+**Bridge 2 — Standards** is the shared language. Do you speak the protocols AI agents understand? OpenAPI specs, GraphQL endpoints, XML sitemaps, markdown content negotiation, llms.txt, MCP endpoints, structured data — these are the machine-readable standards that let agents go beyond scraping your HTML. milieu also checks if your server returns markdown via HTTP content negotiation (`Accept: text/markdown`), which cuts agent token usage by ~80% compared to raw HTML.
 
 **Bridge 3 — Separation** is the developer surface. Do you have a clear API boundary? Developer docs? SDKs? Webhooks? This is where agents look to determine if your product is something they can build with, not just read from.
 

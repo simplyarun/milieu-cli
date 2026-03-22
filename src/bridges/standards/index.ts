@@ -7,6 +7,7 @@ import { checkSchemaOrg } from "./schema-org.js";
 import { checkSecurityTxt, checkAiPlugin } from "./well-known.js";
 import { checkGraphql } from "./graphql.js";
 import { checkSitemap } from "./sitemap.js";
+import { checkMarkdownNegotiation } from "./markdown-negotiation.js";
 
 /**
  * Calculate bridge score from check results.
@@ -36,9 +37,9 @@ function calculateScore(checks: Check[]): {
 /**
  * Run Bridge 2: Standards.
  *
- * Runs 10 checks in two phases:
+ * Runs 11 checks in two phases:
  *
- * Phase 1 (parallel): Sitemap + llms.txt + llms-full.txt + MCP + security.txt + ai-plugin.json
+ * Phase 1 (parallel): Sitemap + Markdown negotiation + llms.txt + llms-full.txt + MCP + security.txt + ai-plugin.json
  * Phase 2 (parallel): OpenAPI (fed sitemap API URLs as candidates) + GraphQL
  * Synchronous: JSON-LD + Schema.org (from ctx.shared.pageBody)
  *
@@ -57,9 +58,10 @@ export async function runStandardsBridge(
   const pageBody = (ctx.shared.pageBody as string) ?? "";
   const robotsSitemaps = (ctx.shared.robotsSitemaps as string[]) ?? [];
 
-  // Phase 1: Sitemap + independent HTTP probes (parallel)
+  // Phase 1: Sitemap + Markdown negotiation + independent HTTP probes (parallel)
   const [
     sitemapResult,
+    markdownResult,
     llmsTxtResult,
     llmsFullTxtCheck,
     mcpCheck,
@@ -67,6 +69,7 @@ export async function runStandardsBridge(
     aiPluginCheck,
   ] = await Promise.all([
     checkSitemap(ctx.baseUrl, robotsSitemaps, ctx.options.timeout),
+    checkMarkdownNegotiation(ctx.baseUrl, ctx.options.timeout),
     checkLlmsTxt(ctx.baseUrl, ctx.options.timeout),
     checkLlmsFullTxt(ctx.baseUrl, ctx.options.timeout),
     checkMcpEndpoint(ctx.baseUrl, ctx.options.timeout),
@@ -92,11 +95,12 @@ export async function runStandardsBridge(
   ctx.shared.sitemapUrls = sitemapResult.urls;
   ctx.shared.llmsTxtBody = llmsTxtResult.body;
 
-  // Collect all 10 checks in order
+  // Collect all 11 checks in order
   const checks: Check[] = [
     openApiResult.check,
     graphqlResult.check,
     sitemapResult.check,
+    markdownResult.check,
     llmsTxtResult.check,
     llmsFullTxtCheck,
     mcpCheck,

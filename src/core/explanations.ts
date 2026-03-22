@@ -64,6 +64,12 @@ export const CHECK_EXPLANATIONS: Record<string, ExplanationEntry> = {
     "X-Robots-Tag headers apply indexing restrictions at the server level, affecting all AI agents regardless of page content.",
 
   // Bridge 2: Standards
+  markdown_negotiation: {
+    pass: "Your server returns markdown via content negotiation — AI agents get clean, token-efficient content instead of parsing HTML.",
+    fail: "Your server doesn't support markdown content negotiation — AI agents must parse raw HTML, using ~5x more tokens.",
+    partial: "Your server signals AI content permissions but doesn't return markdown — agents know they're welcome but still get HTML.",
+    default: "Markdown content negotiation (Accept: text/markdown) lets AI agents request clean, token-efficient content instead of HTML.",
+  },
   sitemap: {
     pass: "Your XML sitemap helps AI agents discover all your pages and API resources efficiently without crawling.",
     fail: "Without a sitemap, AI agents must crawl your site blindly — they may miss important pages and API resources.",

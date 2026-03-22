@@ -28,6 +28,9 @@ vi.mock("../graphql.js", () => ({
 vi.mock("../sitemap.js", () => ({
   checkSitemap: vi.fn(),
 }));
+vi.mock("../markdown-negotiation.js", () => ({
+  checkMarkdownNegotiation: vi.fn(),
+}));
 
 import { runStandardsBridge } from "../index.js";
 import { checkOpenApi } from "../openapi.js";
@@ -38,6 +41,7 @@ import { checkSchemaOrg } from "../schema-org.js";
 import { checkSecurityTxt, checkAiPlugin } from "../well-known.js";
 import { checkGraphql } from "../graphql.js";
 import { checkSitemap } from "../sitemap.js";
+import { checkMarkdownNegotiation } from "../markdown-negotiation.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -74,6 +78,10 @@ function setupAllPass(): void {
     urls: ["https://example.com/page1"],
     apiRelevantUrls: [],
   });
+  vi.mocked(checkMarkdownNegotiation).mockResolvedValue({
+    check: makeCheck("pass", "markdown_negotiation"),
+    supported: true,
+  });
   vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: "# Example\n\nContent here" });
   vi.mocked(checkLlmsFullTxt).mockResolvedValue(
     makeCheck("pass", "llms_full_txt"),
@@ -104,6 +112,10 @@ function setupAllFail(): void {
     check: makeCheck("fail", "sitemap"),
     urls: [],
     apiRelevantUrls: [],
+  });
+  vi.mocked(checkMarkdownNegotiation).mockResolvedValue({
+    check: makeCheck("fail", "markdown_negotiation"),
+    supported: false,
   });
   vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("fail", "llms_txt"), body: null });
   vi.mocked(checkLlmsFullTxt).mockResolvedValue(
@@ -137,15 +149,16 @@ describe("runStandardsBridge", () => {
     expect(result.status).toBe("evaluated");
   });
 
-  it("includes all 10 checks in result.checks array", async () => {
+  it("includes all 11 checks in result.checks array", async () => {
     setupAllPass();
     const result = await runStandardsBridge(makeCtx());
-    expect(result.checks).toHaveLength(10);
+    expect(result.checks).toHaveLength(11);
     const ids = result.checks.map((c) => c.id);
     expect(ids).toEqual([
       "openapi_spec",
       "graphql_endpoint",
       "sitemap",
+      "markdown_negotiation",
       "llms_txt",
       "llms_full_txt",
       "mcp_endpoint",
@@ -163,8 +176,8 @@ describe("runStandardsBridge", () => {
     expect(result.scoreLabel).toBe("pass");
   });
 
-  it("returns score 40 and scoreLabel partial when 4 pass + 6 fail", async () => {
-    // First 4 pass, rest fail (10 checks total: 4/10 = 40%)
+  it("returns score 36 and scoreLabel fail when 4 pass + 7 fail", async () => {
+    // First 4 pass, rest fail (11 checks total: 4/11 = 36%)
     vi.mocked(checkOpenApi).mockResolvedValue({
       check: makeCheck("pass", "openapi_spec"),
       detected: true,
@@ -180,7 +193,11 @@ describe("runStandardsBridge", () => {
       urls: [],
       apiRelevantUrls: [],
     });
-    vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: "# Example\n\nContent here" });
+    vi.mocked(checkMarkdownNegotiation).mockResolvedValue({
+      check: makeCheck("pass", "markdown_negotiation"),
+      supported: true,
+    });
+    vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("fail", "llms_txt"), body: null });
     vi.mocked(checkLlmsFullTxt).mockResolvedValue(
       makeCheck("fail", "llms_full_txt"),
     );
@@ -197,8 +214,8 @@ describe("runStandardsBridge", () => {
     );
 
     const result = await runStandardsBridge(makeCtx());
-    expect(result.score).toBe(40);
-    expect(result.scoreLabel).toBe("partial");
+    expect(result.score).toBe(36);
+    expect(result.scoreLabel).toBe("fail");
   });
 
   it("returns score 0 and scoreLabel fail when all 8 checks fail", async () => {
@@ -208,8 +225,8 @@ describe("runStandardsBridge", () => {
     expect(result.scoreLabel).toBe("fail");
   });
 
-  it("returns score 30 and scoreLabel fail for 2 pass + 2 partial + 6 fail", async () => {
-    // 2 pass (2 points) + 2 partial (1 point) + 6 fail (0) = 3/10 = 30%
+  it("returns score 27 and scoreLabel fail for 2 pass + 2 partial + 7 fail", async () => {
+    // 2 pass (2 points) + 2 partial (1 point) + 7 fail (0) = 3/11 = 27%
     vi.mocked(checkOpenApi).mockResolvedValue({
       check: makeCheck("pass", "openapi_spec"),
       detected: true,
@@ -224,6 +241,10 @@ describe("runStandardsBridge", () => {
       check: makeCheck("fail", "sitemap"),
       urls: [],
       apiRelevantUrls: [],
+    });
+    vi.mocked(checkMarkdownNegotiation).mockResolvedValue({
+      check: makeCheck("fail", "markdown_negotiation"),
+      supported: false,
     });
     vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: "# Example\n\nContent here" });
     vi.mocked(checkLlmsFullTxt).mockResolvedValue(
@@ -242,7 +263,7 @@ describe("runStandardsBridge", () => {
     );
 
     const result = await runStandardsBridge(makeCtx());
-    expect(result.score).toBe(30);
+    expect(result.score).toBe(27);
     expect(result.scoreLabel).toBe("fail");
   });
 
@@ -311,6 +332,7 @@ describe("runStandardsBridge", () => {
     });
     vi.mocked(checkGraphql).mockResolvedValue({ check: makeCheck("pass", "graphql_endpoint"), detected: true });
     vi.mocked(checkSitemap).mockResolvedValue({ check: makeCheck("pass", "sitemap"), urls: [], apiRelevantUrls: [] });
+    vi.mocked(checkMarkdownNegotiation).mockResolvedValue({ check: makeCheck("pass", "markdown_negotiation"), supported: true });
     vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: null });
     vi.mocked(checkLlmsFullTxt).mockResolvedValue(makeCheck("pass", "llms_full_txt"));
     vi.mocked(checkMcpEndpoint).mockResolvedValue(makeCheck("pass", "mcp_endpoint"));
