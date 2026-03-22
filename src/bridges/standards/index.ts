@@ -6,11 +6,12 @@ import { checkJsonLd } from "./json-ld.js";
 import { checkSchemaOrg } from "./schema-org.js";
 import { checkSecurityTxt, checkAiPlugin } from "./well-known.js";
 import { checkGraphql } from "./graphql.js";
+import { checkSitemap } from "./sitemap.js";
 
 /**
  * Calculate bridge score from check results.
  * - Pass = 1 point, Partial = 0.5 points, Fail/Error = 0 points
- * - All 8 checks always count (no skip concept in Bridge 2)
+ * - All checks always count (no skip concept in Bridge 2)
  */
 function calculateScore(checks: Check[]): {
   score: number;
@@ -35,41 +36,51 @@ function calculateScore(checks: Check[]): {
 /**
  * Run Bridge 2: Standards.
  *
- * Runs 9 checks:
- *   - 7 independent HTTP probes in parallel (OpenAPI, GraphQL, llms.txt, llms-full.txt, MCP, security.txt, ai-plugin.json)
- *   - 2 synchronous HTML-based checks (JSON-LD, Schema.org) using ctx.shared.pageBody from Bridge 1
+ * Runs 10 checks in two phases:
  *
- * Stores ctx.shared.openApiDetected and ctx.shared.graphqlDetected for Bridge 3 consumption.
- * Stores ctx.shared.llmsTxtBody for downstream consumption.
+ * Phase 1 (parallel): Sitemap + llms.txt + llms-full.txt + MCP + security.txt + ai-plugin.json
+ * Phase 2 (parallel): OpenAPI (fed sitemap API URLs as candidates) + GraphQL
+ * Synchronous: JSON-LD + Schema.org (from ctx.shared.pageBody)
+ *
+ * Two-phase execution is required because sitemap results feed into
+ * OpenAPI detection as candidate spec URLs.
+ *
+ * Stores ctx.shared.openApiDetected, ctx.shared.graphqlDetected,
+ * ctx.shared.sitemapUrls, and ctx.shared.llmsTxtBody for Bridge 3 consumption.
  */
 export async function runStandardsBridge(
   ctx: ScanContext,
 ): Promise<BridgeResult> {
   const start = performance.now();
 
-  // Get page body from shared context (set by Bridge 1)
+  // Get shared context from Bridge 1
   const pageBody = (ctx.shared.pageBody as string) ?? "";
+  const robotsSitemaps = (ctx.shared.robotsSitemaps as string[]) ?? [];
 
-  // Run all independent HTTP probes in parallel
+  // Phase 1: Sitemap + independent HTTP probes (parallel)
   const [
-    openApiResult,
+    sitemapResult,
     llmsTxtResult,
     llmsFullTxtCheck,
     mcpCheck,
     securityTxtCheck,
     aiPluginCheck,
-    graphqlResult,
   ] = await Promise.all([
-    checkOpenApi(ctx.baseUrl, ctx.options.timeout),
+    checkSitemap(ctx.baseUrl, robotsSitemaps, ctx.options.timeout),
     checkLlmsTxt(ctx.baseUrl, ctx.options.timeout),
     checkLlmsFullTxt(ctx.baseUrl, ctx.options.timeout),
     checkMcpEndpoint(ctx.baseUrl, ctx.options.timeout),
     checkSecurityTxt(ctx.baseUrl, ctx.options.timeout),
     checkAiPlugin(ctx.baseUrl, ctx.options.timeout),
+  ]);
+
+  // Phase 2: OpenAPI (with sitemap API URLs) + GraphQL (parallel)
+  const [openApiResult, graphqlResult] = await Promise.all([
+    checkOpenApi(ctx.baseUrl, ctx.options.timeout, sitemapResult.apiRelevantUrls),
     checkGraphql(ctx.baseUrl, ctx.options.timeout),
   ]);
 
-  // Run HTML-based checks (synchronous, no HTTP)
+  // Synchronous HTML-based checks (no HTTP)
   const jsonLdCheck = checkJsonLd(pageBody);
   const schemaOrgCheck = checkSchemaOrg(pageBody, jsonLdCheck);
 
@@ -78,12 +89,14 @@ export async function runStandardsBridge(
   ctx.shared.openApiHasWebhooks = openApiResult.hasWebhooks;
   ctx.shared.openApiHasCallbacks = openApiResult.hasCallbacks;
   ctx.shared.graphqlDetected = graphqlResult.detected;
+  ctx.shared.sitemapUrls = sitemapResult.urls;
   ctx.shared.llmsTxtBody = llmsTxtResult.body;
 
-  // Collect all 9 checks in order
+  // Collect all 10 checks in order
   const checks: Check[] = [
     openApiResult.check,
     graphqlResult.check,
+    sitemapResult.check,
     llmsTxtResult.check,
     llmsFullTxtCheck,
     mcpCheck,
