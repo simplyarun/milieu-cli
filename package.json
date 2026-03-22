@@ -1,7 +1,7 @@
 {
   "name": "milieu-cli",
   "version": "0.1.6",
-  "description": "Check if AI agents can discover, understand, and use your API",
+  "description": "Check if AI agents can discover, understand, and use your product",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
