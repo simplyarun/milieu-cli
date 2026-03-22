@@ -13,7 +13,7 @@ Good design made products usable for humans. Good milieu design makes products u
 milieu-cli measures this. It scans your site and tells you what AI agents can actually see.
 
 ```bash
-npx milieu-cli scan stripe.com
+npx milieu-cli scan petstore.swagger.io
 ```
 
 ```bash
@@ -57,12 +57,45 @@ Each policy is checked individually — you might be allowing Googlebot but bloc
 ## Install
 
 ```bash
-npx milieu-cli scan stripe.com        # one-off, no install
-npm install -g milieu-cli              # global install
-milieu scan stripe.com                 # short alias after install
+npx milieu-cli scan petstore.swagger.io   # one-off, no install
+npm install -g milieu-cli                 # global install
+milieu scan petstore.swagger.io           # short alias after install
 ```
 
 > Both `milieu` and `milieu-cli` work as commands after global install.
+
+## Quick start
+
+Run your first scan in under a minute:
+
+```bash
+npx milieu-cli scan petstore.swagger.io
+```
+
+No config, no API keys. You'll get a scored report showing what AI agents can see when they visit that site.
+
+### Example sites to try
+
+Each of these exercises different parts of the scanner:
+
+```bash
+# The classic OpenAPI demo — Swagger spec at a well-known path
+npx milieu-cli scan petstore.swagger.io
+
+# Rich structured data — JSON-LD and Schema.org markup
+npx milieu-cli scan schema.org
+
+# Minimal API service — clean reachability, few standards signals
+npx milieu-cli scan httpbin.org
+```
+
+Add `--verbose` to any scan to see individual check results and explanations:
+
+```bash
+npx milieu-cli scan petstore.swagger.io --verbose
+```
+
+Once you've seen how these score, scan your own site and compare.
 
 ## CI/CD integration
 
@@ -121,7 +154,7 @@ const options: ScanOptions = {
   silent: true,    // suppress spinner output (recommended for library use)
 };
 
-const result = await scan("https://stripe.com", options);
+const result = await scan("https://petstore.swagger.io", options);
 
 console.log(result.overallScore);      // number (average of scored bridges)
 console.log(result.overallScoreLabel); // "pass" | "partial" | "fail"
