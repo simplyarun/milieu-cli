@@ -17,7 +17,7 @@ import { resolveRedirectUrl } from "../url.js";
 const mockValidateDns = vi.mocked(validateDns);
 const mockResolveRedirectUrl = vi.mocked(resolveRedirectUrl);
 
-// Helper to create a mock Response
+// Helper to create a mock Response with a real ReadableStream body
 function mockResponse(options: {
   status?: number;
   statusText?: string;
@@ -26,6 +26,15 @@ function mockResponse(options: {
 }): Response {
   const { status = 200, statusText = "OK", headers = {}, body = "" } = options;
   const h = new Headers(headers);
+  const encoded = new TextEncoder().encode(body);
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      if (encoded.length > 0) {
+        controller.enqueue(encoded);
+      }
+      controller.close();
+    },
+  });
   return {
     status,
     statusText,
@@ -36,7 +45,7 @@ function mockResponse(options: {
     type: "basic",
     url: "",
     clone: () => mockResponse(options),
-    body: null,
+    body: stream,
     bodyUsed: false,
     arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
     blob: () => Promise.resolve(new Blob()),
@@ -506,7 +515,7 @@ describe("httpGet", () => {
       }
     });
 
-    it("truncates body when exceeding maxBodyBytes without Content-Length", async () => {
+    it("stops reading body stream at maxBodyBytes without downloading the rest", async () => {
       const largeBody = "x".repeat(200);
       fetchSpy.mockResolvedValueOnce(
         mockResponse({ status: 200, body: largeBody }),
@@ -516,6 +525,85 @@ describe("httpGet", () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.body.length).toBe(100);
+      }
+    });
+
+    it("reads body correctly when delivered in multiple chunks", async () => {
+      const h = new Headers();
+      const chunkA = new TextEncoder().encode("Hello ");
+      const chunkB = new TextEncoder().encode("World!");
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(chunkA);
+          controller.enqueue(chunkB);
+          controller.close();
+        },
+      });
+      const response = {
+        status: 200,
+        statusText: "OK",
+        headers: h,
+        text: () => Promise.resolve("Hello World!"),
+        body: stream,
+        bodyUsed: false,
+        ok: true,
+        redirected: false,
+        type: "basic",
+        url: "",
+        clone: () => response,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+        blob: () => Promise.resolve(new Blob()),
+        formData: () => Promise.resolve(new FormData()),
+        json: () => Promise.resolve({}),
+        bytes: () => Promise.resolve(new Uint8Array()),
+      } as Response;
+
+      fetchSpy.mockResolvedValueOnce(response);
+
+      const result = await httpGet("https://example.com");
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.body).toBe("Hello World!");
+      }
+    });
+
+    it("stops mid-chunk when maxBodyBytes falls within a chunk boundary", async () => {
+      const h = new Headers();
+      const chunk1 = new TextEncoder().encode("aaaa"); // 4 bytes
+      const chunk2 = new TextEncoder().encode("bbbbbbbb"); // 8 bytes
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(chunk1);
+          controller.enqueue(chunk2);
+          controller.close();
+        },
+      });
+      const response = {
+        status: 200,
+        statusText: "OK",
+        headers: h,
+        text: () => Promise.resolve("aaaabbbbbbbb"),
+        body: stream,
+        bodyUsed: false,
+        ok: true,
+        redirected: false,
+        type: "basic",
+        url: "",
+        clone: () => response,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+        blob: () => Promise.resolve(new Blob()),
+        formData: () => Promise.resolve(new FormData()),
+        json: () => Promise.resolve({}),
+        bytes: () => Promise.resolve(new Uint8Array()),
+      } as Response;
+
+      fetchSpy.mockResolvedValueOnce(response);
+
+      const result = await httpGet("https://example.com", { maxBodyBytes: 7 });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.body).toBe("aaaabbb"); // 4 from chunk1 + 3 from chunk2
+        expect(result.body.length).toBe(7);
       }
     });
   });

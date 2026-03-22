@@ -65,6 +65,61 @@ function classifyFetchError(error: unknown, url: string): HttpFailure {
 }
 
 // ---------------------------------------------------------------------------
+// Streaming body reader
+// ---------------------------------------------------------------------------
+
+/**
+ * Read response body as a string, stopping early when maxBytes is reached.
+ *
+ * Uses the response body ReadableStream for chunk-by-chunk reading,
+ * cancelling the stream once the byte limit is exceeded. This prevents
+ * downloading multi-megabyte responses when only the first portion is needed.
+ *
+ * Falls back to response.text() if no body stream is available.
+ */
+async function readBodyStream(
+  response: Response,
+  maxBytes: number,
+): Promise<string> {
+  const stream = response.body;
+  if (!stream) {
+    // Fallback for environments where body stream isn't available
+    const text = await response.text();
+    return text.length > maxBytes ? text.slice(0, maxBytes) : text;
+  }
+
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      totalBytes += value.length;
+      if (totalBytes > maxBytes) {
+        // Keep only what fits within the limit
+        const excess = totalBytes - maxBytes;
+        chunks.push(value.subarray(0, value.length - excess));
+        break;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    try { await reader.cancel(); } catch { /* stream may already be closed */ }
+  }
+
+  const decoder = new TextDecoder();
+  let body = "";
+  for (const chunk of chunks) {
+    body += decoder.decode(chunk, { stream: true });
+  }
+  body += decoder.decode(); // flush remaining multi-byte chars
+  return body;
+}
+
+// ---------------------------------------------------------------------------
 // Bot protection detection
 // ---------------------------------------------------------------------------
 
@@ -221,12 +276,8 @@ async function fetchOnce(
         };
       }
 
-      body = await response.text();
-
-      // Truncate if body exceeds limit (no Content-Length header case)
-      if (body.length > options.maxBodyBytes) {
-        body = body.slice(0, options.maxBodyBytes);
-      }
+      // Stream body with early cancellation at maxBodyBytes
+      body = await readBodyStream(response, options.maxBodyBytes);
     }
 
     const success: HttpSuccess = {
