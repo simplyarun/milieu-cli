@@ -131,6 +131,7 @@ describe("runSeparationBridge", () => {
       true,
       expect.any(Array),
       expect.any(Object),
+      expect.any(Boolean),
     );
   });
 
@@ -144,11 +145,12 @@ describe("runSeparationBridge", () => {
       { content: "<html>test</html>", source: "homepage" },
     ];
 
-    // checkApiPresence: 2nd arg is ContentSource[]
+    // checkApiPresence: 2nd arg is ContentSource[], 4th is graphqlDetected
     expect(checkApiPresence).toHaveBeenCalledWith(
       expect.anything(),
       expectedSources,
       expect.any(Object),
+      expect.any(Boolean),
     );
     // checkSdkReferences: 1st arg is ContentSource[]
     expect(checkSdkReferences).toHaveBeenCalledWith(expectedSources);
@@ -178,6 +180,7 @@ describe("runSeparationBridge", () => {
       expect.anything(),
       expect.any(Array),
       headers,
+      expect.any(Boolean),
     );
   });
 
@@ -225,6 +228,7 @@ describe("runSeparationBridge", () => {
       expect.anything(),
       expect.any(Array),
       {},
+      expect.any(Boolean),
     );
   });
 
@@ -236,6 +240,7 @@ describe("runSeparationBridge", () => {
       false,
       expect.any(Array),
       expect.any(Object),
+      expect.any(Boolean),
     );
   });
 
@@ -273,6 +278,7 @@ describe("runSeparationBridge", () => {
       expect.anything(),
       expectedSources,
       expect.any(Object),
+      expect.any(Boolean),
     );
   });
 
