@@ -64,6 +64,12 @@ export const CHECK_EXPLANATIONS: Record<string, ExplanationEntry> = {
     "X-Robots-Tag headers apply indexing restrictions at the server level, affecting all AI agents regardless of page content.",
 
   // Bridge 2: Standards
+  graphql_endpoint: {
+    pass: "Your GraphQL endpoint with introspection lets AI agents discover your entire API schema and build queries automatically.",
+    fail: "No GraphQL endpoint found — if you offer a GraphQL API, AI agents can't discover it.",
+    partial: "A GraphQL endpoint was detected but introspection is disabled or requires authentication — AI agents know it exists but can't discover the schema.",
+    default: "A GraphQL endpoint with introspection enabled lets AI agents explore your API schema and construct queries without documentation.",
+  },
   openapi_spec: {
     pass: "Your OpenAPI spec lets AI agents discover and correctly call your API endpoints automatically.",
     fail: "Without an OpenAPI spec, AI agents can't discover or correctly call your endpoints — they're locked out of programmatic access.",

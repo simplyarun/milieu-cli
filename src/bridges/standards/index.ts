@@ -5,6 +5,7 @@ import { checkMcpEndpoint } from "./mcp.js";
 import { checkJsonLd } from "./json-ld.js";
 import { checkSchemaOrg } from "./schema-org.js";
 import { checkSecurityTxt, checkAiPlugin } from "./well-known.js";
+import { checkGraphql } from "./graphql.js";
 
 /**
  * Calculate bridge score from check results.
@@ -34,11 +35,11 @@ function calculateScore(checks: Check[]): {
 /**
  * Run Bridge 2: Standards.
  *
- * Runs 8 checks:
- *   - 6 independent HTTP probes in parallel (OpenAPI, llms.txt, llms-full.txt, MCP, security.txt, ai-plugin.json)
+ * Runs 9 checks:
+ *   - 7 independent HTTP probes in parallel (OpenAPI, GraphQL, llms.txt, llms-full.txt, MCP, security.txt, ai-plugin.json)
  *   - 2 synchronous HTML-based checks (JSON-LD, Schema.org) using ctx.shared.pageBody from Bridge 1
  *
- * Stores ctx.shared.openApiDetected for Bridge 3 consumption.
+ * Stores ctx.shared.openApiDetected and ctx.shared.graphqlDetected for Bridge 3 consumption.
  * Stores ctx.shared.llmsTxtBody for downstream consumption.
  */
 export async function runStandardsBridge(
@@ -57,6 +58,7 @@ export async function runStandardsBridge(
     mcpCheck,
     securityTxtCheck,
     aiPluginCheck,
+    graphqlResult,
   ] = await Promise.all([
     checkOpenApi(ctx.baseUrl, ctx.options.timeout),
     checkLlmsTxt(ctx.baseUrl, ctx.options.timeout),
@@ -64,21 +66,24 @@ export async function runStandardsBridge(
     checkMcpEndpoint(ctx.baseUrl, ctx.options.timeout),
     checkSecurityTxt(ctx.baseUrl, ctx.options.timeout),
     checkAiPlugin(ctx.baseUrl, ctx.options.timeout),
+    checkGraphql(ctx.baseUrl, ctx.options.timeout),
   ]);
 
   // Run HTML-based checks (synchronous, no HTTP)
   const jsonLdCheck = checkJsonLd(pageBody);
   const schemaOrgCheck = checkSchemaOrg(pageBody, jsonLdCheck);
 
-  // Store OpenAPI detection result for Bridge 3
+  // Store detection results for Bridge 3
   ctx.shared.openApiDetected = openApiResult.detected;
   ctx.shared.openApiHasWebhooks = openApiResult.hasWebhooks;
   ctx.shared.openApiHasCallbacks = openApiResult.hasCallbacks;
+  ctx.shared.graphqlDetected = graphqlResult.detected;
   ctx.shared.llmsTxtBody = llmsTxtResult.body;
 
-  // Collect all 8 checks in order
+  // Collect all 9 checks in order
   const checks: Check[] = [
     openApiResult.check,
+    graphqlResult.check,
     llmsTxtResult.check,
     llmsFullTxtCheck,
     mcpCheck,

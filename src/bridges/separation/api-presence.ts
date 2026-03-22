@@ -47,11 +47,12 @@ function scanApiLinksMarkdown(text: string): string[] {
 /**
  * Detect API presence via multiple signals across content sources.
  *
- * Four signal sources:
+ * Five signal sources:
  * 1. OpenAPI spec detected by Bridge 2 (boolean from ctx.shared.openApiDetected)
- * 2. API-related response headers (X-RateLimit-*, X-Request-Id, etc.)
- * 3. HTML links containing /api/ paths (scanned from all content sources)
- * 4. Markdown links containing /api/ paths (scanned from all content sources)
+ * 2. GraphQL endpoint detected by Bridge 2 (boolean from ctx.shared.graphqlDetected)
+ * 3. API-related response headers (X-RateLimit-*, X-Request-Id, etc.)
+ * 4. HTML links containing /api/ paths (scanned from all content sources)
+ * 5. Markdown links containing /api/ paths (scanned from all content sources)
  *
  * Pure function -- no HTTP calls.
  */
@@ -59,6 +60,7 @@ export function checkApiPresence(
   openApiDetected: boolean,
   sources: ContentSource[],
   headers: Record<string, string>,
+  graphqlDetected = false,
 ): Check {
   const id = "api_presence";
   const label = "API Presence";
@@ -67,6 +69,9 @@ export function checkApiPresence(
 
   // Signal 1: OpenAPI spec detected by Bridge 2
   if (openApiDetected) signals.push("OpenAPI spec");
+
+  // Signal 2: GraphQL endpoint detected by Bridge 2
+  if (graphqlDetected) signals.push("GraphQL endpoint");
 
   // Signal 2: API-related response headers
   const apiHeaders = API_HEADERS.filter((h) => headers[h] !== undefined);
