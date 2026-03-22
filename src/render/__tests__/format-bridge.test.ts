@@ -21,7 +21,7 @@ describe("formatBridge", () => {
       durationMs: 230,
     };
     const output = stripAnsi(formatBridge(bridge, false));
-    expect(output).toContain("Reachability: Is my site accessible to AI agents?");
+    expect(output).toContain("Reachability: Is my product surface accessible to AI agents?");
     expect(output).toContain("85");
     expect(output).toContain("(230ms)");
   });
@@ -37,7 +37,7 @@ describe("formatBridge", () => {
       durationMs: 1450,
     };
     const output = stripAnsi(formatBridge(bridge, false));
-    expect(output).toContain("Standards: Does my site publish machine-readable standards?");
+    expect(output).toContain("Standards: Does my product surface publish machine-readable standards?");
     expect(output).toContain("42");
     expect(output).toContain("(1450ms)");
   });
@@ -58,7 +58,7 @@ describe("formatBridge", () => {
       durationMs: 320,
     };
     const output = stripAnsi(formatBridge(bridge, false));
-    expect(output).toContain("Separation: Does my site expose API infrastructure?");
+    expect(output).toContain("Separation: Does my product surface expose API infrastructure?");
     expect(output).toContain("3 of 4 signals detected");
     expect(output).toContain("(320ms)");
   });

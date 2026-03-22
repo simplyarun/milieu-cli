@@ -23,7 +23,7 @@ As an industry, we've spent decades perfecting UI & UX design for humans. Now we
 
 Good design made products usable for humans. Good milieu design makes products usable for agents.
 
-milieu-cli measures this. It scans your site and tells you what AI agents can actually see.
+milieu-cli measures this. It scans your product surface and tells you what AI agents can actually see.
 
 ```bash
 npx milieu-cli scan petstore.swagger.io
@@ -42,9 +42,9 @@ Run your first scan in under a minute:
 npx milieu-cli scan petstore.swagger.io
 ```
 
-No config, no API keys. You'll get a scored report showing what AI agents can see when they visit that site.
+No config, no API keys. You'll get a scored report showing what AI agents can see when they visit that product surface.
 
-### Example sites to try
+### Example products to try
 
 Each of these exercises different parts of the scanner:
 
@@ -65,7 +65,7 @@ Add `--verbose` to any scan to see individual check results and explanations:
 npx milieu-cli scan petstore.swagger.io --verbose
 ```
 
-Once you've seen how these score, scan your own site and compare.
+Once you've seen how these score, scan your own product surface and compare.
 
 ## The 5 Bridges
 
@@ -81,9 +81,9 @@ Milieu evaluates your product through five progressive bridges. Each one represe
 
 *Bridge 3 reports what's present rather than scoring quality.
 
-The bridges are progressive: there's no point checking your OpenAPI spec (Bridge 2) if agents can't even reach your site (Bridge 1). There's no point looking for SDK references (Bridge 3) if you don't publish machine-readable standards (Bridge 2). Each bridge builds on the last.
+The bridges are progressive: there's no point checking your OpenAPI spec (Bridge 2) if agents can't even reach your product surface (Bridge 1). There's no point looking for SDK references (Bridge 3) if you don't publish machine-readable standards (Bridge 2). Each bridge builds on the last.
 
-**Bridge 1 — Reachability** is the front door. Can AI agents get to your content at all? Are you blocking specific crawlers without realizing it? This is the most actionable bridge for most sites — many are unknowingly blocking GPTBot or ClaudeBot in their robots.txt.
+**Bridge 1 — Reachability** is the front door. Can AI agents get to your content at all? Are you blocking specific crawlers without realizing it? This is the most actionable bridge for most products — many are unknowingly blocking GPTBot or ClaudeBot in their robots.txt.
 
 **Bridge 2 — Standards** is the shared language. Do you speak the protocols AI agents understand? OpenAPI specs, GraphQL endpoints, XML sitemaps, markdown content negotiation, llms.txt, MCP endpoints, structured data — these are the machine-readable standards that let agents go beyond scraping your HTML. milieu also checks if your server returns markdown via HTTP content negotiation (`Accept: text/markdown`), which cuts agent token usage by ~80% compared to raw HTML.
 
@@ -93,7 +93,7 @@ The bridges are progressive: there's no point checking your OpenAPI spec (Bridge
 
 ### Crawler policies
 
-The single most actionable finding for most sites: are you blocking AI agents? milieu checks your robots.txt for policies on six specific bots:
+The single most actionable finding for most products: are you blocking AI agents? milieu checks your robots.txt for policies on six specific bots:
 
 - **GPTBot** (OpenAI) · **ClaudeBot** (Anthropic) · **CCBot** (Common Crawl)
 - **Googlebot** (Google) · **Bingbot** (Microsoft) · **PerplexityBot** (Perplexity)
@@ -153,7 +153,7 @@ Each check within a scored bridge contributes: **pass = 1**, **partial = 0.5**, 
 
 A "partial" means the signal exists but is incomplete: an OpenAPI spec served as YAML (detected but not fully parseable), or a robots.txt with valid structure but no explicit allow/disallow rules.
 
-All checks are reproducible: same site state produces the same score every time.
+All checks are reproducible: same product surface state produces the same score every time.
 
 ## Programmatic API
 

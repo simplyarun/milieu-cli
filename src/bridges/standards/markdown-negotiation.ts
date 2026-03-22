@@ -92,7 +92,7 @@ export async function checkMarkdownNegotiation(
         id,
         label,
         status: "fail",
-        detail: "Could not reach site to test markdown negotiation",
+        detail: "Could not reach product surface to test markdown negotiation",
       },
       supported: false,
     };
