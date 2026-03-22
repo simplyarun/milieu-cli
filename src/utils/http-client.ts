@@ -69,17 +69,24 @@ function classifyFetchError(error: unknown, url: string): HttpFailure {
 // ---------------------------------------------------------------------------
 
 /**
- * Read response body as a string, stopping early when maxBytes is reached.
+ * Read response body as a string, stopping early when maxBytes is reached
+ * or timeoutMs elapses.
  *
  * Uses the response body ReadableStream for chunk-by-chunk reading,
  * cancelling the stream once the byte limit is exceeded. This prevents
  * downloading multi-megabyte responses when only the first portion is needed.
+ *
+ * The timeoutMs parameter provides a hard deadline for body reading,
+ * independent of the fetch AbortSignal (which may not propagate to
+ * body stream reads in all Node.js versions). When the timeout fires,
+ * the reader is cancelled and whatever data was collected is returned.
  *
  * Falls back to response.text() if no body stream is available.
  */
 async function readBodyStream(
   response: Response,
   maxBytes: number,
+  timeoutMs?: number,
 ): Promise<string> {
   const stream = response.body;
   if (!stream) {
@@ -91,6 +98,11 @@ async function readBodyStream(
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
   let totalBytes = 0;
+
+  // Hard timeout: cancel the reader directly if body reading stalls
+  const timeoutId = timeoutMs
+    ? setTimeout(() => { reader.cancel().catch(() => {}); }, timeoutMs)
+    : undefined;
 
   try {
     while (true) {
@@ -106,7 +118,11 @@ async function readBodyStream(
       }
       chunks.push(value);
     }
+  } catch {
+    // reader.read() throws when stream is cancelled (timeout or network error).
+    // Return whatever data was collected so far.
   } finally {
+    if (timeoutId) clearTimeout(timeoutId);
     try { await reader.cancel(); } catch { /* stream may already be closed */ }
   }
 
@@ -276,8 +292,8 @@ async function fetchOnce(
         };
       }
 
-      // Stream body with early cancellation at maxBodyBytes
-      body = await readBodyStream(response, options.maxBodyBytes);
+      // Stream body with early cancellation at maxBodyBytes and hard timeout
+      body = await readBodyStream(response, options.maxBodyBytes, options.timeout);
     }
 
     const success: HttpSuccess = {

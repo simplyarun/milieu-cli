@@ -606,6 +606,49 @@ describe("httpGet", () => {
         expect(result.body.length).toBe(7);
       }
     });
+
+    it("returns partial data when body read times out", async () => {
+      const h = new Headers();
+      // Simulate a slow stream: first chunk arrives immediately, second never comes
+      let resolveSecondRead: (() => void) | undefined;
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode("fast-data"));
+          // Don't close — simulate a stalled stream
+        },
+        cancel() {
+          // Stream was cancelled (by our timeout) — resolve any pending read
+          if (resolveSecondRead) resolveSecondRead();
+        },
+      });
+      const response = {
+        status: 200,
+        statusText: "OK",
+        headers: h,
+        text: () => Promise.resolve(""),
+        body: stream,
+        bodyUsed: false,
+        ok: true,
+        redirected: false,
+        type: "basic",
+        url: "",
+        clone: () => response,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+        blob: () => Promise.resolve(new Blob()),
+        formData: () => Promise.resolve(new FormData()),
+        json: () => Promise.resolve({}),
+        bytes: () => Promise.resolve(new Uint8Array()),
+      } as Response;
+
+      fetchSpy.mockResolvedValueOnce(response);
+
+      const result = await httpGet("https://example.com", { timeout: 200 });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        // Should get the first chunk that arrived before timeout
+        expect(result.body).toBe("fast-data");
+      }
+    }, 5000);
   });
 
   // -----------------------------------------------------------------------
