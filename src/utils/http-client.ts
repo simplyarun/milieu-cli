@@ -6,10 +6,10 @@ import type {
 import { validateDns, type DnsCache } from "./ssrf.js";
 import { resolveRedirectUrl } from "./url.js";
 
-/** Options for httpGet */
+/** Options for httpGet (also supports POST despite the name) */
 export interface HttpGetOptions {
   /** HTTP method (default: "GET") */
-  method?: "GET" | "HEAD";
+  method?: "GET" | "HEAD" | "POST";
   /** Per-request timeout in milliseconds (default: 10000) */
   timeout?: number;
   /** Maximum number of redirects to follow (default: 5) */
@@ -20,6 +20,8 @@ export interface HttpGetOptions {
   dnsCache?: DnsCache;
   /** Custom headers to merge with defaults */
   headers?: Record<string, string>;
+  /** Request body for POST requests */
+  body?: string;
 }
 
 const DEFAULT_OPTIONS = {
@@ -102,12 +104,13 @@ function headersToRecord(headers: Headers): Record<string, string> {
 async function fetchOnce(
   url: string,
   options: {
-    method: "GET" | "HEAD";
+    method: "GET" | "HEAD" | "POST";
     timeout: number;
     maxRedirects: number;
     maxBodyBytes: number;
     dnsCache: DnsCache;
     headers: Record<string, string>;
+    body?: string;
   },
 ): Promise<HttpResponse> {
   let currentUrl = url;
@@ -140,13 +143,25 @@ async function fetchOnce(
         redirect: "manual",
         signal: AbortSignal.timeout(options.timeout),
         headers: options.headers,
+        // POST body (only sent on first request, not on redirects)
+        ...(options.method === "POST" && options.body && hop === 0
+          ? { body: options.body }
+          : {}),
       });
     } catch (err) {
       return classifyFetchError(err, currentUrl);
     }
 
-    // Handle redirects (3xx)
+    // Handle redirects (3xx) — POST does not follow redirects
     if (response.status >= 300 && response.status < 400) {
+      if (options.method === "POST") {
+        // POST redirects are not followed — treat as final response
+        const headerRecord = headersToRecord(response.headers);
+        return {
+          ok: false,
+          error: { kind: "http_error", message: `HTTP ${response.status} ${response.statusText}`, statusCode: response.status, url: currentUrl },
+        };
+      }
       const location = response.headers.get("location");
       if (!location) {
         // No Location header -- treat as final response
@@ -255,12 +270,13 @@ function isRetriable(result: HttpResponse): boolean {
 async function fetchWithRetry(
   url: string,
   options: {
-    method: "GET" | "HEAD";
+    method: "GET" | "HEAD" | "POST";
     timeout: number;
     maxRedirects: number;
     maxBodyBytes: number;
     dnsCache: DnsCache;
     headers: Record<string, string>;
+    body?: string;
   },
 ): Promise<HttpResponse> {
   const result = await fetchOnce(url, options);
@@ -279,8 +295,11 @@ async function fetchWithRetry(
 // ---------------------------------------------------------------------------
 
 /**
- * Perform an HTTP GET (or HEAD) request with SSRF protection, redirect
- * tracking, retry logic, and discriminated union error handling.
+ * Perform an HTTP request with SSRF protection, redirect tracking,
+ * retry logic, and discriminated union error handling.
+ *
+ * Supports GET, HEAD, and POST methods. POST requests do not follow
+ * redirects and require a `body` option.
  *
  * NEVER throws -- all errors are returned as HttpFailure values.
  */
@@ -298,6 +317,11 @@ export async function httpGet(
     ...(options?.headers ?? {}),
   };
 
+  // POST requests need Content-Type if not explicitly set
+  if (method === "POST" && !headers["Content-Type"] && !headers["content-type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+
   const start = performance.now();
 
   const result = await fetchWithRetry(url, {
@@ -307,6 +331,7 @@ export async function httpGet(
     maxBodyBytes,
     dnsCache,
     headers,
+    body: options?.body,
   });
 
   const durationMs = Math.round(performance.now() - start);

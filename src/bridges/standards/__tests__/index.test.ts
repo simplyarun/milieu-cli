@@ -22,6 +22,9 @@ vi.mock("../well-known.js", () => ({
   checkSecurityTxt: vi.fn(),
   checkAiPlugin: vi.fn(),
 }));
+vi.mock("../graphql.js", () => ({
+  checkGraphql: vi.fn(),
+}));
 
 import { runStandardsBridge } from "../index.js";
 import { checkOpenApi } from "../openapi.js";
@@ -30,6 +33,7 @@ import { checkMcpEndpoint } from "../mcp.js";
 import { checkJsonLd } from "../json-ld.js";
 import { checkSchemaOrg } from "../schema-org.js";
 import { checkSecurityTxt, checkAiPlugin } from "../well-known.js";
+import { checkGraphql } from "../graphql.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -57,6 +61,10 @@ function setupAllPass(): void {
     hasWebhooks: false,
     hasCallbacks: false,
   });
+  vi.mocked(checkGraphql).mockResolvedValue({
+    check: makeCheck("pass", "graphql_endpoint"),
+    detected: true,
+  });
   vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: "# Example\n\nContent here" });
   vi.mocked(checkLlmsFullTxt).mockResolvedValue(
     makeCheck("pass", "llms_full_txt"),
@@ -78,6 +86,10 @@ function setupAllFail(): void {
     detected: false,
     hasWebhooks: false,
     hasCallbacks: false,
+  });
+  vi.mocked(checkGraphql).mockResolvedValue({
+    check: makeCheck("fail", "graphql_endpoint"),
+    detected: false,
   });
   vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("fail", "llms_txt"), body: null });
   vi.mocked(checkLlmsFullTxt).mockResolvedValue(
@@ -111,13 +123,14 @@ describe("runStandardsBridge", () => {
     expect(result.status).toBe("evaluated");
   });
 
-  it("includes all 8 checks in result.checks array", async () => {
+  it("includes all 9 checks in result.checks array", async () => {
     setupAllPass();
     const result = await runStandardsBridge(makeCtx());
-    expect(result.checks).toHaveLength(8);
+    expect(result.checks).toHaveLength(9);
     const ids = result.checks.map((c) => c.id);
     expect(ids).toEqual([
       "openapi_spec",
+      "graphql_endpoint",
       "llms_txt",
       "llms_full_txt",
       "mcp_endpoint",
@@ -135,20 +148,24 @@ describe("runStandardsBridge", () => {
     expect(result.scoreLabel).toBe("pass");
   });
 
-  it("returns score 50 and scoreLabel partial when 4 pass + 4 fail", async () => {
-    // First 4 pass, last 4 fail
+  it("returns score 44 and scoreLabel partial when 4 pass + 5 fail", async () => {
+    // First 4 pass, rest fail (9 checks total: 4/9 = 44%)
     vi.mocked(checkOpenApi).mockResolvedValue({
       check: makeCheck("pass", "openapi_spec"),
       detected: true,
       hasWebhooks: false,
       hasCallbacks: false,
     });
+    vi.mocked(checkGraphql).mockResolvedValue({
+      check: makeCheck("pass", "graphql_endpoint"),
+      detected: true,
+    });
     vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: "# Example\n\nContent here" });
     vi.mocked(checkLlmsFullTxt).mockResolvedValue(
       makeCheck("pass", "llms_full_txt"),
     );
     vi.mocked(checkMcpEndpoint).mockResolvedValue(
-      makeCheck("pass", "mcp_endpoint"),
+      makeCheck("fail", "mcp_endpoint"),
     );
     vi.mocked(checkJsonLd).mockReturnValue(makeCheck("fail", "json_ld"));
     vi.mocked(checkSchemaOrg).mockReturnValue(makeCheck("fail", "schema_org"));
@@ -160,7 +177,7 @@ describe("runStandardsBridge", () => {
     );
 
     const result = await runStandardsBridge(makeCtx());
-    expect(result.score).toBe(50);
+    expect(result.score).toBe(44);
     expect(result.scoreLabel).toBe("partial");
   });
 
@@ -171,13 +188,17 @@ describe("runStandardsBridge", () => {
     expect(result.scoreLabel).toBe("fail");
   });
 
-  it("returns score 38 and scoreLabel fail for 2 pass + 2 partial + 4 fail", async () => {
-    // 2 pass (2 points) + 2 partial (1 point) + 4 fail (0) = 3/8 = 37.5 => 38
+  it("returns score 33 and scoreLabel fail for 2 pass + 2 partial + 5 fail", async () => {
+    // 2 pass (2 points) + 2 partial (1 point) + 5 fail (0) = 3/9 = 33.3 => 33
     vi.mocked(checkOpenApi).mockResolvedValue({
       check: makeCheck("pass", "openapi_spec"),
       detected: true,
       hasWebhooks: false,
       hasCallbacks: false,
+    });
+    vi.mocked(checkGraphql).mockResolvedValue({
+      check: makeCheck("fail", "graphql_endpoint"),
+      detected: false,
     });
     vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: "# Example\n\nContent here" });
     vi.mocked(checkLlmsFullTxt).mockResolvedValue(
@@ -196,7 +217,7 @@ describe("runStandardsBridge", () => {
     );
 
     const result = await runStandardsBridge(makeCtx());
-    expect(result.score).toBe(38);
+    expect(result.score).toBe(33);
     expect(result.scoreLabel).toBe("fail");
   });
 

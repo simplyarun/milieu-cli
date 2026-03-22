@@ -44,7 +44,7 @@ describe("resolveExplanation", () => {
 });
 
 describe("CHECK_EXPLANATIONS structural sync", () => {
-  // All 23 known check IDs across bridges 1-3
+  // All 24 known check IDs across bridges 1-3
   const ALL_CHECK_IDS = [
     // Bridge 1: Reachability
     "https_available",
@@ -60,6 +60,7 @@ describe("CHECK_EXPLANATIONS structural sync", () => {
     "x_robots_tag",
     // Bridge 2: Standards
     "openapi_spec",
+    "graphql_endpoint",
     "llms_txt",
     "llms_full_txt",
     "mcp_endpoint",

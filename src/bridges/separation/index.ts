@@ -33,6 +33,7 @@ export async function runSeparationBridge(
   const openApiDetected = (ctx.shared.openApiDetected as boolean) ?? false;
   const openApiHasWebhooks = (ctx.shared.openApiHasWebhooks as boolean) ?? false;
   const openApiHasCallbacks = (ctx.shared.openApiHasCallbacks as boolean) ?? false;
+  const graphqlDetected = (ctx.shared.graphqlDetected as boolean) ?? false;
   const llmsTxtBody = (ctx.shared.llmsTxtBody as string | undefined) ?? null;
 
   // Fire async developer docs probe first (non-blocking)
@@ -55,7 +56,7 @@ export async function runSeparationBridge(
   contentSources.push(...devDocsResult.pages);
 
   // Run 3 synchronous pure-function checks with assembled content sources
-  const apiPresenceCheck = checkApiPresence(openApiDetected, contentSources, pageHeaders);
+  const apiPresenceCheck = checkApiPresence(openApiDetected, contentSources, pageHeaders, graphqlDetected);
   const sdkRefsCheck = checkSdkReferences(contentSources);
   const webhookCheck = checkWebhookSupport(contentSources, {
     pageHeaders,
