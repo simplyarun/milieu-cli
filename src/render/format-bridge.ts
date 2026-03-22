@@ -3,9 +3,9 @@ import { cyan, dim, bold } from "./colors.js";
 import { progressBar } from "./progress-bar.js";
 
 const BRIDGE_QUESTIONS: Record<BridgeId, string> = {
-  1: "Is my site accessible to AI agents?",
-  2: "Does my site publish machine-readable standards?",
-  3: "Does my site expose API infrastructure?",
+  1: "Is my product surface accessible to AI agents?",
+  2: "Does my product surface publish machine-readable standards?",
+  3: "Does my product surface expose API infrastructure?",
   4: "Can agents use the APIs correctly?",
   5: "Can agents trust and leverage the context?",
 };

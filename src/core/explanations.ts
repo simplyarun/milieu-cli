@@ -11,16 +11,16 @@ export const CHECK_EXPLANATIONS: Record<string, ExplanationEntry> = {
   https_available:
     "HTTPS is required for secure communication. AI agents refuse to interact with insecure endpoints.",
   http_status: {
-    pass: "Your site returns a clean 200 response — agents can reach your content without issues.",
+    pass: "Your product surface returns a clean 200 response — agents can reach your content without issues.",
     fail: "Agents can't reach your content. Non-200 responses block automated workflows entirely.",
     partial: "Redirects add latency and may break automated agent workflows.",
     default: "A non-200 status means agents can't reliably reach your content.",
   },
   robots_txt: {
     pass: "Your robots.txt gives AI agents clear crawling guidance.",
-    fail: "Without robots.txt, AI agents have no guidance on what they can access — most default to cautious behavior and skip your site.",
+    fail: "Without robots.txt, AI agents have no guidance on what they can access — most default to cautious behavior and skip your product surface.",
     partial: "Your robots.txt exists but may not provide clear guidance to AI agents.",
-    default: "robots.txt tells AI agents what they're allowed to crawl on your site.",
+    default: "robots.txt tells AI agents what they're allowed to crawl on your product surface.",
   },
   crawler_policy_gptbot: {
     pass: "GPTBot can access your content — it will be available to ChatGPT and OpenAI's APIs.",
@@ -72,9 +72,9 @@ export const CHECK_EXPLANATIONS: Record<string, ExplanationEntry> = {
   },
   sitemap: {
     pass: "Your XML sitemap helps AI agents discover all your pages and API resources efficiently without crawling.",
-    fail: "Without a sitemap, AI agents must crawl your site blindly — they may miss important pages and API resources.",
+    fail: "Without a sitemap, AI agents must crawl your product surface blindly — they may miss important pages and API resources.",
     partial: "Your sitemap exists but contains no URLs — AI agents can't use it to discover your content.",
-    default: "An XML sitemap gives AI agents a complete map of your site's pages and resources.",
+    default: "An XML sitemap gives AI agents a complete map of your pages and resources.",
   },
   graphql_endpoint: {
     pass: "Your GraphQL endpoint with introspection lets AI agents discover your entire API schema and build queries automatically.",
@@ -89,15 +89,15 @@ export const CHECK_EXPLANATIONS: Record<string, ExplanationEntry> = {
     default: "An OpenAPI spec is the machine-readable contract that lets AI agents use your API.",
   },
   llms_txt: {
-    pass: "Your llms.txt helps AI agents understand what your site offers without crawling every page.",
-    fail: "Without llms.txt, AI agents must crawl your entire site to understand what you offer — most won't bother.",
+    pass: "Your llms.txt helps AI agents understand what your product surface offers without crawling every page.",
+    fail: "Without llms.txt, AI agents must crawl your entire product surface to understand what you offer — most won't bother.",
     partial: "Your llms.txt exists but may not follow the expected format for optimal AI consumption.",
-    default: "llms.txt provides a structured overview of your site purpose-built for large language models.",
+    default: "llms.txt provides a structured overview of your product surface purpose-built for large language models.",
   },
   llms_full_txt: {
     pass: "Your llms-full.txt gives AI agents comprehensive content for deep understanding.",
     fail: "Without llms-full.txt, AI agents only have the summary from llms.txt — they lack the depth needed for detailed answers about your product.",
-    default: "llms-full.txt provides comprehensive site content that gives AI agents deep context beyond the llms.txt summary.",
+    default: "llms-full.txt provides comprehensive product content that gives AI agents deep context beyond the llms.txt summary.",
   },
   mcp_endpoint: {
     pass: "Your MCP endpoint lets AI agents connect to your service as a tool — the emerging standard for AI-to-service integration.",
@@ -125,7 +125,7 @@ export const CHECK_EXPLANATIONS: Record<string, ExplanationEntry> = {
   // Bridge 3: Separation
   api_presence: {
     pass: "AI agents can see that your product has a programmatic interface — they'll attempt to integrate with it.",
-    fail: "Without API presence signals, AI agents treat your site as content-only — they won't attempt programmatic integration.",
+    fail: "Without API presence signals, AI agents treat your product surface as content-only — they won't attempt programmatic integration.",
     default: "API presence signals tell AI agents your product has a programmatic interface, not just web pages.",
   },
   developer_docs: {

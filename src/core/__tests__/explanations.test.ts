@@ -25,7 +25,7 @@ describe("resolveExplanation", () => {
   it("returns the status-specific string when available", () => {
     const result = resolveExplanation("http_status", "pass");
     expect(result).toBe(
-      "Your site returns a clean 200 response — agents can reach your content without issues.",
+      "Your product surface returns a clean 200 response — agents can reach your content without issues.",
     );
   });
 
