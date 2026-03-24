@@ -39,15 +39,16 @@ function calculateScore(checks: Check[]): {
  *
  * Runs 11 checks in two phases:
  *
- * Phase 1 (parallel): Sitemap + Markdown negotiation + llms.txt + llms-full.txt + MCP + security.txt + ai-plugin.json
- * Phase 2 (parallel): OpenAPI (fed sitemap API URLs as candidates) + GraphQL
+ * Phase 1 (parallel): Sitemap + Markdown negotiation + llms.txt + llms-full.txt + security.txt + ai-plugin.json
+ * Phase 2 (parallel): OpenAPI (fed sitemap API URLs) + GraphQL + MCP (fed pageBody + llmsTxtBody)
  * Synchronous: JSON-LD + Schema.org (from ctx.shared.pageBody)
  *
  * Two-phase execution is required because sitemap results feed into
- * OpenAPI detection as candidate spec URLs.
+ * OpenAPI detection, and llms.txt body feeds into MCP content scanning.
  *
  * Stores ctx.shared.openApiDetected, ctx.shared.graphqlDetected,
- * ctx.shared.sitemapUrls, and ctx.shared.llmsTxtBody for Bridge 3 consumption.
+ * ctx.shared.mcpDetected, ctx.shared.sitemapUrls, and ctx.shared.llmsTxtBody
+ * for Bridge 3 consumption.
  */
 export async function runStandardsBridge(
   ctx: ScanContext,
@@ -64,7 +65,6 @@ export async function runStandardsBridge(
     markdownResult,
     llmsTxtResult,
     llmsFullTxtCheck,
-    mcpCheck,
     securityTxtCheck,
     aiPluginCheck,
   ] = await Promise.all([
@@ -72,15 +72,15 @@ export async function runStandardsBridge(
     checkMarkdownNegotiation(ctx.baseUrl, ctx.options.timeout),
     checkLlmsTxt(ctx.baseUrl, ctx.options.timeout),
     checkLlmsFullTxt(ctx.baseUrl, ctx.options.timeout),
-    checkMcpEndpoint(ctx.baseUrl, ctx.options.timeout),
     checkSecurityTxt(ctx.baseUrl, ctx.options.timeout),
     checkAiPlugin(ctx.baseUrl, ctx.options.timeout),
   ]);
 
-  // Phase 2: OpenAPI (with sitemap API URLs) + GraphQL (parallel)
-  const [openApiResult, graphqlResult] = await Promise.all([
+  // Phase 2: OpenAPI (with sitemap API URLs) + GraphQL + MCP (with page content) (parallel)
+  const [openApiResult, graphqlResult, mcpResult] = await Promise.all([
     checkOpenApi(ctx.baseUrl, ctx.options.timeout, sitemapResult.apiRelevantUrls),
     checkGraphql(ctx.baseUrl, ctx.options.timeout),
+    checkMcpEndpoint(ctx.baseUrl, ctx.options.timeout, pageBody, llmsTxtResult.body ?? undefined),
   ]);
 
   // Synchronous HTML-based checks (no HTTP)
@@ -92,6 +92,7 @@ export async function runStandardsBridge(
   ctx.shared.openApiHasWebhooks = openApiResult.hasWebhooks;
   ctx.shared.openApiHasCallbacks = openApiResult.hasCallbacks;
   ctx.shared.graphqlDetected = graphqlResult.detected;
+  ctx.shared.mcpDetected = mcpResult.detected;
   ctx.shared.sitemapUrls = sitemapResult.urls;
   ctx.shared.llmsTxtBody = llmsTxtResult.body;
 
@@ -103,7 +104,7 @@ export async function runStandardsBridge(
     markdownResult.check,
     llmsTxtResult.check,
     llmsFullTxtCheck,
-    mcpCheck,
+    mcpResult.check,
     jsonLdCheck,
     schemaOrgCheck,
     securityTxtCheck,

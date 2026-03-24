@@ -86,9 +86,10 @@ function setupAllPass(): void {
   vi.mocked(checkLlmsFullTxt).mockResolvedValue(
     makeCheck("pass", "llms_full_txt"),
   );
-  vi.mocked(checkMcpEndpoint).mockResolvedValue(
-    makeCheck("pass", "mcp_endpoint"),
-  );
+  vi.mocked(checkMcpEndpoint).mockResolvedValue({
+    check: makeCheck("pass", "mcp_endpoint"),
+    detected: true,
+  });
   vi.mocked(checkJsonLd).mockReturnValue(makeCheck("pass", "json_ld"));
   vi.mocked(checkSchemaOrg).mockReturnValue(makeCheck("pass", "schema_org"));
   vi.mocked(checkSecurityTxt).mockResolvedValue(
@@ -121,9 +122,10 @@ function setupAllFail(): void {
   vi.mocked(checkLlmsFullTxt).mockResolvedValue(
     makeCheck("fail", "llms_full_txt"),
   );
-  vi.mocked(checkMcpEndpoint).mockResolvedValue(
-    makeCheck("fail", "mcp_endpoint"),
-  );
+  vi.mocked(checkMcpEndpoint).mockResolvedValue({
+    check: makeCheck("fail", "mcp_endpoint"),
+    detected: false,
+  });
   vi.mocked(checkJsonLd).mockReturnValue(makeCheck("fail", "json_ld"));
   vi.mocked(checkSchemaOrg).mockReturnValue(makeCheck("fail", "schema_org"));
   vi.mocked(checkSecurityTxt).mockResolvedValue(
@@ -201,9 +203,10 @@ describe("runStandardsBridge", () => {
     vi.mocked(checkLlmsFullTxt).mockResolvedValue(
       makeCheck("fail", "llms_full_txt"),
     );
-    vi.mocked(checkMcpEndpoint).mockResolvedValue(
-      makeCheck("fail", "mcp_endpoint"),
-    );
+    vi.mocked(checkMcpEndpoint).mockResolvedValue({
+      check: makeCheck("fail", "mcp_endpoint"),
+      detected: false,
+    });
     vi.mocked(checkJsonLd).mockReturnValue(makeCheck("fail", "json_ld"));
     vi.mocked(checkSchemaOrg).mockReturnValue(makeCheck("fail", "schema_org"));
     vi.mocked(checkSecurityTxt).mockResolvedValue(
@@ -250,9 +253,10 @@ describe("runStandardsBridge", () => {
     vi.mocked(checkLlmsFullTxt).mockResolvedValue(
       makeCheck("partial", "llms_full_txt"),
     );
-    vi.mocked(checkMcpEndpoint).mockResolvedValue(
-      makeCheck("partial", "mcp_endpoint"),
-    );
+    vi.mocked(checkMcpEndpoint).mockResolvedValue({
+      check: makeCheck("partial", "mcp_endpoint"),
+      detected: false,
+    });
     vi.mocked(checkJsonLd).mockReturnValue(makeCheck("fail", "json_ld"));
     vi.mocked(checkSchemaOrg).mockReturnValue(makeCheck("fail", "schema_org"));
     vi.mocked(checkSecurityTxt).mockResolvedValue(
@@ -335,7 +339,7 @@ describe("runStandardsBridge", () => {
     vi.mocked(checkMarkdownNegotiation).mockResolvedValue({ check: makeCheck("pass", "markdown_negotiation"), supported: true });
     vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: null });
     vi.mocked(checkLlmsFullTxt).mockResolvedValue(makeCheck("pass", "llms_full_txt"));
-    vi.mocked(checkMcpEndpoint).mockResolvedValue(makeCheck("pass", "mcp_endpoint"));
+    vi.mocked(checkMcpEndpoint).mockResolvedValue({ check: makeCheck("pass", "mcp_endpoint"), detected: true });
     vi.mocked(checkJsonLd).mockReturnValue(makeCheck("pass", "json_ld"));
     vi.mocked(checkSchemaOrg).mockReturnValue(makeCheck("pass", "schema_org"));
     vi.mocked(checkSecurityTxt).mockResolvedValue(makeCheck("pass", "security_txt"));
@@ -353,5 +357,31 @@ describe("runStandardsBridge", () => {
     await runStandardsBridge(ctx);
     expect(ctx.shared.openApiHasWebhooks).toBe(false);
     expect(ctx.shared.openApiHasCallbacks).toBe(false);
+  });
+
+  it("stores ctx.shared.mcpDetected from MCP result", async () => {
+    setupAllPass();
+    const ctx = makeCtx();
+    await runStandardsBridge(ctx);
+    expect(ctx.shared.mcpDetected).toBe(true);
+  });
+
+  it("stores mcpDetected false when MCP not found", async () => {
+    setupAllFail();
+    const ctx = makeCtx();
+    await runStandardsBridge(ctx);
+    expect(ctx.shared.mcpDetected).toBe(false);
+  });
+
+  it("passes pageBody and llmsTxtBody to MCP check in Phase 2", async () => {
+    setupAllPass();
+    const ctx = makeCtx({ shared: { pageBody: "<html>test</html>" } });
+    await runStandardsBridge(ctx);
+    expect(checkMcpEndpoint).toHaveBeenCalledWith(
+      "https://example.com",
+      5000,
+      "<html>test</html>",
+      "# Example\n\nContent here",
+    );
   });
 });
