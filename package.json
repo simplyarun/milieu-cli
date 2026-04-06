@@ -61,6 +61,7 @@
     "url": "https://github.com/simplyarun/milieu-cli/issues"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.0.0",
     "tsx": "^4",
     "typescript": "^5.9",
@@ -69,6 +70,7 @@
   "dependencies": {
     "chalk": "^5.6.2",
     "commander": "^14.0.3",
+    "js-yaml": "^4.1.1",
     "ora": "^9.3.0"
   }
 }

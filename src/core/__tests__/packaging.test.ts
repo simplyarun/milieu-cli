@@ -36,9 +36,9 @@ function walkDir(dir: string): string[] {
 }
 
 describe("packaging", () => {
-  it("has exactly 3 runtime dependencies", () => {
+  it("has exactly 4 runtime dependencies", () => {
     const deps = Object.keys(pkg.dependencies).sort();
-    expect(deps).toEqual(["chalk", "commander", "ora"]);
+    expect(deps).toEqual(["chalk", "commander", "js-yaml", "ora"]);
   });
 
   it("is ESM-only", () => {

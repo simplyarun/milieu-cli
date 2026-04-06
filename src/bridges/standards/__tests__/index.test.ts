@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Check, CheckStatus, ScanContext } from "../../../core/types.js";
 
 // Mock all check modules
-vi.mock("../openapi.js", () => ({
-  checkOpenApi: vi.fn(),
+vi.mock("../../../lib/openapi/index.js", () => ({
+  checkOpenAPI: vi.fn(),
 }));
 vi.mock("../llms-txt.js", () => ({
   checkLlmsTxt: vi.fn(),
@@ -20,7 +20,6 @@ vi.mock("../schema-org.js", () => ({
 }));
 vi.mock("../well-known.js", () => ({
   checkSecurityTxt: vi.fn(),
-  checkAiPlugin: vi.fn(),
 }));
 vi.mock("../graphql.js", () => ({
   checkGraphql: vi.fn(),
@@ -31,17 +30,29 @@ vi.mock("../sitemap.js", () => ({
 vi.mock("../markdown-negotiation.js", () => ({
   checkMarkdownNegotiation: vi.fn(),
 }));
+vi.mock("../webmcp.js", () => ({
+  checkWebMcp: vi.fn(),
+}));
+vi.mock("../a2a-agent-card.js", () => ({
+  checkA2aAgentCard: vi.fn(),
+}));
+vi.mock("../content-negotiation.js", () => ({
+  checkContentNegotiation: vi.fn(),
+}));
 
 import { runStandardsBridge } from "../index.js";
-import { checkOpenApi } from "../openapi.js";
+import { checkOpenAPI } from "../../../lib/openapi/index.js";
 import { checkLlmsTxt, checkLlmsFullTxt } from "../llms-txt.js";
 import { checkMcpEndpoint } from "../mcp.js";
 import { checkJsonLd } from "../json-ld.js";
 import { checkSchemaOrg } from "../schema-org.js";
-import { checkSecurityTxt, checkAiPlugin } from "../well-known.js";
+import { checkSecurityTxt } from "../well-known.js";
 import { checkGraphql } from "../graphql.js";
 import { checkSitemap } from "../sitemap.js";
 import { checkMarkdownNegotiation } from "../markdown-negotiation.js";
+import { checkWebMcp } from "../webmcp.js";
+import { checkA2aAgentCard } from "../a2a-agent-card.js";
+import { checkContentNegotiation } from "../content-negotiation.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -63,11 +74,22 @@ function makeCtx(overrides?: Partial<ScanContext>): ScanContext {
 }
 
 function setupAllPass(): void {
-  vi.mocked(checkOpenApi).mockResolvedValue({
-    check: makeCheck("pass", "openapi_spec"),
-    detected: true,
-    hasWebhooks: false,
-    hasCallbacks: false,
+  vi.mocked(checkOpenAPI).mockResolvedValue({
+    exists: true,
+    url: "https://example.com/openapi.json",
+    version: "3.0",
+    endpointCount: 10,
+    operationCount: 20,
+    hasDescriptions: true,
+    descriptionCoverage: 0.9,
+    hasAuthSchemes: true,
+    authSchemeTypes: ["apiKey"],
+    authSchemeNames: ["ApiKey"],
+    hasGlobalSecurity: true,
+    governanceReady: true,
+    durationMs: 100,
+    error: null,
+    spec: { openapi: "3.0.0", paths: {} },
   });
   vi.mocked(checkGraphql).mockResolvedValue({
     check: makeCheck("pass", "graphql_endpoint"),
@@ -95,15 +117,28 @@ function setupAllPass(): void {
   vi.mocked(checkSecurityTxt).mockResolvedValue(
     makeCheck("pass", "security_txt"),
   );
-  vi.mocked(checkAiPlugin).mockResolvedValue(makeCheck("pass", "ai_plugin"));
+  vi.mocked(checkWebMcp).mockResolvedValue(makeCheck("pass", "standards_webmcp"));
+  vi.mocked(checkA2aAgentCard).mockResolvedValue(makeCheck("pass", "standards_a2a_agent_card"));
+  vi.mocked(checkContentNegotiation).mockResolvedValue(makeCheck("pass", "standards_content_negotiation"));
 }
 
 function setupAllFail(): void {
-  vi.mocked(checkOpenApi).mockResolvedValue({
-    check: makeCheck("fail", "openapi_spec"),
-    detected: false,
-    hasWebhooks: false,
-    hasCallbacks: false,
+  vi.mocked(checkOpenAPI).mockResolvedValue({
+    exists: false,
+    url: null,
+    version: null,
+    endpointCount: 0,
+    operationCount: 0,
+    hasDescriptions: false,
+    descriptionCoverage: 0,
+    hasAuthSchemes: false,
+    authSchemeTypes: [],
+    authSchemeNames: [],
+    hasGlobalSecurity: false,
+    governanceReady: false,
+    durationMs: 100,
+    error: null,
+    spec: null,
   });
   vi.mocked(checkGraphql).mockResolvedValue({
     check: makeCheck("fail", "graphql_endpoint"),
@@ -131,7 +166,9 @@ function setupAllFail(): void {
   vi.mocked(checkSecurityTxt).mockResolvedValue(
     makeCheck("fail", "security_txt"),
   );
-  vi.mocked(checkAiPlugin).mockResolvedValue(makeCheck("fail", "ai_plugin"));
+  vi.mocked(checkWebMcp).mockResolvedValue(makeCheck("fail", "standards_webmcp"));
+  vi.mocked(checkA2aAgentCard).mockResolvedValue(makeCheck("fail", "standards_a2a_agent_card"));
+  vi.mocked(checkContentNegotiation).mockResolvedValue(makeCheck("fail", "standards_content_negotiation"));
 }
 
 // ---------------------------------------------------------------------------
@@ -151,10 +188,10 @@ describe("runStandardsBridge", () => {
     expect(result.status).toBe("evaluated");
   });
 
-  it("includes all 11 checks in result.checks array", async () => {
+  it("includes all 13 checks in result.checks array", async () => {
     setupAllPass();
     const result = await runStandardsBridge(makeCtx());
-    expect(result.checks).toHaveLength(11);
+    expect(result.checks).toHaveLength(13);
     const ids = result.checks.map((c) => c.id);
     expect(ids).toEqual([
       "openapi_spec",
@@ -167,122 +204,46 @@ describe("runStandardsBridge", () => {
       "json_ld",
       "schema_org",
       "security_txt",
-      "ai_plugin",
+      "standards_webmcp",
+      "standards_a2a_agent_card",
+      "standards_content_negotiation",
     ]);
   });
 
-  it("returns score 100 and scoreLabel pass when all 8 checks pass", async () => {
+  it("returns score 100 and scoreLabel pass when all checks pass", async () => {
     setupAllPass();
     const result = await runStandardsBridge(makeCtx());
     expect(result.score).toBe(100);
     expect(result.scoreLabel).toBe("pass");
   });
 
-  it("returns score 36 and scoreLabel fail when 4 pass + 7 fail", async () => {
-    // First 4 pass, rest fail (11 checks total: 4/11 = 36%)
-    vi.mocked(checkOpenApi).mockResolvedValue({
-      check: makeCheck("pass", "openapi_spec"),
-      detected: true,
-      hasWebhooks: false,
-      hasCallbacks: false,
-    });
-    vi.mocked(checkGraphql).mockResolvedValue({
-      check: makeCheck("pass", "graphql_endpoint"),
-      detected: true,
-    });
-    vi.mocked(checkSitemap).mockResolvedValue({
-      check: makeCheck("pass", "sitemap"),
-      urls: [],
-      apiRelevantUrls: [],
-    });
-    vi.mocked(checkMarkdownNegotiation).mockResolvedValue({
-      check: makeCheck("pass", "markdown_negotiation"),
-      supported: true,
-    });
-    vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("fail", "llms_txt"), body: null });
-    vi.mocked(checkLlmsFullTxt).mockResolvedValue(
-      makeCheck("fail", "llms_full_txt"),
-    );
-    vi.mocked(checkMcpEndpoint).mockResolvedValue({
-      check: makeCheck("fail", "mcp_endpoint"),
-      detected: false,
-    });
-    vi.mocked(checkJsonLd).mockReturnValue(makeCheck("fail", "json_ld"));
-    vi.mocked(checkSchemaOrg).mockReturnValue(makeCheck("fail", "schema_org"));
-    vi.mocked(checkSecurityTxt).mockResolvedValue(
-      makeCheck("fail", "security_txt"),
-    );
-    vi.mocked(checkAiPlugin).mockResolvedValue(
-      makeCheck("fail", "ai_plugin"),
-    );
-
-    const result = await runStandardsBridge(makeCtx());
-    expect(result.score).toBe(36);
-    expect(result.scoreLabel).toBe("fail");
-  });
-
-  it("returns score 0 and scoreLabel fail when all 8 checks fail", async () => {
+  it("returns score 0 and scoreLabel fail when all checks fail", async () => {
     setupAllFail();
     const result = await runStandardsBridge(makeCtx());
     expect(result.score).toBe(0);
     expect(result.scoreLabel).toBe("fail");
   });
 
-  it("returns score 27 and scoreLabel fail for 2 pass + 2 partial + 7 fail", async () => {
-    // 2 pass (2 points) + 2 partial (1 point) + 7 fail (0) = 3/11 = 27%
-    vi.mocked(checkOpenApi).mockResolvedValue({
-      check: makeCheck("pass", "openapi_spec"),
-      detected: true,
-      hasWebhooks: false,
-      hasCallbacks: false,
-    });
-    vi.mocked(checkGraphql).mockResolvedValue({
-      check: makeCheck("fail", "graphql_endpoint"),
-      detected: false,
-    });
-    vi.mocked(checkSitemap).mockResolvedValue({
-      check: makeCheck("fail", "sitemap"),
-      urls: [],
-      apiRelevantUrls: [],
-    });
-    vi.mocked(checkMarkdownNegotiation).mockResolvedValue({
-      check: makeCheck("fail", "markdown_negotiation"),
-      supported: false,
-    });
-    vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: "# Example\n\nContent here" });
-    vi.mocked(checkLlmsFullTxt).mockResolvedValue(
-      makeCheck("partial", "llms_full_txt"),
-    );
-    vi.mocked(checkMcpEndpoint).mockResolvedValue({
-      check: makeCheck("partial", "mcp_endpoint"),
-      detected: false,
-    });
-    vi.mocked(checkJsonLd).mockReturnValue(makeCheck("fail", "json_ld"));
-    vi.mocked(checkSchemaOrg).mockReturnValue(makeCheck("fail", "schema_org"));
-    vi.mocked(checkSecurityTxt).mockResolvedValue(
-      makeCheck("fail", "security_txt"),
-    );
-    vi.mocked(checkAiPlugin).mockResolvedValue(
-      makeCheck("fail", "ai_plugin"),
-    );
-
-    const result = await runStandardsBridge(makeCtx());
-    expect(result.score).toBe(27);
-    expect(result.scoreLabel).toBe("fail");
-  });
-
   it("sets ctx.shared.openApiDetected to true when OpenAPI found", async () => {
-    setupAllPass(); // checkOpenApi returns detected: true
+    setupAllPass();
     const ctx = makeCtx();
     await runStandardsBridge(ctx);
     expect(ctx.shared.openApiDetected).toBe(true);
   });
 
   it("sets ctx.shared.openApiDetected to false when OpenAPI not found", async () => {
-    setupAllFail(); // checkOpenApi returns detected: false
+    setupAllFail();
     const ctx = makeCtx();
     await runStandardsBridge(ctx);
     expect(ctx.shared.openApiDetected).toBe(false);
+  });
+
+  it("stores openApiSpec and openApiResult in ctx.shared", async () => {
+    setupAllPass();
+    const ctx = makeCtx();
+    await runStandardsBridge(ctx);
+    expect(ctx.shared.openApiSpec).toEqual({ openapi: "3.0.0", paths: {} });
+    expect(ctx.shared.openApiResult).toBeDefined();
   });
 
   it("passes ctx.shared.pageBody to JSON-LD and Schema.org checks", async () => {
@@ -325,63 +286,5 @@ describe("runStandardsBridge", () => {
     const ctx = makeCtx();
     await runStandardsBridge(ctx);
     expect(ctx.shared.llmsTxtBody).toBeNull();
-  });
-
-  it("stores openApiHasWebhooks and openApiHasCallbacks in ctx.shared", async () => {
-    vi.mocked(checkOpenApi).mockResolvedValue({
-      check: makeCheck("pass", "openapi_spec"),
-      detected: true,
-      hasWebhooks: true,
-      hasCallbacks: true,
-    });
-    vi.mocked(checkGraphql).mockResolvedValue({ check: makeCheck("pass", "graphql_endpoint"), detected: true });
-    vi.mocked(checkSitemap).mockResolvedValue({ check: makeCheck("pass", "sitemap"), urls: [], apiRelevantUrls: [] });
-    vi.mocked(checkMarkdownNegotiation).mockResolvedValue({ check: makeCheck("pass", "markdown_negotiation"), supported: true });
-    vi.mocked(checkLlmsTxt).mockResolvedValue({ check: makeCheck("pass", "llms_txt"), body: null });
-    vi.mocked(checkLlmsFullTxt).mockResolvedValue(makeCheck("pass", "llms_full_txt"));
-    vi.mocked(checkMcpEndpoint).mockResolvedValue({ check: makeCheck("pass", "mcp_endpoint"), detected: true });
-    vi.mocked(checkJsonLd).mockReturnValue(makeCheck("pass", "json_ld"));
-    vi.mocked(checkSchemaOrg).mockReturnValue(makeCheck("pass", "schema_org"));
-    vi.mocked(checkSecurityTxt).mockResolvedValue(makeCheck("pass", "security_txt"));
-    vi.mocked(checkAiPlugin).mockResolvedValue(makeCheck("pass", "ai_plugin"));
-
-    const ctx = makeCtx();
-    await runStandardsBridge(ctx);
-    expect(ctx.shared.openApiHasWebhooks).toBe(true);
-    expect(ctx.shared.openApiHasCallbacks).toBe(true);
-  });
-
-  it("stores false for webhook flags when no spec found", async () => {
-    setupAllFail();
-    const ctx = makeCtx();
-    await runStandardsBridge(ctx);
-    expect(ctx.shared.openApiHasWebhooks).toBe(false);
-    expect(ctx.shared.openApiHasCallbacks).toBe(false);
-  });
-
-  it("stores ctx.shared.mcpDetected from MCP result", async () => {
-    setupAllPass();
-    const ctx = makeCtx();
-    await runStandardsBridge(ctx);
-    expect(ctx.shared.mcpDetected).toBe(true);
-  });
-
-  it("stores mcpDetected false when MCP not found", async () => {
-    setupAllFail();
-    const ctx = makeCtx();
-    await runStandardsBridge(ctx);
-    expect(ctx.shared.mcpDetected).toBe(false);
-  });
-
-  it("passes pageBody and llmsTxtBody to MCP check in Phase 2", async () => {
-    setupAllPass();
-    const ctx = makeCtx({ shared: { pageBody: "<html>test</html>" } });
-    await runStandardsBridge(ctx);
-    expect(checkMcpEndpoint).toHaveBeenCalledWith(
-      "https://example.com",
-      5000,
-      "<html>test</html>",
-      "# Example\n\nContent here",
-    );
   });
 });

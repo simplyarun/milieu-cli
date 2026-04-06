@@ -115,7 +115,7 @@ describe("integration: healthy site scan", () => {
     expect(openapiCheck).toBeDefined();
     expect(openapiCheck!.status).toBe("pass");
     expect((openapiCheck!.data as Record<string, unknown>).version).toBe(
-      "3.1.0",
+      "3.1",
     );
   });
 
@@ -207,7 +207,8 @@ describe("integration: minimal site scan", () => {
       "json_ld",
       "schema_org",
       "security_txt",
-      "ai_plugin",
+      "standards_webmcp",
+      "standards_a2a_agent_card",
     ];
 
     for (const checkId of standardCheckIds) {

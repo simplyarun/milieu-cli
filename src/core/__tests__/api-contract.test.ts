@@ -24,27 +24,23 @@ vi.mock("../../bridges/index.js", () => ({
   runReachabilityBridge: mockRunReachability,
   runStandardsBridge: mockRunStandards,
   runSeparationBridge: mockRunSeparation,
-  createBridge4Stub: vi.fn(() => ({
+  runSchemaBridge: vi.fn(() => ({
     id: 4,
     name: "Schema",
-    status: "not_evaluated",
-    score: null,
-    scoreLabel: null,
+    status: "evaluated",
+    score: 50,
+    scoreLabel: "partial",
     checks: [],
-    durationMs: 0,
-    message:
-      "Schema quality assessment requires deeper analysis beyond automated checks.",
+    durationMs: 100,
   })),
-  createBridge5Stub: vi.fn(() => ({
+  runContextBridge: vi.fn(() => ({
     id: 5,
     name: "Context",
-    status: "not_evaluated",
-    score: null,
-    scoreLabel: null,
+    status: "evaluated",
+    score: 30,
+    scoreLabel: "partial",
     checks: [],
-    durationMs: 0,
-    message:
-      "Context evaluation requires deeper analysis beyond automated checks.",
+    durationMs: 80,
   })),
 }));
 

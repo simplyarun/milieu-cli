@@ -10,8 +10,8 @@ import {
   runReachabilityBridge,
   runStandardsBridge,
   runSeparationBridge,
-  createBridge4Stub,
-  createBridge5Stub,
+  runSchemaBridge,
+  runContextBridge,
 } from "../bridges/index.js";
 import { getVersion } from "./version.js";
 
@@ -46,6 +46,8 @@ export async function scan(
 
     let bridge2: BridgeResult;
     let bridge3: BridgeResult;
+    let bridge4: BridgeResult;
+    let bridge5: BridgeResult;
 
     if (bridge1.abort) {
       // Fatal error -- skip remaining bridges
@@ -68,6 +70,24 @@ export async function scan(
         checks: [],
         durationMs: 0,
       };
+      bridge4 = {
+        id: 4,
+        name: "Schema",
+        status: "evaluated",
+        score: 0,
+        scoreLabel: "fail",
+        checks: [],
+        durationMs: 0,
+      };
+      bridge5 = {
+        id: 5,
+        name: "Context",
+        status: "evaluated",
+        score: 0,
+        scoreLabel: "fail",
+        checks: [],
+        durationMs: 0,
+      };
     } else {
       // Bridge 2: Standards
       spinner.text = "Bridge 2: Standards...";
@@ -76,11 +96,14 @@ export async function scan(
       // Bridge 3: Separation
       spinner.text = "Bridge 3: Separation...";
       bridge3 = await runSeparationBridge(ctx);
-    }
 
-    // Bridges 4-5: Stubs
-    const bridge4 = createBridge4Stub();
-    const bridge5 = createBridge5Stub();
+      // Bridges 4 and 5 can run in parallel (read different shared data)
+      spinner.text = "Bridges 4-5: Schema & Context...";
+      [bridge4, bridge5] = await Promise.all([
+        runSchemaBridge(ctx),
+        runContextBridge(ctx),
+      ]);
+    }
 
     // Calculate overall score (average of scored bridges where score is not null)
     const scoredBridges = [bridge1, bridge2, bridge3, bridge4, bridge5].filter(

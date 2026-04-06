@@ -16,27 +16,23 @@ vi.mock("../../bridges/index.js", () => ({
   runReachabilityBridge: vi.fn(),
   runStandardsBridge: vi.fn(),
   runSeparationBridge: vi.fn(),
-  createBridge4Stub: vi.fn(() => ({
+  runSchemaBridge: vi.fn(() => ({
     id: 4,
     name: "Schema",
-    status: "not_evaluated",
-    score: null,
-    scoreLabel: null,
+    status: "evaluated",
+    score: 50,
+    scoreLabel: "partial",
     checks: [],
-    durationMs: 0,
-    message:
-      "Schema quality assessment requires deeper analysis beyond automated checks.",
+    durationMs: 100,
   })),
-  createBridge5Stub: vi.fn(() => ({
+  runContextBridge: vi.fn(() => ({
     id: 5,
     name: "Context",
-    status: "not_evaluated",
-    score: null,
-    scoreLabel: null,
+    status: "evaluated",
+    score: 30,
+    scoreLabel: "partial",
     checks: [],
-    durationMs: 0,
-    message:
-      "Context evaluation requires deeper analysis beyond automated checks.",
+    durationMs: 80,
   })),
 }));
 
@@ -62,8 +58,8 @@ import {
   runReachabilityBridge,
   runStandardsBridge,
   runSeparationBridge,
-  createBridge4Stub,
-  createBridge5Stub,
+  runSchemaBridge,
+  runContextBridge,
 } from "../../bridges/index.js";
 
 import type { BridgeResult } from "../types.js";
@@ -143,30 +139,34 @@ describe("scan", () => {
     const result = await scan("https://example.com");
 
     expect(result.bridges).toHaveLength(5);
-    // Overall score = Math.round((85 + 63) / 2) = 74
-    expect(result.overallScore).toBe(74);
+    // Overall score = Math.round((85 + 63 + 50 + 30) / 4) = 57
+    expect(result.overallScore).toBe(57);
     expect(result.overallScoreLabel).toBe("partial");
     expect(runReachabilityBridge).toHaveBeenCalledOnce();
     expect(runStandardsBridge).toHaveBeenCalledOnce();
     expect(runSeparationBridge).toHaveBeenCalledOnce();
   });
 
-  it("skips Bridges 2 and 3 when Bridge 1 aborts", async () => {
+  it("skips Bridges 2-5 when Bridge 1 aborts", async () => {
     vi.mocked(runReachabilityBridge).mockResolvedValue(mockBridge1Abort);
 
     const result = await scan("https://example.com");
 
     expect(runStandardsBridge).not.toHaveBeenCalled();
     expect(runSeparationBridge).not.toHaveBeenCalled();
+    expect(runSchemaBridge).not.toHaveBeenCalled();
+    expect(runContextBridge).not.toHaveBeenCalled();
     expect(result.bridges[0].abort).toBe(true);
-    // Stubs still present at indices 3 and 4
+    // Bridges 4 and 5 are empty stubs in abort flow
     expect(result.bridges[3].id).toBe(4);
-    expect(result.bridges[3].status).toBe("not_evaluated");
+    expect(result.bridges[3].status).toBe("evaluated");
+    expect(result.bridges[3].score).toBe(0);
     expect(result.bridges[4].id).toBe(5);
-    expect(result.bridges[4].status).toBe("not_evaluated");
+    expect(result.bridges[4].status).toBe("evaluated");
+    expect(result.bridges[4].score).toBe(0);
   });
 
-  it("averages only non-null scores (excludes Bridge 3 and stubs)", async () => {
+  it("averages only non-null scores (excludes Bridge 3)", async () => {
     const bridge1 = { ...mockBridge1Normal, score: 90 as number | null, scoreLabel: "pass" as const };
     const bridge2 = { ...mockBridge2Normal, score: 70 as number | null, scoreLabel: "partial" as const };
     vi.mocked(runReachabilityBridge).mockResolvedValue(bridge1);
@@ -175,9 +175,9 @@ describe("scan", () => {
 
     const result = await scan("https://example.com");
 
-    // Math.round((90 + 70) / 2) = 80
-    expect(result.overallScore).toBe(80);
-    expect(result.overallScoreLabel).toBe("pass");
+    // Math.round((90 + 70 + 50 + 30) / 4) = 60
+    expect(result.overallScore).toBe(60);
+    expect(result.overallScoreLabel).toBe("partial");
   });
 
   it("starts spinner and stops on success", async () => {
@@ -203,24 +203,19 @@ describe("scan", () => {
     expect(mockSpinner.stop).not.toHaveBeenCalled();
   });
 
-  it("always creates Bridge 4 and 5 stubs in normal flow", async () => {
+  it("runs Bridge 4 and 5 in normal flow", async () => {
     vi.mocked(runReachabilityBridge).mockResolvedValue(mockBridge1Normal);
     vi.mocked(runStandardsBridge).mockResolvedValue(mockBridge2Normal);
     vi.mocked(runSeparationBridge).mockResolvedValue(mockBridge3Normal);
 
-    await scan("https://example.com");
+    const result = await scan("https://example.com");
 
-    expect(createBridge4Stub).toHaveBeenCalledOnce();
-    expect(createBridge5Stub).toHaveBeenCalledOnce();
-  });
-
-  it("always creates Bridge 4 and 5 stubs in abort flow", async () => {
-    vi.mocked(runReachabilityBridge).mockResolvedValue(mockBridge1Abort);
-
-    await scan("https://example.com");
-
-    expect(createBridge4Stub).toHaveBeenCalledOnce();
-    expect(createBridge5Stub).toHaveBeenCalledOnce();
+    expect(runSchemaBridge).toHaveBeenCalledOnce();
+    expect(runContextBridge).toHaveBeenCalledOnce();
+    expect(result.bridges[3].id).toBe(4);
+    expect(result.bridges[3].status).toBe("evaluated");
+    expect(result.bridges[4].id).toBe(5);
+    expect(result.bridges[4].status).toBe("evaluated");
   });
 
   it("passes isSilent to ora when options.silent is true", async () => {

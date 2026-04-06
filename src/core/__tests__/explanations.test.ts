@@ -44,7 +44,7 @@ describe("resolveExplanation", () => {
 });
 
 describe("CHECK_EXPLANATIONS structural sync", () => {
-  // All 26 known check IDs across bridges 1-3
+  // All known check IDs across bridges 1-5
   const ALL_CHECK_IDS = [
     // Bridge 1: Reachability
     "https_available",
@@ -69,12 +69,29 @@ describe("CHECK_EXPLANATIONS structural sync", () => {
     "json_ld",
     "schema_org",
     "security_txt",
-    "ai_plugin",
+    "standards_webmcp",
+    "standards_a2a_agent_card",
+    "standards_content_negotiation",
     // Bridge 3: Separation
     "api_presence",
     "developer_docs",
     "sdk_references",
     "webhook_support",
+    // Bridge 4: Schema
+    "schema_operation_ids",
+    "schema_types_defined",
+    "schema_error_responses",
+    "schema_required_fields",
+    "schema_descriptions",
+    "schema_consistent_error_format",
+    // Bridge 5: Context
+    "context_rate_limit_headers",
+    "context_auth_clarity",
+    "context_tos_url",
+    "context_versioning_signal",
+    "context_ai_policy",
+    "context_contact_info",
+    "context_agents_json",
   ];
 
   it("every check ID has an explanation", () => {
