@@ -63,39 +63,35 @@ describe("formatBridge", () => {
     expect(output).toContain("(320ms)");
   });
 
-  it("formats a stub bridge (Bridge 4) as dim with no timing", () => {
+  it("formats a scored Bridge 4 (Schema)", () => {
     const bridge: BridgeResult = {
       id: 4,
       name: "Schema",
-      status: "not_evaluated",
-      score: null,
-      scoreLabel: null,
+      status: "evaluated",
+      score: 50,
+      scoreLabel: "partial",
       checks: [],
-      durationMs: 0,
-      message:
-        "Schema quality assessment requires deeper analysis beyond automated checks.",
+      durationMs: 10,
     };
     const output = stripAnsi(formatBridge(bridge, false));
     expect(output).toContain("Schema: Can agents use the APIs correctly?");
-    expect(output).toContain("not evaluated");
-    expect(output).not.toContain("ms");
+    expect(output).toContain("50");
+    expect(output).toContain("(10ms)");
   });
 
-  it("formats a stub bridge (Bridge 5) as dim with no timing", () => {
+  it("formats a scored Bridge 5 (Context)", () => {
     const bridge: BridgeResult = {
       id: 5,
       name: "Context",
-      status: "not_evaluated",
-      score: null,
-      scoreLabel: null,
+      status: "evaluated",
+      score: 30,
+      scoreLabel: "fail",
       checks: [],
-      durationMs: 0,
-      message:
-        "Context evaluation requires deeper analysis beyond automated checks.",
+      durationMs: 15,
     };
     const output = stripAnsi(formatBridge(bridge, false));
     expect(output).toContain("Context: Can agents trust and leverage the context?");
-    expect(output).toContain("not evaluated");
-    expect(output).not.toContain("ms");
+    expect(output).toContain("30");
+    expect(output).toContain("(15ms)");
   });
 });

@@ -24,27 +24,11 @@ vi.mock("../../bridges/index.js", () => ({
   runReachabilityBridge: mockRunReachability,
   runStandardsBridge: mockRunStandards,
   runSeparationBridge: mockRunSeparation,
-  createBridge4Stub: vi.fn(() => ({
-    id: 4,
-    name: "Schema",
-    status: "not_evaluated",
-    score: null,
-    scoreLabel: null,
-    checks: [],
-    durationMs: 0,
-    message:
-      "Schema quality assessment requires deeper analysis beyond automated checks.",
+  runSchemaBridge: vi.fn(() => ({
+    id: 4, name: "Schema", status: "evaluated", score: 50, scoreLabel: "partial", checks: [], durationMs: 10,
   })),
-  createBridge5Stub: vi.fn(() => ({
-    id: 5,
-    name: "Context",
-    status: "not_evaluated",
-    score: null,
-    scoreLabel: null,
-    checks: [],
-    durationMs: 0,
-    message:
-      "Context evaluation requires deeper analysis beyond automated checks.",
+  runContextBridge: vi.fn(() => ({
+    id: 5, name: "Context", status: "evaluated", score: 30, scoreLabel: "partial", checks: [], durationMs: 10,
   })),
 }));
 
@@ -265,8 +249,8 @@ describe("Programmatic API contract", () => {
           bridge1Result,
           bridge2Result,
           bridge3Result,
-          { ...bridge1Result, id: 4, name: "Schema", status: "not_evaluated", score: null, scoreLabel: null },
-          { ...bridge1Result, id: 5, name: "Context", status: "not_evaluated", score: null, scoreLabel: null },
+          { ...bridge1Result, id: 4, name: "Schema", status: "evaluated" as const, score: 50, scoreLabel: "partial" as const },
+          { ...bridge1Result, id: 5, name: "Context", status: "evaluated" as const, score: 30, scoreLabel: "partial" as const },
         ],
       };
 

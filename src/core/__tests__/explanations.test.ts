@@ -44,37 +44,25 @@ describe("resolveExplanation", () => {
 });
 
 describe("CHECK_EXPLANATIONS structural sync", () => {
-  // All 26 known check IDs across bridges 1-3
   const ALL_CHECK_IDS = [
     // Bridge 1: Reachability
-    "https_available",
-    "http_status",
-    "robots_txt",
-    "crawler_policy_gptbot",
-    "crawler_policy_claudebot",
-    "crawler_policy_ccbot",
-    "crawler_policy_googlebot",
-    "crawler_policy_bingbot",
-    "crawler_policy_perplexitybot",
-    "meta_robots",
-    "x_robots_tag",
+    "https_available", "http_status", "robots_txt",
+    "crawler_policy_gptbot", "crawler_policy_claudebot", "crawler_policy_ccbot",
+    "crawler_policy_googlebot", "crawler_policy_bingbot", "crawler_policy_perplexitybot",
+    "meta_robots", "x_robots_tag",
     // Bridge 2: Standards
-    "openapi_spec",
-    "graphql_endpoint",
-    "sitemap",
-    "markdown_negotiation",
-    "llms_txt",
-    "llms_full_txt",
-    "mcp_endpoint",
-    "json_ld",
-    "schema_org",
-    "security_txt",
-    "ai_plugin",
+    "openapi_spec", "graphql_endpoint", "sitemap", "markdown_negotiation",
+    "llms_txt", "llms_full_txt", "mcp_endpoint", "json_ld", "schema_org",
+    "security_txt", "standards_webmcp", "standards_a2a_agent_card",
     // Bridge 3: Separation
-    "api_presence",
-    "developer_docs",
-    "sdk_references",
-    "webhook_support",
+    "api_presence", "developer_docs", "sdk_references", "webhook_support",
+    // Bridge 4: Schema
+    "schema_operation_ids", "schema_types_defined", "schema_error_responses",
+    "schema_required_fields", "schema_descriptions",
+    // Bridge 5: Context
+    "context_rate_limit_headers", "context_auth_clarity", "context_auth_legibility",
+    "context_tos_url", "context_versioning_signal", "context_contact_info",
+    "context_agents_json",
   ];
 
   it("every check ID has an explanation", () => {
