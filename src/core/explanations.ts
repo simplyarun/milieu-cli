@@ -116,10 +116,15 @@ export const CHECK_EXPLANATIONS: Record<string, ExplanationEntry> = {
   },
   security_txt:
     "security.txt tells AI agents and automated systems how to report security issues. Its presence signals operational maturity.",
-  ai_plugin: {
-    pass: "Your ai-plugin.json lets ChatGPT and compatible AI agents discover and use your API as a plugin.",
-    fail: "Without ai-plugin.json, ChatGPT and compatible AI agents can't discover your API as a plugin.",
-    default: "ai-plugin.json is the manifest that lets AI agents like ChatGPT use your API as a plugin.",
+  standards_webmcp: {
+    pass: "Your WebMCP endpoint lets AI agents discover available tools and capabilities at a well-known URL.",
+    fail: "No WebMCP endpoint found — AI agents can't discover your MCP tools via the standard /.well-known/mcp.json path.",
+    default: "WebMCP (/.well-known/mcp.json) is the emerging standard for AI agents to discover MCP tool providers.",
+  },
+  standards_a2a_agent_card: {
+    pass: "Your A2A Agent Card lets other AI agents discover your agent's capabilities and communication protocols.",
+    fail: "No A2A Agent Card found — other AI agents can't discover your agent at /.well-known/agent.json.",
+    default: "The A2A Agent Card (/.well-known/agent.json) is Google's standard for agent-to-agent capability discovery.",
   },
 
   // Bridge 3: Separation
@@ -142,6 +147,74 @@ export const CHECK_EXPLANATIONS: Record<string, ExplanationEntry> = {
     pass: "AI agents can see your webhook support — they'll build reactive workflows that respond to your events in real-time.",
     fail: "No webhook signals found in your OpenAPI spec, standards headers, or documentation — AI agents must poll your API for changes.",
     default: "Webhooks enable AI agents to receive real-time events instead of polling your API.",
+  },
+
+  // Bridge 4: Schema
+  schema_operation_ids: {
+    pass: "All operations have operationId — agents can map every API capability to a callable function.",
+    fail: "Operations lack operationId — agents cannot reliably reference or call your API endpoints by name.",
+    default: "operationId is the machine-readable function name that AI agents use to call your API endpoints.",
+  },
+  schema_types_defined: {
+    pass: "All request/response schemas have type or $ref — agents can construct valid payloads.",
+    fail: "Schemas lack type definitions — agents cannot determine the shape of data to send or expect.",
+    default: "Typed schemas tell AI agents exactly what data structures your API accepts and returns.",
+  },
+  schema_error_responses: {
+    pass: "Error responses have structured schemas — agents can programmatically handle failures.",
+    fail: "Error responses lack schemas — agents cannot distinguish or handle different failure modes.",
+    default: "Structured error schemas let AI agents understand and recover from API failures automatically.",
+  },
+  schema_required_fields: {
+    pass: "Request schemas declare required fields — agents know exactly which parameters are mandatory.",
+    fail: "Request schemas don't declare required fields — agents must guess which parameters are mandatory.",
+    default: "The required field array tells AI agents which parameters they must provide vs. which are optional.",
+  },
+  schema_descriptions: {
+    pass: "Fields and parameters have descriptions — agents understand what each value means.",
+    fail: "Fields lack descriptions — agents must infer parameter meaning from names alone.",
+    partial: "Some fields have descriptions but coverage is incomplete — agents have partial context.",
+    default: "Field descriptions are the documentation AI agents read to understand how to use each parameter.",
+  },
+
+  // Bridge 5: Context
+  context_rate_limit_headers: {
+    pass: "Rate-limit headers present — agents can pace requests and avoid throttling.",
+    fail: "No rate-limit headers found — agents must guess at request limits and risk being throttled.",
+    default: "Rate-limit headers (X-RateLimit-Limit, Retry-After) tell AI agents how fast they can call your API.",
+  },
+  context_auth_clarity: {
+    pass: "Security schemes are clearly documented and applied — agents know exactly how to authenticate.",
+    fail: "No security schemes documented — agents cannot determine how to authenticate with your API.",
+    partial: "Security schemes exist but lack descriptions or aren't applied to operations.",
+    default: "securitySchemes in the OpenAPI spec tell AI agents which authentication method to use and how.",
+  },
+  context_auth_legibility: {
+    pass: "Auth rejection responses guide agents toward successful authentication with structured errors and documentation links.",
+    fail: "Auth rejection returns no guidance — agents cannot determine how to authenticate from the error response.",
+    partial: "Auth rejection provides some guidance but is missing key signals (WWW-Authenticate, JSON body, or docs URL).",
+    default: "When an AI agent's first unauthenticated request is rejected, the quality of that rejection determines whether the agent can self-onboard.",
+  },
+  context_tos_url: {
+    pass: "Terms of Service URL found — agents can check usage policies before integration.",
+    fail: "No Terms of Service URL found — agents cannot verify whether automated access is permitted.",
+    default: "A Terms of Service URL lets AI agents (and their operators) verify that API usage is authorized.",
+  },
+  context_versioning_signal: {
+    pass: "API versioning detected — agents can target a stable API version.",
+    fail: "No versioning signal found — agents cannot determine which API version they're using.",
+    partial: "Version found in spec metadata but not in URL paths or response headers.",
+    default: "Versioning signals help AI agents target a stable API version and detect breaking changes.",
+  },
+  context_contact_info: {
+    pass: "Contact info found in spec — agents (or their operators) have a way to report issues.",
+    fail: "No contact info in spec — there's no programmatic way for agents to discover support channels.",
+    default: "Contact info in the spec gives AI agent operators a way to report integration issues.",
+  },
+  context_agents_json: {
+    pass: "agents.json found — agents can discover your agent interaction policies.",
+    fail: "No agents.json found at /.well-known/agents.json.",
+    default: "agents.json at /.well-known/ defines policies for how AI agents should interact with your service.",
   },
 };
 
