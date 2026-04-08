@@ -15,9 +15,6 @@ function bridgeLabel(bridge: BridgeResult): string {
 }
 
 export function formatBridge(bridge: BridgeResult, verbose: boolean): string {
-  if (bridge.status === "not_evaluated") {
-    return formatStubBridge(bridge);
-  }
   if (bridge.score !== null) {
     return formatScoredBridge(bridge, verbose);
   }
@@ -41,8 +38,4 @@ function formatDetectionBridge(
   const label = bridgeLabel(bridge);
   const timing = dim(`(${bridge.durationMs}ms)`);
   return `  ${bold(label)}  ${cyan(countText)}  ${timing}`;
-}
-
-function formatStubBridge(bridge: BridgeResult): string {
-  return dim(`  ${bridgeLabel(bridge)}    not evaluated`);
 }

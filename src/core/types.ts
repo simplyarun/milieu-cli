@@ -53,7 +53,7 @@ export interface BridgeResult {
   name: BridgeName;
   /** Whether this bridge was evaluated or is a stub */
   status: BridgeStatus;
-  /** Score 0-100 for scored bridges (1, 2), null for detection-only (3) and stubs (4, 5) */
+  /** Score 0-100 for scored bridges (1, 2, 4, 5), null for detection-only (3) */
   score: number | null;
   /** Score category for scored bridges, null for unscored */
   scoreLabel: "pass" | "partial" | "fail" | null;
@@ -105,7 +105,7 @@ export interface ScanResult {
   timestamp: string;
   /** Total scan duration in milliseconds */
   durationMs: number;
-  /** Overall score (0-100) averaged from scored bridges only (1, 2) */
+  /** Overall score (0-100) averaged from scored bridges (1, 2, 4, 5) */
   overallScore: number;
   /** Overall score category */
   overallScoreLabel: "pass" | "partial" | "fail";
