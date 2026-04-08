@@ -20,7 +20,6 @@ vi.mock("../schema-org.js", () => ({
 }));
 vi.mock("../well-known.js", () => ({
   checkSecurityTxt: vi.fn(),
-  checkAiPlugin: vi.fn(),
 }));
 vi.mock("../graphql.js", () => ({
   checkGraphql: vi.fn(),
@@ -31,6 +30,12 @@ vi.mock("../sitemap.js", () => ({
 vi.mock("../markdown-negotiation.js", () => ({
   checkMarkdownNegotiation: vi.fn(),
 }));
+vi.mock("../webmcp.js", () => ({
+  checkWebMcp: vi.fn(),
+}));
+vi.mock("../a2a-agent-card.js", () => ({
+  checkA2aAgentCard: vi.fn(),
+}));
 
 import { runStandardsBridge } from "../index.js";
 import { checkOpenApi } from "../openapi.js";
@@ -38,10 +43,12 @@ import { checkLlmsTxt, checkLlmsFullTxt } from "../llms-txt.js";
 import { checkMcpEndpoint } from "../mcp.js";
 import { checkJsonLd } from "../json-ld.js";
 import { checkSchemaOrg } from "../schema-org.js";
-import { checkSecurityTxt, checkAiPlugin } from "../well-known.js";
+import { checkSecurityTxt } from "../well-known.js";
 import { checkGraphql } from "../graphql.js";
 import { checkSitemap } from "../sitemap.js";
 import { checkMarkdownNegotiation } from "../markdown-negotiation.js";
+import { checkWebMcp } from "../webmcp.js";
+import { checkA2aAgentCard } from "../a2a-agent-card.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -68,6 +75,7 @@ function setupAllPass(): void {
     detected: true,
     hasWebhooks: false,
     hasCallbacks: false,
+    parsedSpec: null,
   });
   vi.mocked(checkGraphql).mockResolvedValue({
     check: makeCheck("pass", "graphql_endpoint"),
@@ -95,7 +103,8 @@ function setupAllPass(): void {
   vi.mocked(checkSecurityTxt).mockResolvedValue(
     makeCheck("pass", "security_txt"),
   );
-  vi.mocked(checkAiPlugin).mockResolvedValue(makeCheck("pass", "ai_plugin"));
+  vi.mocked(checkWebMcp).mockResolvedValue(makeCheck("pass", "standards_webmcp"));
+  vi.mocked(checkA2aAgentCard).mockResolvedValue(makeCheck("pass", "standards_a2a_agent_card"));
 }
 
 function setupAllFail(): void {
@@ -104,6 +113,7 @@ function setupAllFail(): void {
     detected: false,
     hasWebhooks: false,
     hasCallbacks: false,
+    parsedSpec: null,
   });
   vi.mocked(checkGraphql).mockResolvedValue({
     check: makeCheck("fail", "graphql_endpoint"),
@@ -131,7 +141,8 @@ function setupAllFail(): void {
   vi.mocked(checkSecurityTxt).mockResolvedValue(
     makeCheck("fail", "security_txt"),
   );
-  vi.mocked(checkAiPlugin).mockResolvedValue(makeCheck("fail", "ai_plugin"));
+  vi.mocked(checkWebMcp).mockResolvedValue(makeCheck("fail", "standards_webmcp"));
+  vi.mocked(checkA2aAgentCard).mockResolvedValue(makeCheck("fail", "standards_a2a_agent_card"));
 }
 
 // ---------------------------------------------------------------------------
@@ -151,10 +162,10 @@ describe("runStandardsBridge", () => {
     expect(result.status).toBe("evaluated");
   });
 
-  it("includes all 11 checks in result.checks array", async () => {
+  it("includes all 12 checks in result.checks array", async () => {
     setupAllPass();
     const result = await runStandardsBridge(makeCtx());
-    expect(result.checks).toHaveLength(11);
+    expect(result.checks).toHaveLength(12);
     const ids = result.checks.map((c) => c.id);
     expect(ids).toEqual([
       "openapi_spec",
@@ -167,24 +178,26 @@ describe("runStandardsBridge", () => {
       "json_ld",
       "schema_org",
       "security_txt",
-      "ai_plugin",
+      "standards_webmcp",
+      "standards_a2a_agent_card",
     ]);
   });
 
-  it("returns score 100 and scoreLabel pass when all 8 checks pass", async () => {
+  it("returns score 100 and scoreLabel pass when all 12 checks pass", async () => {
     setupAllPass();
     const result = await runStandardsBridge(makeCtx());
     expect(result.score).toBe(100);
     expect(result.scoreLabel).toBe("pass");
   });
 
-  it("returns score 36 and scoreLabel fail when 4 pass + 7 fail", async () => {
-    // First 4 pass, rest fail (11 checks total: 4/11 = 36%)
+  it("returns score 33 and scoreLabel fail when 4 pass + 8 fail", async () => {
+    // First 4 pass, rest fail (12 checks total: 4/12 = 33%)
     vi.mocked(checkOpenApi).mockResolvedValue({
       check: makeCheck("pass", "openapi_spec"),
       detected: true,
       hasWebhooks: false,
       hasCallbacks: false,
+      parsedSpec: null,
     });
     vi.mocked(checkGraphql).mockResolvedValue({
       check: makeCheck("pass", "graphql_endpoint"),
@@ -212,29 +225,29 @@ describe("runStandardsBridge", () => {
     vi.mocked(checkSecurityTxt).mockResolvedValue(
       makeCheck("fail", "security_txt"),
     );
-    vi.mocked(checkAiPlugin).mockResolvedValue(
-      makeCheck("fail", "ai_plugin"),
-    );
+    vi.mocked(checkWebMcp).mockResolvedValue(makeCheck("fail", "standards_webmcp"));
+    vi.mocked(checkA2aAgentCard).mockResolvedValue(makeCheck("fail", "standards_a2a_agent_card"));
 
     const result = await runStandardsBridge(makeCtx());
-    expect(result.score).toBe(36);
+    expect(result.score).toBe(33);
     expect(result.scoreLabel).toBe("fail");
   });
 
-  it("returns score 0 and scoreLabel fail when all 8 checks fail", async () => {
+  it("returns score 0 and scoreLabel fail when all 12 checks fail", async () => {
     setupAllFail();
     const result = await runStandardsBridge(makeCtx());
     expect(result.score).toBe(0);
     expect(result.scoreLabel).toBe("fail");
   });
 
-  it("returns score 27 and scoreLabel fail for 2 pass + 2 partial + 7 fail", async () => {
-    // 2 pass (2 points) + 2 partial (1 point) + 7 fail (0) = 3/11 = 27%
+  it("returns score 25 and scoreLabel fail for 2 pass + 2 partial + 8 fail", async () => {
+    // 2 pass (2 points) + 2 partial (1 point) + 8 fail (0) = 3/12 = 25%
     vi.mocked(checkOpenApi).mockResolvedValue({
       check: makeCheck("pass", "openapi_spec"),
       detected: true,
       hasWebhooks: false,
       hasCallbacks: false,
+      parsedSpec: null,
     });
     vi.mocked(checkGraphql).mockResolvedValue({
       check: makeCheck("fail", "graphql_endpoint"),
@@ -262,12 +275,11 @@ describe("runStandardsBridge", () => {
     vi.mocked(checkSecurityTxt).mockResolvedValue(
       makeCheck("fail", "security_txt"),
     );
-    vi.mocked(checkAiPlugin).mockResolvedValue(
-      makeCheck("fail", "ai_plugin"),
-    );
+    vi.mocked(checkWebMcp).mockResolvedValue(makeCheck("fail", "standards_webmcp"));
+    vi.mocked(checkA2aAgentCard).mockResolvedValue(makeCheck("fail", "standards_a2a_agent_card"));
 
     const result = await runStandardsBridge(makeCtx());
-    expect(result.score).toBe(27);
+    expect(result.score).toBe(25);
     expect(result.scoreLabel).toBe("fail");
   });
 
@@ -333,6 +345,7 @@ describe("runStandardsBridge", () => {
       detected: true,
       hasWebhooks: true,
       hasCallbacks: true,
+      parsedSpec: null,
     });
     vi.mocked(checkGraphql).mockResolvedValue({ check: makeCheck("pass", "graphql_endpoint"), detected: true });
     vi.mocked(checkSitemap).mockResolvedValue({ check: makeCheck("pass", "sitemap"), urls: [], apiRelevantUrls: [] });
@@ -343,7 +356,8 @@ describe("runStandardsBridge", () => {
     vi.mocked(checkJsonLd).mockReturnValue(makeCheck("pass", "json_ld"));
     vi.mocked(checkSchemaOrg).mockReturnValue(makeCheck("pass", "schema_org"));
     vi.mocked(checkSecurityTxt).mockResolvedValue(makeCheck("pass", "security_txt"));
-    vi.mocked(checkAiPlugin).mockResolvedValue(makeCheck("pass", "ai_plugin"));
+    vi.mocked(checkWebMcp).mockResolvedValue(makeCheck("pass", "standards_webmcp"));
+    vi.mocked(checkA2aAgentCard).mockResolvedValue(makeCheck("pass", "standards_a2a_agent_card"));
 
     const ctx = makeCtx();
     await runStandardsBridge(ctx);
