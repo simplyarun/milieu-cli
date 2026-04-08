@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { collectOperations } from "../oas-types.js";
-import type { ParsedOpenApiSpec } from "../oas-types.js";
+import type { ParsedOpenApiSpec, OasOperation } from "../oas-types.js";
 import { checkOperationIds } from "../operation-ids.js";
 import { checkSchemaTypes } from "../schema-types.js";
 import { checkErrorSchemas } from "../error-schemas.js";
@@ -41,7 +41,7 @@ describe("collectOperations", () => {
         "/users": {
           get: { operationId: "listUsers" },
           parameters: [{ name: "id" }],
-        } as Record<string, unknown>,
+        } as unknown as Record<string, OasOperation>,
       },
     };
     const ops = collectOperations(spec);
