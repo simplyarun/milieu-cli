@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { checkSecurityTxt, checkAiPlugin } from "../well-known.js";
+import { checkSecurityTxt } from "../well-known.js";
 import { httpGet } from "../../../utils/http-client.js";
 import type { HttpResponse } from "../../../core/types.js";
 
@@ -73,64 +73,5 @@ describe("checkSecurityTxt", () => {
     mockHttpGet.mockResolvedValue(makeSuccess("# Comment\nExpires: 2027-01-01\nContact: mailto:test@example.com"));
     const result = await checkSecurityTxt("https://example.com");
     expect(result.status).toBe("pass");
-  });
-});
-
-describe("checkAiPlugin", () => {
-  beforeEach(() => {
-    mockHttpGet.mockReset();
-  });
-
-  it("returns pass with valid manifest", async () => {
-    const body = JSON.stringify({
-      schema_version: "v1",
-      name_for_human: "My Plugin",
-      api: { type: "openapi", url: "/openapi.json" },
-    });
-    mockHttpGet.mockResolvedValue(makeSuccess(body, "https://example.com/.well-known/ai-plugin.json"));
-    const result = await checkAiPlugin("https://example.com");
-    expect(result.id).toBe("ai_plugin");
-    expect(result.label).toBe("ai-plugin.json");
-    expect(result.status).toBe("pass");
-    expect(result.detail).toBe("ai-plugin.json found: My Plugin");
-    expect(result.data).toEqual({ nameForHuman: "My Plugin", schemaVersion: "v1" });
-  });
-
-  it("returns partial when JSON is missing required fields", async () => {
-    const body = JSON.stringify({ schema_version: "v1" });
-    mockHttpGet.mockResolvedValue(makeSuccess(body, "https://example.com/.well-known/ai-plugin.json"));
-    const result = await checkAiPlugin("https://example.com");
-    expect(result.status).toBe("partial");
-    expect(result.detail).toBe("ai-plugin.json found but missing required fields");
-  });
-
-  it("returns fail on HTTP 404", async () => {
-    mockHttpGet.mockResolvedValue(make404("https://example.com/.well-known/ai-plugin.json"));
-    const result = await checkAiPlugin("https://example.com");
-    expect(result.status).toBe("fail");
-    expect(result.detail).toBe("No ai-plugin.json found");
-  });
-
-  it("returns fail for non-JSON body", async () => {
-    mockHttpGet.mockResolvedValue(makeSuccess("not json at all", "https://example.com/.well-known/ai-plugin.json"));
-    const result = await checkAiPlugin("https://example.com");
-    expect(result.status).toBe("fail");
-    expect(result.detail).toBe("No ai-plugin.json found");
-  });
-
-  it("returns partial when name_for_human missing but other fields present", async () => {
-    const body = JSON.stringify({ schema_version: "v1", api: { type: "openapi" } });
-    mockHttpGet.mockResolvedValue(makeSuccess(body, "https://example.com/.well-known/ai-plugin.json"));
-    const result = await checkAiPlugin("https://example.com");
-    expect(result.status).toBe("partial");
-  });
-
-  it("sends Accept: application/json header", async () => {
-    mockHttpGet.mockResolvedValue(make404("https://example.com/.well-known/ai-plugin.json"));
-    await checkAiPlugin("https://example.com", 5000);
-    expect(mockHttpGet).toHaveBeenCalledWith(
-      "https://example.com/.well-known/ai-plugin.json",
-      { timeout: 5000, headers: { Accept: "application/json" } },
-    );
   });
 });

@@ -12,6 +12,8 @@ export interface OpenApiResult {
   hasWebhooks: boolean;
   /** OpenAPI 3.0+ `callbacks` found in any operation */
   hasCallbacks: boolean;
+  /** Full parsed spec object when JSON spec found. For Bridge 4/5 consumption. */
+  parsedSpec: unknown | null;
 }
 
 interface OpenApiInfo {
@@ -366,6 +368,7 @@ export async function checkOpenApi(
           detected: true,
           hasWebhooks: info.hasWebhooks,
           hasCallbacks: info.hasCallbacks,
+          parsedSpec: JSON.parse(response.body),
         };
       }
     }
@@ -388,6 +391,7 @@ export async function checkOpenApi(
         detected: true,
         hasWebhooks: yamlInfo.hasWebhooks,
         hasCallbacks: yamlInfo.hasCallbacks,
+        parsedSpec: null,
       };
     }
   }
@@ -494,6 +498,7 @@ export async function checkOpenApi(
             detected: true,
             hasWebhooks: info.hasWebhooks,
             hasCallbacks: info.hasCallbacks,
+            parsedSpec: JSON.parse(response.body),
           };
         }
       }
@@ -516,6 +521,7 @@ export async function checkOpenApi(
           detected: true,
           hasWebhooks: yamlInfo.hasWebhooks,
           hasCallbacks: yamlInfo.hasCallbacks,
+          parsedSpec: null,
         };
       }
     }
@@ -536,6 +542,7 @@ export async function checkOpenApi(
         detected: true,
         hasWebhooks: false,
         hasCallbacks: false,
+        parsedSpec: null,
       };
     }
   }
@@ -551,5 +558,6 @@ export async function checkOpenApi(
     detected: false,
     hasWebhooks: false,
     hasCallbacks: false,
+    parsedSpec: null,
   };
 }
