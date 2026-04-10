@@ -22,6 +22,12 @@ export async function checkSecurityTxt(
     return { id, label, status: "fail", detail: "No security.txt found" };
   }
 
+  // Reject soft 404s: servers returning HTML instead of the actual file
+  const contentType = (result.headers["content-type"] ?? "").toLowerCase();
+  if (contentType.includes("text/html")) {
+    return { id, label, status: "fail", detail: "No security.txt found (HTML response)" };
+  }
+
   if (/^Contact:/mi.test(result.body)) {
     return {
       id,
