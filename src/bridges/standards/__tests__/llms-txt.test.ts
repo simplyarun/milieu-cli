@@ -9,12 +9,12 @@ vi.mock("../../../utils/http-client.js", () => ({
 
 const mockHttpGet = vi.mocked(httpGet);
 
-function makeSuccess(body: string): HttpResponse {
+function makeSuccess(body: string, headers: Record<string, string> = {}): HttpResponse {
   return {
     ok: true,
     url: "https://example.com/llms.txt",
     status: 200,
-    headers: {},
+    headers,
     body,
     redirects: [],
     durationMs: 50,
@@ -84,6 +84,14 @@ describe("checkLlmsTxt", () => {
     const { check } = await checkLlmsTxt("https://example.com");
     expect(check.status).toBe("fail");
     expect(check.detail).toBe("No llms.txt found");
+  });
+
+  it("returns fail when response is HTML (soft 404)", async () => {
+    mockHttpGet.mockResolvedValue(makeSuccess("<html><body>Page</body></html>", { "content-type": "text/html; charset=utf-8" }));
+    const { check, body } = await checkLlmsTxt("https://example.com");
+    expect(check.status).toBe("fail");
+    expect(check.detail).toBe("No llms.txt found (HTML response)");
+    expect(body).toBeNull();
   });
 
   it("returns fail on whitespace-only body", async () => {
@@ -174,6 +182,13 @@ describe("checkLlmsFullTxt", () => {
     const result = await checkLlmsFullTxt("https://example.com");
     expect(result.status).toBe("fail");
     expect(result.detail).toBe("No llms-full.txt found");
+  });
+
+  it("returns fail when response is HTML (soft 404)", async () => {
+    mockHttpGet.mockResolvedValue(makeSuccess("<html><body>Marketplace</body></html>", { "content-type": "text/html" }));
+    const result = await checkLlmsFullTxt("https://example.com");
+    expect(result.status).toBe("fail");
+    expect(result.detail).toBe("No llms-full.txt found (HTML response)");
   });
 });
 

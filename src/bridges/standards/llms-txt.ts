@@ -49,6 +49,12 @@ export async function checkLlmsTxt(
     return { check: { id, label, status: "fail", detail: "No llms.txt found" }, body: null };
   }
 
+  // Reject soft 404s: servers returning HTML instead of the actual file
+  const contentType = (result.headers["content-type"] ?? "").toLowerCase();
+  if (contentType.includes("text/html")) {
+    return { check: { id, label, status: "fail", detail: "No llms.txt found (HTML response)" }, body: null };
+  }
+
   const sizeBytes = new TextEncoder().encode(result.body).byteLength;
   const firstLine = result.body.trim().split("\n")[0].trim();
 
@@ -109,6 +115,12 @@ export async function checkLlmsFullTxt(
 
   if (!result.ok || result.body.trim().length === 0) {
     return { id, label, status: "fail", detail: "No llms-full.txt found" };
+  }
+
+  // Reject soft 404s: servers returning HTML instead of the actual file
+  const contentType = (result.headers["content-type"] ?? "").toLowerCase();
+  if (contentType.includes("text/html")) {
+    return { id, label, status: "fail", detail: "No llms-full.txt found (HTML response)" };
   }
 
   const sizeBytes = new TextEncoder().encode(result.body).byteLength;

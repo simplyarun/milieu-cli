@@ -9,12 +9,12 @@ vi.mock("../../../utils/http-client.js", () => ({
 
 const mockHttpGet = vi.mocked(httpGet);
 
-function makeSuccess(body: string, url?: string): HttpResponse {
+function makeSuccess(body: string, url?: string, headers: Record<string, string> = {}): HttpResponse {
   return {
     ok: true,
     url: url ?? "https://example.com/.well-known/security.txt",
     status: 200,
-    headers: {},
+    headers,
     body,
     redirects: [],
     durationMs: 50,
@@ -73,5 +73,14 @@ describe("checkSecurityTxt", () => {
     mockHttpGet.mockResolvedValue(makeSuccess("# Comment\nExpires: 2027-01-01\nContact: mailto:test@example.com"));
     const result = await checkSecurityTxt("https://example.com");
     expect(result.status).toBe("pass");
+  });
+
+  it("returns fail when response is HTML (soft 404)", async () => {
+    mockHttpGet.mockResolvedValue(
+      makeSuccess("<html><body>Not Found</body></html>", undefined, { "content-type": "text/html; charset=utf-8" }),
+    );
+    const result = await checkSecurityTxt("https://example.com");
+    expect(result.status).toBe("fail");
+    expect(result.detail).toBe("No security.txt found (HTML response)");
   });
 });
