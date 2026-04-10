@@ -8,7 +8,7 @@ import { httpGet } from "../../../utils/http-client.js";
 import { checkRateLimitHeaders } from "../rate-limits.js";
 import { checkAuthClarity } from "../auth-clarity.js";
 import { checkAuthLegibility } from "../auth-legibility.js";
-import { checkTosUrl, checkContactInfo } from "../tos-contact.js";
+import { checkTosUrl, checkContactInfo, extractTosUrl } from "../tos-contact.js";
 import { checkVersioningSignal } from "../versioning.js";
 import { checkAgentsJson } from "../agents-json.js";
 
@@ -107,12 +107,45 @@ describe("checkAuthLegibility", () => {
   });
 });
 
+describe("extractTosUrl", () => {
+  it("extracts clean URL from plain text", () => {
+    expect(extractTosUrl("See https://example.com/terms for details")).toBe("https://example.com/terms");
+  });
+  it("strips trailing parenthesis from markdown-style link", () => {
+    expect(extractTosUrl("(https://example.com/terms)")).toBe("https://example.com/terms");
+  });
+  it("strips trailing period", () => {
+    expect(extractTosUrl("Visit https://example.com/tos.")).toBe("https://example.com/tos");
+  });
+  it("extracts URL from JSON blob", () => {
+    expect(extractTosUrl('{"url":"https://example.com/legal"}')).toBe("https://example.com/legal");
+  });
+  it("returns null for text with no ToS URL", () => {
+    expect(extractTosUrl("No URLs here at all")).toBeNull();
+  });
+  it("returns null for invalid URL-like string", () => {
+    expect(extractTosUrl("https://not a valid url/terms")).toBeNull();
+  });
+  it("falls through garbled first match to valid second match", () => {
+    const text = "[https://:::bad/terms] and https://example.com/tos";
+    expect(extractTosUrl(text)).toBe("https://example.com/tos");
+  });
+  it("handles URL with path segments after keyword", () => {
+    expect(extractTosUrl("https://example.com/legal/en-us")).toBe("https://example.com/legal/en-us");
+  });
+});
+
 describe("checkTosUrl", () => {
   it("returns pass when spec has termsOfService", () => {
     expect(checkTosUrl({ info: { termsOfService: "https://example.com/tos" } }, null).status).toBe("pass");
   });
   it("returns partial when ToS URL found in llms.txt", () => {
     expect(checkTosUrl(undefined, "Check our https://example.com/terms for details").status).toBe("partial");
+  });
+  it("returns partial with clean URL even when surrounded by delimiters", () => {
+    const result = checkTosUrl(undefined, 'See (https://example.com/terms) for info');
+    expect(result.status).toBe("partial");
+    expect(result.data?.url).toBe("https://example.com/terms");
   });
   it("returns fail when no ToS found anywhere", () => {
     expect(checkTosUrl(undefined, null).status).toBe("fail");

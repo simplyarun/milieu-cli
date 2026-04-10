@@ -37,7 +37,7 @@ export async function checkRobotsTxt(
           id,
           label,
           status: "partial",
-          detail: "No robots.txt found",
+          detail: `No robots.txt found at ${domain}`,
         },
         parsed: null,
       };
@@ -66,7 +66,7 @@ export async function checkRobotsTxt(
         id,
         label,
         status: "fail",
-        detail: "robots.txt is not a text file",
+        detail: `robots.txt at ${domain} is not a text file (robots.txt is per-origin)`,
       },
       parsed: null,
     };
@@ -81,7 +81,7 @@ export async function checkRobotsTxt(
         id,
         label,
         status: "partial",
-        detail: "robots.txt exists but has no rules",
+        detail: `robots.txt at ${domain} exists but has no rules`,
       },
       parsed,
     };
@@ -92,7 +92,7 @@ export async function checkRobotsTxt(
       id,
       label,
       status: "pass",
-      detail: `robots.txt found with ${parsed.ruleCount} rules`,
+      detail: `robots.txt at ${domain} found with ${parsed.ruleCount} rules`,
       data: { ruleCount: parsed.ruleCount, sitemaps: parsed.sitemaps },
     },
     parsed,

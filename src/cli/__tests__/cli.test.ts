@@ -35,7 +35,7 @@ const mockScanResult = {
       scoreLabel: "pass",
       checks: [
         { id: "https_available", label: "HTTPS Available", status: "pass" as const },
-        { id: "robots_txt", label: "robots.txt", status: "fail" as const, detail: "No robots.txt found" },
+        { id: "robots_txt", label: "robots.txt", status: "fail" as const, detail: "No robots.txt found at example.com" },
       ],
       durationMs: 200,
     },
