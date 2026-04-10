@@ -18,8 +18,8 @@ export const CHECK_EXPLANATIONS: Record<string, ExplanationEntry> = {
   },
   robots_txt: {
     pass: "Your robots.txt gives AI agents clear crawling guidance.",
-    fail: "Without robots.txt, AI agents have no guidance on what they can access — most default to cautious behavior and skip your product surface.",
-    partial: "Your robots.txt exists but may not provide clear guidance to AI agents.",
+    fail: "Without robots.txt, AI agents have no guidance on what they can access — most default to cautious behavior and skip your product surface. Note: robots.txt is per-origin (RFC 9309), so a parent domain's robots.txt does not apply to subdomains.",
+    partial: "Your robots.txt exists but may not provide clear guidance to AI agents. Note: robots.txt is per-origin (RFC 9309) — only the scanned domain's robots.txt is evaluated.",
     default: "robots.txt tells AI agents what they're allowed to crawl on your product surface.",
   },
   crawler_policy_gptbot: {
@@ -91,12 +91,13 @@ export const CHECK_EXPLANATIONS: Record<string, ExplanationEntry> = {
   llms_txt: {
     pass: "Your llms.txt helps AI agents understand what your product surface offers without crawling every page.",
     fail: "Without llms.txt, AI agents must crawl your entire product surface to understand what you offer — most won't bother.",
-    partial: "Your llms.txt exists but may not follow the expected format for optimal AI consumption.",
+    partial: "Your llms.txt exists but may lack structured sections or links — AI agents get limited navigational value without these.",
     default: "llms.txt provides a structured overview of your product surface purpose-built for large language models.",
   },
   llms_full_txt: {
     pass: "Your llms-full.txt gives AI agents comprehensive content for deep understanding.",
     fail: "Without llms-full.txt, AI agents only have the summary from llms.txt — they lack the depth needed for detailed answers about your product.",
+    partial: "Your llms-full.txt exists but is very short — AI agents need more comprehensive content for deep understanding.",
     default: "llms-full.txt provides comprehensive product content that gives AI agents deep context beyond the llms.txt summary.",
   },
   mcp_endpoint: {

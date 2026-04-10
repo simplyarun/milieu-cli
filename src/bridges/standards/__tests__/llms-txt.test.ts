@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { checkLlmsTxt, checkLlmsFullTxt } from "../llms-txt.js";
+import { checkLlmsTxt, checkLlmsFullTxt, analyzeLlmsContent } from "../llms-txt.js";
 import { httpGet } from "../../../utils/http-client.js";
 import type { HttpResponse } from "../../../core/types.js";
 
@@ -40,14 +40,28 @@ describe("checkLlmsTxt", () => {
     expect(check.label).toBe("llms.txt");
   });
 
-  it("returns pass with size and firstLine when body starts with H1", async () => {
-    mockHttpGet.mockResolvedValue(makeSuccess("# My Site\n\nSome content here"));
+  it("returns pass with quality data when body has H1, sections, and links", async () => {
+    mockHttpGet.mockResolvedValue(makeSuccess("# My Site\n\n## Overview\nSee https://example.com/docs for details"));
     const { check } = await checkLlmsTxt("https://example.com");
     expect(check.status).toBe("pass");
-    expect(check.detail).toBe("llms.txt found (28 bytes)");
-    expect(check.data).toEqual({
-      sizeBytes: 28,
+    expect(check.detail).toBe("llms.txt found (63 bytes, 1 sections, 1 links)");
+    expect(check.data).toMatchObject({
+      sizeBytes: 63,
       firstLine: "# My Site",
+      sectionCount: 1,
+      linkCount: 1,
+    });
+  });
+
+  it("returns partial when H1 present but no sections or links", async () => {
+    mockHttpGet.mockResolvedValue(makeSuccess("# My Site\n\nSome content here"));
+    const { check } = await checkLlmsTxt("https://example.com");
+    expect(check.status).toBe("partial");
+    expect(check.detail).toBe("llms.txt found but lacks sections or links");
+    expect(check.data).toMatchObject({
+      sizeBytes: 28,
+      sectionCount: 0,
+      linkCount: 0,
     });
   });
 
@@ -80,10 +94,10 @@ describe("checkLlmsTxt", () => {
   });
 
   it("calculates byte size correctly for multi-byte chars", async () => {
-    // "# Cafe" is 7 ASCII bytes
+    // "# Cafe" has 0 sections/links so it's partial, but we can still check sizeBytes
     mockHttpGet.mockResolvedValue(makeSuccess("# Cafe"));
     const { check } = await checkLlmsTxt("https://example.com");
-    expect(check.status).toBe("pass");
+    expect(check.status).toBe("partial");
     expect((check.data as { sizeBytes: number }).sizeBytes).toBe(6);
   });
 
@@ -131,13 +145,21 @@ describe("checkLlmsFullTxt", () => {
     expect(result.label).toBe("llms-full.txt");
   });
 
-  it("returns pass with size for non-empty HTTP 200", async () => {
+  it("returns pass with size and quality data for non-empty HTTP 200 above 500 bytes", async () => {
     const body = "A".repeat(1024);
     mockHttpGet.mockResolvedValue(makeSuccess(body));
     const result = await checkLlmsFullTxt("https://example.com");
     expect(result.status).toBe("pass");
     expect(result.detail).toBe("llms-full.txt found (1024 bytes)");
-    expect(result.data).toEqual({ sizeBytes: 1024 });
+    expect(result.data).toMatchObject({ sizeBytes: 1024, sectionCount: 0, linkCount: 0 });
+  });
+
+  it("returns partial when under 500 bytes", async () => {
+    mockHttpGet.mockResolvedValue(makeSuccess("Short content here"));
+    const result = await checkLlmsFullTxt("https://example.com");
+    expect(result.status).toBe("partial");
+    expect(result.detail).toBe("llms-full.txt found but minimal (18 bytes)");
+    expect(result.data).toMatchObject({ sizeBytes: 18 });
   });
 
   it("returns fail on HTTP 404", async () => {
@@ -152,5 +174,29 @@ describe("checkLlmsFullTxt", () => {
     const result = await checkLlmsFullTxt("https://example.com");
     expect(result.status).toBe("fail");
     expect(result.detail).toBe("No llms-full.txt found");
+  });
+});
+
+describe("analyzeLlmsContent", () => {
+  it("counts sections, links, lines, and detects API references", () => {
+    const body = "# Title\n\n## Overview\nSome text\n\n## API\nUse https://api.example.com/v1 and https://docs.example.com\n";
+    const result = analyzeLlmsContent(body);
+    expect(result.sectionCount).toBe(2);
+    expect(result.linkCount).toBe(2);
+    expect(result.hasApiReferences).toBe(true);
+    expect(result.lineCount).toBe(5);
+  });
+
+  it("returns zeros for plain text with no structure", () => {
+    const result = analyzeLlmsContent("Just some plain text here");
+    expect(result.sectionCount).toBe(0);
+    expect(result.linkCount).toBe(0);
+    expect(result.hasApiReferences).toBe(false);
+    expect(result.lineCount).toBe(1);
+  });
+
+  it("does not count H1 as a section", () => {
+    const result = analyzeLlmsContent("# Title\n\nContent");
+    expect(result.sectionCount).toBe(0);
   });
 });
