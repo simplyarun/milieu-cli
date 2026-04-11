@@ -60,9 +60,9 @@ describe("runSchemaBridge", () => {
     expect(result.scoreLabel).toBe("pass");
   });
 
-  it("returns score 0 with nuanced no-spec messages when no spec available", async () => {
+  it("returns score null with nuanced no-spec messages when no spec available", async () => {
     const result = await runSchemaBridge(makeCtx(null));
-    expect(result.score).toBe(0);
+    expect(result.score).toBeNull();
     expect(result.scoreLabel).toBe("fail");
     expect(result.checks).toHaveLength(5);
     for (const check of result.checks) {

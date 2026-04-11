@@ -40,17 +40,24 @@ export async function runSchemaBridge(ctx: ScanContext): Promise<BridgeResult> {
   const hasSpec = ctx.shared.openApiDetected === true && ctx.shared.openApiSpec != null;
   const spec = hasSpec ? (ctx.shared.openApiSpec as ParsedOpenApiSpec) : undefined;
 
-  const checks: Check[] = hasSpec
-    ? [
-        checkOperationIds(spec),
-        checkSchemaTypes(spec),
-        checkErrorSchemas(spec),
-        checkRequiredFields(spec),
-        checkDescriptions(spec),
-      ]
-    : NO_SPEC_CHECKS.map(({ id, label }) => ({
-        id, label, status: "fail" as const, detail: NO_SPEC_MESSAGES[id],
-      }));
+  // No spec → score: null (excluded from overall average, like Bridge 3)
+  if (!hasSpec) {
+    const checks: Check[] = NO_SPEC_CHECKS.map(({ id, label }) => ({
+      id, label, status: "fail" as const, detail: NO_SPEC_MESSAGES[id],
+    }));
+    return {
+      id: 4, name: "Schema", status: "evaluated", score: null, scoreLabel: "fail", checks,
+      durationMs: Math.round(performance.now() - start),
+    };
+  }
+
+  const checks: Check[] = [
+    checkOperationIds(spec),
+    checkSchemaTypes(spec),
+    checkErrorSchemas(spec),
+    checkRequiredFields(spec),
+    checkDescriptions(spec),
+  ];
 
   const { score, scoreLabel } = calculateScore(checks);
 

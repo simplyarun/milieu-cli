@@ -8,7 +8,7 @@ import { httpGet } from "../../../utils/http-client.js";
 import { checkRateLimitHeaders } from "../rate-limits.js";
 import { checkAuthClarity } from "../auth-clarity.js";
 import { checkAuthLegibility } from "../auth-legibility.js";
-import { checkTosUrl, checkContactInfo, extractTosUrl } from "../tos-contact.js";
+import { checkTosUrl, checkContactInfo, extractTosUrl, extractTosUrlFromHtml } from "../tos-contact.js";
 import { checkVersioningSignal } from "../versioning.js";
 import { checkAgentsJson } from "../agents-json.js";
 
@@ -108,7 +108,7 @@ describe("checkAuthLegibility", () => {
 });
 
 describe("extractTosUrl", () => {
-  it("extracts clean URL from plain text", () => {
+  it("extracts clean URL with /terms as path segment", () => {
     expect(extractTosUrl("See https://example.com/terms for details")).toBe("https://example.com/terms");
   });
   it("strips trailing parenthesis from markdown-style link", () => {
@@ -117,7 +117,7 @@ describe("extractTosUrl", () => {
   it("strips trailing period", () => {
     expect(extractTosUrl("Visit https://example.com/tos.")).toBe("https://example.com/tos");
   });
-  it("extracts URL from JSON blob", () => {
+  it("extracts URL with /legal as path segment", () => {
     expect(extractTosUrl('{"url":"https://example.com/legal"}')).toBe("https://example.com/legal");
   });
   it("returns null for text with no ToS URL", () => {
@@ -126,6 +126,12 @@ describe("extractTosUrl", () => {
   it("returns null for invalid URL-like string", () => {
     expect(extractTosUrl("https://not a valid url/terms")).toBeNull();
   });
+  it("rejects denial-of-service as a false positive", () => {
+    expect(extractTosUrl("https://example.com/blog/denial-of-service-issues-html.md")).toBeNull();
+  });
+  it("rejects internal-tools as a false positive", () => {
+    expect(extractTosUrl("https://example.com/analytics-overview")).toBeNull();
+  });
   it("falls through garbled first match to valid second match", () => {
     const text = "[https://:::bad/terms] and https://example.com/tos";
     expect(extractTosUrl(text)).toBe("https://example.com/tos");
@@ -133,31 +139,58 @@ describe("extractTosUrl", () => {
   it("handles URL with path segments after keyword", () => {
     expect(extractTosUrl("https://example.com/legal/en-us")).toBe("https://example.com/legal/en-us");
   });
+  it("matches /terms-of-service as a path segment", () => {
+    expect(extractTosUrl("https://example.com/terms-of-service")).toBe("https://example.com/terms-of-service");
+  });
+});
+
+describe("extractTosUrlFromHtml", () => {
+  it("extracts ToS URL from anchor tag", () => {
+    expect(extractTosUrlFromHtml('<a href="https://example.com/terms">Terms</a>')).toBe("https://example.com/terms");
+  });
+  it("extracts /legal URL from footer-style HTML", () => {
+    expect(extractTosUrlFromHtml('<footer><a href="https://example.com/legal/privacy">Privacy</a></footer>')).toBe("https://example.com/legal/privacy");
+  });
+  it("returns null when no ToS link in HTML", () => {
+    expect(extractTosUrlFromHtml('<a href="https://example.com/about">About</a>')).toBeNull();
+  });
+  it("skips javascript: links", () => {
+    expect(extractTosUrlFromHtml('<a href="javascript:void(0)">Terms</a>')).toBeNull();
+  });
+  it("skips relative URLs", () => {
+    expect(extractTosUrlFromHtml('<a href="/terms">Terms</a>')).toBeNull();
+  });
 });
 
 describe("checkTosUrl", () => {
   it("returns pass when spec has termsOfService", () => {
-    expect(checkTosUrl({ info: { termsOfService: "https://example.com/tos" } }, null).status).toBe("pass");
+    expect(checkTosUrl({ info: { termsOfService: "https://example.com/tos" } }, null, null).status).toBe("pass");
   });
   it("returns partial when ToS URL found in llms.txt", () => {
-    expect(checkTosUrl(undefined, "Check our https://example.com/terms for details").status).toBe("partial");
+    expect(checkTosUrl(undefined, "Check our https://example.com/terms for details", null).status).toBe("partial");
   });
-  it("returns partial with clean URL even when surrounded by delimiters", () => {
-    const result = checkTosUrl(undefined, 'See (https://example.com/terms) for info');
+  it("returns partial when ToS URL found in page HTML", () => {
+    const result = checkTosUrl(undefined, null, '<a href="https://example.com/legal">Terms</a>');
     expect(result.status).toBe("partial");
-    expect(result.data?.url).toBe("https://example.com/terms");
+    expect(result.data?.source).toBe("page");
+    expect(result.data?.url).toBe("https://example.com/legal");
   });
   it("returns fail when no ToS found anywhere", () => {
-    expect(checkTosUrl(undefined, null).status).toBe("fail");
+    expect(checkTosUrl(undefined, null, null).status).toBe("fail");
   });
 });
 
 describe("checkContactInfo", () => {
   it("returns pass when spec has contact email", () => {
-    expect(checkContactInfo({ info: { contact: { email: "api@example.com" } } }).status).toBe("pass");
+    expect(checkContactInfo({ info: { contact: { email: "api@example.com" } } }, null).status).toBe("pass");
   });
-  it("returns fail when no contact info", () => {
-    expect(checkContactInfo(undefined).status).toBe("fail");
+  it("returns partial when contact found in security.txt", () => {
+    const result = checkContactInfo(undefined, "Contact: mailto:security@example.com\nExpires: 2027-01-01");
+    expect(result.status).toBe("partial");
+    expect(result.detail).toContain("security.txt");
+  });
+  it("returns fail when no contact info anywhere", () => {
+    expect(checkContactInfo(undefined, null).status).toBe("fail");
   });
 });
 

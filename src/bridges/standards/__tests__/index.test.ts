@@ -101,7 +101,7 @@ function setupAllPass(): void {
   vi.mocked(checkJsonLd).mockReturnValue(makeCheck("pass", "json_ld"));
   vi.mocked(checkSchemaOrg).mockReturnValue(makeCheck("pass", "schema_org"));
   vi.mocked(checkSecurityTxt).mockResolvedValue(
-    makeCheck("pass", "security_txt"),
+    { check: makeCheck("pass", "security_txt"), body: "Contact: mailto:test@example.com" },
   );
   vi.mocked(checkWebMcp).mockResolvedValue(makeCheck("pass", "standards_webmcp"));
   vi.mocked(checkA2aAgentCard).mockResolvedValue(makeCheck("pass", "standards_a2a_agent_card"));
@@ -139,7 +139,7 @@ function setupAllFail(): void {
   vi.mocked(checkJsonLd).mockReturnValue(makeCheck("fail", "json_ld"));
   vi.mocked(checkSchemaOrg).mockReturnValue(makeCheck("fail", "schema_org"));
   vi.mocked(checkSecurityTxt).mockResolvedValue(
-    makeCheck("fail", "security_txt"),
+    { check: makeCheck("fail", "security_txt"), body: null },
   );
   vi.mocked(checkWebMcp).mockResolvedValue(makeCheck("fail", "standards_webmcp"));
   vi.mocked(checkA2aAgentCard).mockResolvedValue(makeCheck("fail", "standards_a2a_agent_card"));
@@ -190,8 +190,8 @@ describe("runStandardsBridge", () => {
     expect(result.scoreLabel).toBe("pass");
   });
 
-  it("returns score 33 and scoreLabel fail when 4 pass + 8 fail", async () => {
-    // First 4 pass, rest fail (12 checks total: 4/12 = 33%)
+  it("returns score 33 and scoreLabel partial when 4 pass + 8 fail (weighted)", async () => {
+    // openapi(2)+graphql(1)+sitemap(2)+markdown(1) = 6/18 = 33% → partial (>=30)
     vi.mocked(checkOpenApi).mockResolvedValue({
       check: makeCheck("pass", "openapi_spec"),
       detected: true,
@@ -223,14 +223,14 @@ describe("runStandardsBridge", () => {
     vi.mocked(checkJsonLd).mockReturnValue(makeCheck("fail", "json_ld"));
     vi.mocked(checkSchemaOrg).mockReturnValue(makeCheck("fail", "schema_org"));
     vi.mocked(checkSecurityTxt).mockResolvedValue(
-      makeCheck("fail", "security_txt"),
+      { check: makeCheck("fail", "security_txt"), body: null },
     );
     vi.mocked(checkWebMcp).mockResolvedValue(makeCheck("fail", "standards_webmcp"));
     vi.mocked(checkA2aAgentCard).mockResolvedValue(makeCheck("fail", "standards_a2a_agent_card"));
 
     const result = await runStandardsBridge(makeCtx());
     expect(result.score).toBe(33);
-    expect(result.scoreLabel).toBe("fail");
+    expect(result.scoreLabel).toBe("partial");
   });
 
   it("returns score 0 and scoreLabel fail when all 12 checks fail", async () => {
@@ -240,8 +240,8 @@ describe("runStandardsBridge", () => {
     expect(result.scoreLabel).toBe("fail");
   });
 
-  it("returns score 25 and scoreLabel fail for 2 pass + 2 partial + 8 fail", async () => {
-    // 2 pass (2 points) + 2 partial (1 point) + 8 fail (0) = 3/12 = 25%
+  it("returns score 28 and scoreLabel fail for 2 pass + 2 partial + 8 fail (weighted)", async () => {
+    // openapi(2)+llms_txt(2) pass=4, llms_full(0.5)+mcp(0.5) partial=1 → 5/18 = 28%
     vi.mocked(checkOpenApi).mockResolvedValue({
       check: makeCheck("pass", "openapi_spec"),
       detected: true,
@@ -273,13 +273,13 @@ describe("runStandardsBridge", () => {
     vi.mocked(checkJsonLd).mockReturnValue(makeCheck("fail", "json_ld"));
     vi.mocked(checkSchemaOrg).mockReturnValue(makeCheck("fail", "schema_org"));
     vi.mocked(checkSecurityTxt).mockResolvedValue(
-      makeCheck("fail", "security_txt"),
+      { check: makeCheck("fail", "security_txt"), body: null },
     );
     vi.mocked(checkWebMcp).mockResolvedValue(makeCheck("fail", "standards_webmcp"));
     vi.mocked(checkA2aAgentCard).mockResolvedValue(makeCheck("fail", "standards_a2a_agent_card"));
 
     const result = await runStandardsBridge(makeCtx());
-    expect(result.score).toBe(25);
+    expect(result.score).toBe(28);
     expect(result.scoreLabel).toBe("fail");
   });
 
@@ -355,7 +355,7 @@ describe("runStandardsBridge", () => {
     vi.mocked(checkMcpEndpoint).mockResolvedValue({ check: makeCheck("pass", "mcp_endpoint"), detected: true });
     vi.mocked(checkJsonLd).mockReturnValue(makeCheck("pass", "json_ld"));
     vi.mocked(checkSchemaOrg).mockReturnValue(makeCheck("pass", "schema_org"));
-    vi.mocked(checkSecurityTxt).mockResolvedValue(makeCheck("pass", "security_txt"));
+    vi.mocked(checkSecurityTxt).mockResolvedValue({ check: makeCheck("pass", "security_txt"), body: null });
     vi.mocked(checkWebMcp).mockResolvedValue(makeCheck("pass", "standards_webmcp"));
     vi.mocked(checkA2aAgentCard).mockResolvedValue(makeCheck("pass", "standards_a2a_agent_card"));
 
