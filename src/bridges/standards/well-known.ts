@@ -1,6 +1,11 @@
 import type { Check } from "../../core/types.js";
 import { httpGet } from "../../utils/http-client.js";
 
+export interface SecurityTxtResult {
+  check: Check;
+  body: string | null;
+}
+
 /**
  * Check for security.txt at /.well-known/security.txt.
  *
@@ -10,7 +15,7 @@ import { httpGet } from "../../utils/http-client.js";
 export async function checkSecurityTxt(
   baseUrl: string,
   timeout?: number,
-): Promise<Check> {
+): Promise<SecurityTxtResult> {
   const id = "security_txt";
   const label = "security.txt";
 
@@ -19,28 +24,24 @@ export async function checkSecurityTxt(
   });
 
   if (!result.ok || result.body.trim().length === 0) {
-    return { id, label, status: "fail", detail: "No security.txt found" };
+    return { check: { id, label, status: "fail", detail: "No security.txt found" }, body: null };
   }
 
   // Reject soft 404s: servers returning HTML instead of the actual file
   const contentType = (result.headers["content-type"] ?? "").toLowerCase();
   if (contentType.includes("text/html")) {
-    return { id, label, status: "fail", detail: "No security.txt found (HTML response)" };
+    return { check: { id, label, status: "fail", detail: "No security.txt found (HTML response)" }, body: null };
   }
 
   if (/^Contact:/mi.test(result.body)) {
     return {
-      id,
-      label,
-      status: "pass",
-      detail: "security.txt found with Contact field",
+      check: { id, label, status: "pass", detail: "security.txt found with Contact field" },
+      body: result.body,
     };
   }
 
   return {
-    id,
-    label,
-    status: "partial",
-    detail: "security.txt found but missing Contact field",
+    check: { id, label, status: "partial", detail: "security.txt found but missing Contact field" },
+    body: result.body,
   };
 }

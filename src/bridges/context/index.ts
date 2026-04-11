@@ -16,24 +16,37 @@ const CHECK_WEIGHTS: Record<string, number> = {
   context_contact_info: 1,
   context_agents_json: 2,
 };
-const MAX_POINTS = 16;
 
-function calculateWeightedScore(checks: Check[]): { score: number; scoreLabel: "pass" | "partial" | "fail" } {
+/** Checks that require an OpenAPI spec to produce meaningful results */
+const SPEC_GATED_CHECKS = new Set([
+  "context_auth_clarity",
+  "context_versioning_signal",
+]);
+
+function calculateWeightedScore(checks: Check[], hasSpec: boolean): { score: number | null; scoreLabel: "pass" | "partial" | "fail" } {
   let earned = 0;
+  let maxPoints = 0;
   for (const check of checks) {
     const weight = CHECK_WEIGHTS[check.id] ?? 1;
+    // Skip spec-gated checks from denominator when no spec exists
+    if (!hasSpec && SPEC_GATED_CHECKS.has(check.id)) continue;
+    maxPoints += weight;
     if (check.status === "pass") earned += weight;
     else if (check.status === "partial") earned += weight * 0.5;
   }
-  const score = Math.round((earned / MAX_POINTS) * 100);
+  if (maxPoints === 0) return { score: null, scoreLabel: "fail" };
+  const score = Math.round((earned / maxPoints) * 100);
   const scoreLabel = score >= 60 ? "pass" : score >= 30 ? "partial" : "fail";
   return { score, scoreLabel };
 }
 
 export async function runContextBridge(ctx: ScanContext): Promise<BridgeResult> {
   const start = performance.now();
-  const spec = ctx.shared.openApiSpec as ParsedOpenApiSpec | undefined;
+  const hasSpec = ctx.shared.openApiDetected === true && ctx.shared.openApiSpec != null;
+  const spec = hasSpec ? (ctx.shared.openApiSpec as ParsedOpenApiSpec) : undefined;
   const llmsTxtBody = (ctx.shared.llmsTxtBody as string | null) ?? null;
+  const pageBody = (ctx.shared.pageBody as string | null) ?? null;
+  const securityTxtBody = (ctx.shared.securityTxtBody as string | null) ?? null;
 
   // Rate-limit probe first — populates ctx.shared.contextProbeHeaders
   const rateLimitCheck = await checkRateLimitHeaders(ctx);
@@ -47,16 +60,16 @@ export async function runContextBridge(ctx: ScanContext): Promise<BridgeResult> 
 
   // Synchronous checks
   const authClarityCheck = checkAuthClarity(spec);
-  const tosCheck = checkTosUrl(spec, llmsTxtBody);
+  const tosCheck = checkTosUrl(spec, llmsTxtBody, pageBody);
   const versioningCheck = checkVersioningSignal(spec, contextProbeHeaders);
-  const contactCheck = checkContactInfo(spec);
+  const contactCheck = checkContactInfo(spec, securityTxtBody);
 
   const checks: Check[] = [
     rateLimitCheck, authClarityCheck, authLegibilityCheck,
     tosCheck, versioningCheck, contactCheck, agentsJsonCheck,
   ];
 
-  const { score, scoreLabel } = calculateWeightedScore(checks);
+  const { score, scoreLabel } = calculateWeightedScore(checks, hasSpec);
 
   return {
     id: 5, name: "Context", status: "evaluated", score, scoreLabel, checks,

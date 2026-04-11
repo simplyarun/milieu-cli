@@ -52,16 +52,19 @@ describe("runContextBridge", () => {
     expect(result.scoreLabel).toBe("fail");
   });
 
-  it("uses weighted scoring (rate-limit pass + auth-legibility partial = 4.5/16 = 28%)", async () => {
+  it("uses dynamic denominator when no spec (rate-limit pass + auth-legibility partial = 4.5/11 = 41%)", async () => {
+    // No spec → spec-gated checks (auth_clarity=3, versioning=2) excluded from denominator
+    // Denominator: rate_limit(3) + auth_legibility(3) + tos_url(2) + contact_info(1) + agents_json(2) = 11
     // /api probe succeeds with rate-limit header → rate-limit pass (3pts)
     // auth-legibility also probes /api, gets 200 → partial (1.5pts)
-    // Total: 4.5/16 = 28.125 → 28
+    // Total: 4.5/11 = 41
     mockHttpGet.mockImplementation(async (url: string) => {
       if (url.includes("/api")) return makeSuccess("", { "x-ratelimit-limit": "100" });
       return makeFailure(404);
     });
     const result = await runContextBridge(makeCtx());
-    expect(result.score).toBe(28);
+    expect(result.score).toBe(41);
+    expect(result.scoreLabel).toBe("partial");
   });
 
   it("uses lower thresholds (>=60 pass, >=30 partial)", async () => {

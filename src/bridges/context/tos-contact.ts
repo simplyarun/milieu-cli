@@ -4,12 +4,12 @@ import type { ParsedOpenApiSpec } from "../schema/oas-types.js";
 /**
  * Extract a clean ToS/legal URL from free text.
  *
- * Iterates over all URL-like matches containing "terms", "tos", or "legal",
- * strips trailing punctuation, and validates with `new URL()`.
- * Returns the first structurally valid URL, or null.
+ * Requires /terms, /tos, or /legal to appear as a path segment start
+ * (preceded by /, followed by -, /, or end-of-URL). This prevents false
+ * positives on "denial-of-service", "analytics-overview", etc.
  */
 export function extractTosUrl(text: string): string | null {
-  const urlPattern = /https?:\/\/[^\s<>"'()\]]+(?:terms|tos|legal)[^\s<>"'()\]]*/gi;
+  const urlPattern = /https?:\/\/[^\s<>"'()\]]*\/(?:terms|tos|legal)(?:[-\/][^\s<>"'()\]]*|[^\s<>"'()\]]*)*/gi;
   for (const match of text.matchAll(urlPattern)) {
     const candidate = match[0].replace(/[.,;:!?)}\]]+$/, "");
     try {
@@ -22,7 +22,33 @@ export function extractTosUrl(text: string): string | null {
   return null;
 }
 
-export function checkTosUrl(spec: ParsedOpenApiSpec | undefined, llmsTxtBody: string | null): Check {
+/**
+ * Extract ToS URL from HTML by scanning <a> tags for /terms, /tos, /legal hrefs.
+ */
+export function extractTosUrlFromHtml(html: string): string | null {
+  const hrefPattern = /<a\s[^>]*href=["']([^"']*\/(?:terms|tos|legal)(?:[-\/][^"']*)?)["'][^>]*>/gi;
+  for (const match of html.matchAll(hrefPattern)) {
+    const href = match[1];
+    // Resolve relative URLs — skip fragment-only or javascript: links
+    if (href.startsWith("#") || href.startsWith("javascript:")) continue;
+    try {
+      // Absolute URLs pass as-is; relative ones would need a base, so skip them
+      if (href.startsWith("http")) {
+        new URL(href);
+        return href;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+export function checkTosUrl(
+  spec: ParsedOpenApiSpec | undefined,
+  llmsTxtBody: string | null,
+  pageBody: string | null,
+): Check {
   const id = "context_tos_url";
   const label = "Terms of Service URL";
   const specTos = spec?.info?.termsOfService;
@@ -33,10 +59,25 @@ export function checkTosUrl(spec: ParsedOpenApiSpec | undefined, llmsTxtBody: st
     const url = extractTosUrl(llmsTxtBody);
     if (url) return { id, label, status: "partial", detail: `Terms of Service URL found in llms.txt: ${url}`, data: { source: "llms.txt", url } };
   }
+  if (pageBody) {
+    const url = extractTosUrlFromHtml(pageBody);
+    if (url) return { id, label, status: "partial", detail: `Terms of Service URL found in page: ${url}`, data: { source: "page", url } };
+  }
   return { id, label, status: "fail", detail: "No Terms of Service URL found", data: { source: null, url: null } };
 }
 
-export function checkContactInfo(spec: ParsedOpenApiSpec | undefined): Check {
+/**
+ * Extract Contact email from security.txt body (RFC 9116 Contact: field).
+ */
+function extractSecurityTxtContact(securityTxtBody: string): string | null {
+  const match = securityTxtBody.match(/^Contact:\s*(.+)/mi);
+  return match ? match[1].trim() : null;
+}
+
+export function checkContactInfo(
+  spec: ParsedOpenApiSpec | undefined,
+  securityTxtBody: string | null,
+): Check {
   const id = "context_contact_info";
   const label = "Contact Info";
   const contact = spec?.info?.contact;
@@ -48,5 +89,11 @@ export function checkContactInfo(spec: ParsedOpenApiSpec | undefined): Check {
     if (url) parts.push(`url: ${url}`);
     return { id, label, status: "pass", detail: `Contact info found in spec: ${parts.join(", ")}`, data: { email, url } };
   }
-  return { id, label, status: "fail", detail: "No contact info found in spec", data: { email: null, url: null } };
+  if (securityTxtBody) {
+    const contactValue = extractSecurityTxtContact(securityTxtBody);
+    if (contactValue) {
+      return { id, label, status: "partial", detail: `Contact info found in security.txt: ${contactValue}`, data: { email: null, url: contactValue } };
+    }
+  }
+  return { id, label, status: "fail", detail: "No contact info found", data: { email: null, url: null } };
 }
