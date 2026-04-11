@@ -145,38 +145,48 @@ describe("extractTosUrl", () => {
 });
 
 describe("extractTosUrlFromHtml", () => {
+  const base = "https://example.com";
   it("extracts ToS URL from anchor tag", () => {
-    expect(extractTosUrlFromHtml('<a href="https://example.com/terms">Terms</a>')).toBe("https://example.com/terms");
+    expect(extractTosUrlFromHtml('<a href="https://example.com/terms">Terms</a>', base)).toBe("https://example.com/terms");
   });
   it("extracts /legal URL from footer-style HTML", () => {
-    expect(extractTosUrlFromHtml('<footer><a href="https://example.com/legal/privacy">Privacy</a></footer>')).toBe("https://example.com/legal/privacy");
+    expect(extractTosUrlFromHtml('<footer><a href="https://example.com/legal/privacy">Privacy</a></footer>', base)).toBe("https://example.com/legal/privacy");
+  });
+  it("resolves relative URLs using baseUrl", () => {
+    expect(extractTosUrlFromHtml('<a href="/terms">Terms</a>', base)).toBe("https://example.com/terms");
+  });
+  it("resolves relative /legal path", () => {
+    expect(extractTosUrlFromHtml('<a href="/legal/en-us">Legal</a>', base)).toBe("https://example.com/legal/en-us");
   });
   it("returns null when no ToS link in HTML", () => {
-    expect(extractTosUrlFromHtml('<a href="https://example.com/about">About</a>')).toBeNull();
+    expect(extractTosUrlFromHtml('<a href="https://example.com/about">About</a>', base)).toBeNull();
   });
   it("skips javascript: links", () => {
-    expect(extractTosUrlFromHtml('<a href="javascript:void(0)">Terms</a>')).toBeNull();
-  });
-  it("skips relative URLs", () => {
-    expect(extractTosUrlFromHtml('<a href="/terms">Terms</a>')).toBeNull();
+    expect(extractTosUrlFromHtml('<a href="javascript:void(0)">Terms</a>', base)).toBeNull();
   });
 });
 
 describe("checkTosUrl", () => {
+  const base = "https://example.com";
   it("returns pass when spec has termsOfService", () => {
-    expect(checkTosUrl({ info: { termsOfService: "https://example.com/tos" } }, null, null).status).toBe("pass");
+    expect(checkTosUrl({ info: { termsOfService: "https://example.com/tos" } }, null, null, base).status).toBe("pass");
   });
   it("returns partial when ToS URL found in llms.txt", () => {
-    expect(checkTosUrl(undefined, "Check our https://example.com/terms for details", null).status).toBe("partial");
+    expect(checkTosUrl(undefined, "Check our https://example.com/terms for details", null, base).status).toBe("partial");
   });
   it("returns partial when ToS URL found in page HTML", () => {
-    const result = checkTosUrl(undefined, null, '<a href="https://example.com/legal">Terms</a>');
+    const result = checkTosUrl(undefined, null, '<a href="https://example.com/legal">Terms</a>', base);
     expect(result.status).toBe("partial");
     expect(result.data?.source).toBe("page");
     expect(result.data?.url).toBe("https://example.com/legal");
   });
+  it("returns partial when ToS found via relative URL in page HTML", () => {
+    const result = checkTosUrl(undefined, null, '<a href="/terms-of-service">Terms</a>', base);
+    expect(result.status).toBe("partial");
+    expect(result.data?.url).toBe("https://example.com/terms-of-service");
+  });
   it("returns fail when no ToS found anywhere", () => {
-    expect(checkTosUrl(undefined, null, null).status).toBe("fail");
+    expect(checkTosUrl(undefined, null, null, base).status).toBe("fail");
   });
 });
 

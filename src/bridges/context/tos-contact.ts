@@ -24,19 +24,16 @@ export function extractTosUrl(text: string): string | null {
 
 /**
  * Extract ToS URL from HTML by scanning <a> tags for /terms, /tos, /legal hrefs.
+ * Resolves relative URLs using the provided baseUrl.
  */
-export function extractTosUrlFromHtml(html: string): string | null {
+export function extractTosUrlFromHtml(html: string, baseUrl: string): string | null {
   const hrefPattern = /<a\s[^>]*href=["']([^"']*\/(?:terms|tos|legal)(?:[-\/][^"']*)?)["'][^>]*>/gi;
   for (const match of html.matchAll(hrefPattern)) {
     const href = match[1];
-    // Resolve relative URLs — skip fragment-only or javascript: links
     if (href.startsWith("#") || href.startsWith("javascript:")) continue;
     try {
-      // Absolute URLs pass as-is; relative ones would need a base, so skip them
-      if (href.startsWith("http")) {
-        new URL(href);
-        return href;
-      }
+      const resolved = new URL(href, baseUrl);
+      return resolved.href;
     } catch {
       continue;
     }
@@ -48,6 +45,7 @@ export function checkTosUrl(
   spec: ParsedOpenApiSpec | undefined,
   llmsTxtBody: string | null,
   pageBody: string | null,
+  baseUrl: string,
 ): Check {
   const id = "context_tos_url";
   const label = "Terms of Service URL";
@@ -60,7 +58,7 @@ export function checkTosUrl(
     if (url) return { id, label, status: "partial", detail: `Terms of Service URL found in llms.txt: ${url}`, data: { source: "llms.txt", url } };
   }
   if (pageBody) {
-    const url = extractTosUrlFromHtml(pageBody);
+    const url = extractTosUrlFromHtml(pageBody, baseUrl);
     if (url) return { id, label, status: "partial", detail: `Terms of Service URL found in page: ${url}`, data: { source: "page", url } };
   }
   return { id, label, status: "fail", detail: "No Terms of Service URL found", data: { source: null, url: null } };

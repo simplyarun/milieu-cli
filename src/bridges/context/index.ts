@@ -23,7 +23,7 @@ const SPEC_GATED_CHECKS = new Set([
   "context_versioning_signal",
 ]);
 
-function calculateWeightedScore(checks: Check[], hasSpec: boolean): { score: number | null; scoreLabel: "pass" | "partial" | "fail" } {
+function calculateWeightedScore(checks: Check[], hasSpec: boolean): { score: number | null; scoreLabel: "pass" | "partial" | "fail" | null } {
   let earned = 0;
   let maxPoints = 0;
   for (const check of checks) {
@@ -34,7 +34,7 @@ function calculateWeightedScore(checks: Check[], hasSpec: boolean): { score: num
     if (check.status === "pass") earned += weight;
     else if (check.status === "partial") earned += weight * 0.5;
   }
-  if (maxPoints === 0) return { score: null, scoreLabel: "fail" };
+  if (maxPoints === 0) return { score: null, scoreLabel: null };
   const score = Math.round((earned / maxPoints) * 100);
   const scoreLabel = score >= 60 ? "pass" : score >= 30 ? "partial" : "fail";
   return { score, scoreLabel };
@@ -60,7 +60,7 @@ export async function runContextBridge(ctx: ScanContext): Promise<BridgeResult> 
 
   // Synchronous checks
   const authClarityCheck = checkAuthClarity(spec);
-  const tosCheck = checkTosUrl(spec, llmsTxtBody, pageBody);
+  const tosCheck = checkTosUrl(spec, llmsTxtBody, pageBody, ctx.baseUrl);
   const versioningCheck = checkVersioningSignal(spec, contextProbeHeaders);
   const contactCheck = checkContactInfo(spec, securityTxtBody);
 
