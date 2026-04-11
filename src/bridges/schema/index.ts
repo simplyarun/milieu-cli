@@ -46,7 +46,7 @@ export async function runSchemaBridge(ctx: ScanContext): Promise<BridgeResult> {
       id, label, status: "fail" as const, detail: NO_SPEC_MESSAGES[id],
     }));
     return {
-      id: 4, name: "Schema", status: "evaluated", score: null, scoreLabel: "fail", checks,
+      id: 4, name: "Schema", status: "evaluated", score: null, scoreLabel: null, checks,
       durationMs: Math.round(performance.now() - start),
     };
   }
