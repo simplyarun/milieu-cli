@@ -142,6 +142,14 @@ describe("extractTosUrl", () => {
   it("matches /terms-of-service as a path segment", () => {
     expect(extractTosUrl("https://example.com/terms-of-service")).toBe("https://example.com/terms-of-service");
   });
+  it("prefers /terms over /legal when both present", () => {
+    const text = "See https://example.com/legal/restricted and https://example.com/terms for details";
+    expect(extractTosUrl(text)).toBe("https://example.com/terms");
+  });
+  it("falls back to /legal when no /terms or /tos present", () => {
+    const text = "See https://example.com/legal/privacy for details";
+    expect(extractTosUrl(text)).toBe("https://example.com/legal/privacy");
+  });
 });
 
 describe("extractTosUrlFromHtml", () => {
@@ -163,6 +171,14 @@ describe("extractTosUrlFromHtml", () => {
   });
   it("skips javascript: links", () => {
     expect(extractTosUrlFromHtml('<a href="javascript:void(0)">Terms</a>', base)).toBeNull();
+  });
+  it("prefers /terms over /legal when both present", () => {
+    const html = '<a href="/legal/privacy">Legal</a><a href="/terms">Terms</a>';
+    expect(extractTosUrlFromHtml(html, base)).toBe("https://example.com/terms");
+  });
+  it("falls back to /legal when no /terms or /tos present", () => {
+    const html = '<a href="/legal/privacy">Legal</a>';
+    expect(extractTosUrlFromHtml(html, base)).toBe("https://example.com/legal/privacy");
   });
 });
 

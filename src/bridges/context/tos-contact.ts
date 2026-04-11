@@ -10,16 +10,20 @@ import type { ParsedOpenApiSpec } from "../schema/oas-types.js";
  */
 export function extractTosUrl(text: string): string | null {
   const urlPattern = /https?:\/\/[^\s<>"'()\]]*\/(?:terms|tos|legal)(?:[-\/][^\s<>"'()\]]*|[^\s<>"'()\]]*)*/gi;
+  const matches: string[] = [];
   for (const match of text.matchAll(urlPattern)) {
     const candidate = match[0].replace(/[.,;:!?)}\]]+$/, "");
     try {
       new URL(candidate);
-      return candidate;
+      matches.push(candidate);
     } catch {
       continue;
     }
   }
-  return null;
+  if (matches.length === 0) return null;
+  // Prefer /terms or /tos over /legal — more specific ToS signals
+  const preferred = matches.find(u => /\/(?:terms|tos)([-\/]|$)/i.test(u));
+  return preferred ?? matches[0];
 }
 
 /**
@@ -28,17 +32,21 @@ export function extractTosUrl(text: string): string | null {
  */
 export function extractTosUrlFromHtml(html: string, baseUrl: string): string | null {
   const hrefPattern = /<a\s[^>]*href=["']([^"']*\/(?:terms|tos|legal)(?:[-\/][^"']*)?)["'][^>]*>/gi;
+  const matches: string[] = [];
   for (const match of html.matchAll(hrefPattern)) {
     const href = match[1];
     if (href.startsWith("#") || href.startsWith("javascript:")) continue;
     try {
       const resolved = new URL(href, baseUrl);
-      return resolved.href;
+      matches.push(resolved.href);
     } catch {
       continue;
     }
   }
-  return null;
+  if (matches.length === 0) return null;
+  // Prefer /terms or /tos over /legal — more specific ToS signals
+  const preferred = matches.find(u => /\/(?:terms|tos)([-\/]|$)/i.test(u));
+  return preferred ?? matches[0];
 }
 
 export function checkTosUrl(
