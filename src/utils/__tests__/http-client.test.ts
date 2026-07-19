@@ -196,7 +196,9 @@ describe("scan request context", () => {
   });
 
   it("shares one DNS cache across all requests in a scan context", async () => {
-    fetchSpy.mockResolvedValue(mockResponse({ status: 404, statusText: "Not Found" }));
+    // Fresh Response per call — a body stream can only be read once, and 4xx
+    // bodies are now read to capture the failure response.
+    fetchSpy.mockImplementation(() => mockResponse({ status: 404, statusText: "Not Found" }));
     await runWithScanRequestContext({}, async () => {
       await httpGet("https://example.com/a");
       await httpGet("https://example.com/b");
@@ -356,6 +358,42 @@ describe("httpGet", () => {
       if (!result.ok) {
         expect(result.error.kind).toBe("http_error");
         expect(result.error.statusCode).toBe(404);
+      }
+    });
+
+    it("attaches the response (status/headers/body) to a 4xx failure", async () => {
+      // A 401 is a reachable, gradeable rejection — its headers and body must
+      // survive so auth-legibility / rate-limit checks can inspect them.
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          status: 401,
+          statusText: "Unauthorized",
+          headers: { "www-authenticate": "Bearer", "content-type": "application/json" },
+          body: '{"error":"unauthorized"}',
+        }),
+      );
+
+      const result = await httpGet("https://example.com/protected");
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.kind).toBe("http_error");
+        expect(result.response).toBeDefined();
+        expect(result.response?.status).toBe(401);
+        expect(result.response?.headers["www-authenticate"]).toBe("Bearer");
+        expect(result.response?.body).toBe('{"error":"unauthorized"}');
+      }
+    });
+
+    it("does NOT attach a response to a network-level failure", async () => {
+      const dnsErr = new TypeError("fetch failed");
+      Object.assign(dnsErr, { cause: { code: "ENOTFOUND" } });
+      fetchSpy.mockRejectedValueOnce(dnsErr);
+
+      const result = await httpGet("https://nope.example.com");
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.kind).toBe("dns");
+        expect(result.response).toBeUndefined();
       }
     });
 

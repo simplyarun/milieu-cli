@@ -20,42 +20,53 @@ function findProtectedGetPath(spec: ParsedOpenApiSpec | undefined): string | nul
   return null;
 }
 
+const id = "context_auth_legibility";
+const label = "Auth Legibility";
+
+/** Grade how well a 401/403 rejection guides an unauthenticated agent. */
+function gradeRejection(
+  response: { headers: Record<string, string>; body: string },
+  probeUrl: string,
+): Check {
+  const signals: string[] = [];
+  const contentType = (response.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
+  if (response.headers["www-authenticate"]) signals.push("www-authenticate");
+  let isJson = false;
+  if (contentType === "application/json" || contentType === "application/problem+json") {
+    try { JSON.parse(response.body); isJson = true; signals.push("json_error_body"); } catch { /* invalid JSON */ }
+  }
+  if (isJson) {
+    try {
+      const parsed = JSON.parse(response.body) as Record<string, unknown>;
+      const hasDocsUrl = Object.entries(parsed).some(([key, val]) => DOCS_URL_KEYS.includes(key.toLowerCase()) && typeof val === "string" && val.startsWith("http"));
+      if (hasDocsUrl) signals.push("docs_url");
+    } catch { /* already handled */ }
+  }
+  if (signals.length >= 3) return { id, label, status: "pass", detail: `API guides unauthenticated agents toward auth: ${signals.join(", ")}`, data: { probeUrl, signals } };
+  if (signals.length >= 1) return { id, label, status: "partial", detail: `API rejects with some guidance (${signals.join(", ")}) but missing: ${["www-authenticate", "json_error_body", "docs_url"].filter((s) => !signals.includes(s)).join(", ")}`, data: { probeUrl, signals } };
+  return { id, label, status: "fail", detail: "API returns opaque rejection with no guidance for agents", data: { probeUrl, signals: [] } };
+}
+
 export async function checkAuthLegibility(ctx: ScanContext): Promise<Check> {
-  const id = "context_auth_legibility";
-  const label = "Auth Legibility";
   const spec = ctx.shared.openApiSpec as ParsedOpenApiSpec | undefined;
   const protectedPath = findProtectedGetPath(spec);
   const probeUrl = protectedPath ? `${ctx.baseUrl}${protectedPath}` : `${ctx.baseUrl}/api`;
   const probeTimeout = Math.min(ctx.options.timeout ?? 10000, 5000);
   const result = await httpGet(probeUrl, { timeout: probeTimeout });
+
   if (!result.ok) {
     if (result.error.kind === "request_budget_exhausted") {
       return { id, label, status: "error", detail: "Auth legibility probe skipped: scan request budget exhausted", data: { probeUrl, signals: [] } };
     }
+    // A 401/403 is a reachable, gradeable rejection — the whole point of this
+    // check. It arrives as a failure (httpGet rejects non-2xx) but carries the
+    // response, so grade it rather than reporting "could not reach".
+    if (result.response && (result.response.status === 401 || result.response.status === 403)) {
+      return gradeRejection(result.response, probeUrl);
+    }
     return { id, label, status: "fail", detail: `Could not reach ${probeUrl} to test auth response quality`, data: { probeUrl, signals: [] } };
   }
-  const status = result.status;
-  if (status >= 200 && status < 300) {
-    return { id, label, status: "partial", detail: "Endpoint does not require authentication — auth legibility could not be tested", data: { probeUrl, signals: ["no_auth_required"] } };
-  }
-  if (status === 401 || status === 403) {
-    const signals: string[] = [];
-    const contentType = (result.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
-    if (result.headers["www-authenticate"]) signals.push("www-authenticate");
-    let isJson = false;
-    if (contentType === "application/json" || contentType === "application/problem+json") {
-      try { JSON.parse(result.body); isJson = true; signals.push("json_error_body"); } catch { /* invalid JSON */ }
-    }
-    if (isJson) {
-      try {
-        const parsed = JSON.parse(result.body) as Record<string, unknown>;
-        const hasDocsUrl = Object.entries(parsed).some(([key, val]) => DOCS_URL_KEYS.includes(key.toLowerCase()) && typeof val === "string" && val.startsWith("http"));
-        if (hasDocsUrl) signals.push("docs_url");
-      } catch { /* already handled */ }
-    }
-    if (signals.length >= 3) return { id, label, status: "pass", detail: `API guides unauthenticated agents toward auth: ${signals.join(", ")}`, data: { probeUrl, signals } };
-    if (signals.length >= 1) return { id, label, status: "partial", detail: `API rejects with some guidance (${signals.join(", ")}) but missing: ${["www-authenticate", "json_error_body", "docs_url"].filter((s) => !signals.includes(s)).join(", ")}`, data: { probeUrl, signals } };
-    return { id, label, status: "fail", detail: "API returns opaque rejection with no guidance for agents", data: { probeUrl, signals: [] } };
-  }
-  return { id, label, status: "fail", detail: `Unexpected status ${status} — could not assess auth legibility`, data: { probeUrl, signals: [] } };
+
+  // 2xx: the endpoint did not require auth, so legibility can't be assessed.
+  return { id, label, status: "partial", detail: "Endpoint does not require authentication — auth legibility could not be tested", data: { probeUrl, signals: ["no_auth_required"] } };
 }

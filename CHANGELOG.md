@@ -4,7 +4,21 @@ All notable changes to milieu-cli are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/). Pre-1.0, breaking changes bump the
 minor version.
 
-## [0.3.0] — unreleased
+## [0.3.1] — unreleased
+
+### Fixed
+
+- **Auth-legibility and rate-limit checks can now actually pass.** `httpGet`
+  collapsed every 4xx/5xx into a headerless failure, so the auth-legibility
+  check (which grades a 401/403's `WWW-Authenticate` header, JSON error body,
+  and docs URL) and the rate-limit check (which reads rate-limit headers) could
+  never reach their pass paths against a real server — both were effectively
+  dead. `HttpFailure` now carries the response (`{ status, headers, body }`)
+  for reachable 4xx/5xx and bot-protected responses, and both checks grade it.
+  A 401/403 is now reported as a gradeable rejection rather than "could not
+  reach"; genuine network failures (dns, timeout, ssrf, …) still are.
+
+## [0.3.0] — 2026-07-19
 
 ### Breaking
 

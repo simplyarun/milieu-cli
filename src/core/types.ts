@@ -177,6 +177,17 @@ export interface HttpSuccess {
 export interface HttpFailure {
   ok: false;
   error: HttpError;
+  /**
+   * The HTTP response, present only when the failure IS one — a 4xx/5xx
+   * (`http_error`) or bot-protection (`bot_protected`). Absent for
+   * network-level failures (dns, timeout, ssrf_blocked, connection_refused,
+   * ssl_error, body_too_large, request_budget_exhausted).
+   *
+   * Checks that grade a *rejection* rather than an absence — auth legibility
+   * (401/403 quality) and rate limits (headers on any response) — read this
+   * instead of treating every non-2xx as "unreachable".
+   */
+  response?: { status: number; headers: Record<string, string>; body: string };
 }
 
 /** Discriminated union for HTTP responses */

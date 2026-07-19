@@ -26,6 +26,16 @@ function makeFailure(statusCode?: number): HttpResponse {
   return { ok: false, error: { kind: "http_error", message: `HTTP ${statusCode ?? 500}`, statusCode, url: "https://example.com/api" } };
 }
 
+/** A reachable non-2xx that carries a response (what a real 401/429 looks like). */
+function makeErrorResponse(status: number, headers: Record<string, string> = {}, body = ""): HttpResponse {
+  const kind = status === 429 ? "bot_protected" : "http_error";
+  return {
+    ok: false,
+    error: { kind, message: `HTTP ${status}`, statusCode: status, url: "https://example.com/api" },
+    response: { status, headers, body },
+  };
+}
+
 describe("checkRateLimitHeaders", () => {
   beforeEach(() => mockHttpGet.mockReset());
   it("returns pass when x-ratelimit-limit header present", async () => {
@@ -57,6 +67,58 @@ describe("checkRateLimitHeaders", () => {
     expect(result.status).toBe("fail");
     expect(ctx.shared.contextProbeHeaders).toEqual({});
   });
+  it("detects rate-limit headers on a non-2xx response (e.g. 429)", async () => {
+    // Many APIs send rate-limit headers on error responses too; httpGet must
+    // not discard them just because the status was 429.
+    mockHttpGet.mockResolvedValue(makeErrorResponse(429, { "x-ratelimit-limit": "100" }));
+    const ctx = makeCtx();
+    const result = await checkRateLimitHeaders(ctx);
+    expect(result.status).toBe("pass");
+    expect(ctx.shared.contextProbeHeaders).toMatchObject({ "x-ratelimit-limit": "100" });
+  });
+  it("still fails cleanly on a network error with no response", async () => {
+    mockHttpGet.mockResolvedValue({ ok: false, error: { kind: "dns", message: "dns fail", url: "https://example.com/api" } });
+    const result = await checkRateLimitHeaders(makeCtx());
+    expect(result.status).toBe("fail");
+  });
+});
+
+describe("checkAuthLegibility (reachable rejections)", () => {
+  beforeEach(() => mockHttpGet.mockReset());
+
+  it("passes when a 401 guides the agent (WWW-Authenticate + JSON + docs_url)", async () => {
+    mockHttpGet.mockResolvedValue(
+      makeErrorResponse(
+        401,
+        { "www-authenticate": "Bearer", "content-type": "application/json" },
+        JSON.stringify({ error: "unauthorized", docs_url: "https://docs.example.com/auth" }),
+      ),
+    );
+    const result = await checkAuthLegibility(makeCtx());
+    expect(result.status).toBe("pass");
+  });
+
+  it("is partial when a 403 gives some guidance but not all", async () => {
+    mockHttpGet.mockResolvedValue(
+      makeErrorResponse(403, { "www-authenticate": "Bearer" }, "Forbidden"),
+    );
+    const result = await checkAuthLegibility(makeCtx());
+    expect(result.status).toBe("partial");
+  });
+
+  it("fails (opaque rejection) — NOT 'could not reach' — on a bare 401", async () => {
+    mockHttpGet.mockResolvedValue(makeErrorResponse(401, { "content-type": "text/html" }, "<html>login</html>"));
+    const result = await checkAuthLegibility(makeCtx());
+    expect(result.status).toBe("fail");
+    expect(result.detail).toContain("opaque");
+  });
+
+  it("reports 'could not reach' only for genuine network failures", async () => {
+    mockHttpGet.mockResolvedValue({ ok: false, error: { kind: "timeout", message: "timed out", url: "https://example.com/api" } });
+    const result = await checkAuthLegibility(makeCtx());
+    expect(result.status).toBe("fail");
+    expect(result.detail).toContain("Could not reach");
+  });
 });
 
 describe("checkAuthClarity", () => {
@@ -83,18 +145,19 @@ describe("checkAuthClarity", () => {
 describe("checkAuthLegibility", () => {
   beforeEach(() => mockHttpGet.mockReset());
   it("returns pass when 401 has WWW-Authenticate + JSON body + docs URL", async () => {
-    mockHttpGet.mockResolvedValue(makeSuccess(
+    mockHttpGet.mockResolvedValue(makeErrorResponse(
+      401,
+      { "www-authenticate": "Bearer", "content-type": "application/json" },
       JSON.stringify({ error: "unauthorized", docs_url: "https://docs.example.com/auth" }),
-      { "www-authenticate": "Bearer", "content-type": "application/json" }, 401,
     ));
     expect((await checkAuthLegibility(makeCtx())).status).toBe("pass");
   });
   it("returns partial when 401 has JSON body but no WWW-Authenticate", async () => {
-    mockHttpGet.mockResolvedValue(makeSuccess(JSON.stringify({ error: "unauthorized" }), { "content-type": "application/json" }, 401));
+    mockHttpGet.mockResolvedValue(makeErrorResponse(401, { "content-type": "application/json" }, JSON.stringify({ error: "unauthorized" })));
     expect((await checkAuthLegibility(makeCtx())).status).toBe("partial");
   });
   it("returns fail when 401 returns HTML", async () => {
-    mockHttpGet.mockResolvedValue(makeSuccess("<html>Login</html>", { "content-type": "text/html" }, 401));
+    mockHttpGet.mockResolvedValue(makeErrorResponse(401, { "content-type": "text/html" }, "<html>Login</html>"));
     expect((await checkAuthLegibility(makeCtx())).status).toBe("fail");
   });
   it("returns partial when endpoint returns 200 (no auth required)", async () => {

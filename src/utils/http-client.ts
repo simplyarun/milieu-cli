@@ -433,11 +433,22 @@ async function fetchOnce(
     // Convert headers
     const headerRecord = headersToRecord(response.headers);
 
+    // For a non-2xx response we're about to reject, keep the actual response
+    // (status/headers/body) so checks that grade a *rejection* — auth
+    // legibility (401/403 quality) and rate limits (headers on any status) —
+    // can inspect it instead of seeing a headerless failure.
+    const captureResponse = async () => ({
+      status: response.status,
+      headers: headerRecord,
+      body: options.method === "HEAD" ? "" : await readBodyStream(response, options.maxBodyBytes, options.timeout),
+    });
+
     // Bot protection detection
     if (isBotProtected(response.status, headerRecord)) {
       return {
         ok: false,
         error: { kind: "bot_protected", message: "Bot protection detected", statusCode: response.status, url: currentUrl },
+        response: await captureResponse(),
       };
     }
 
@@ -446,6 +457,7 @@ async function fetchOnce(
       return {
         ok: false,
         error: { kind: "http_error", message: `HTTP ${response.status} ${response.statusText}`, statusCode: response.status, url: currentUrl },
+        response: await captureResponse(),
       };
     }
 
