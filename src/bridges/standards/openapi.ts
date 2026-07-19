@@ -301,6 +301,48 @@ function isProtectedResponse(response: HttpResponse): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// APIs.guru Registry Lookup
+// ---------------------------------------------------------------------------
+
+/**
+ * Look up the domain in the APIs.guru public registry.
+ *
+ * Uses the lightweight provider endpoint (~550 bytes compressed).
+ * Returns the swaggerUrl for the preferred API version, or null if not found.
+ *
+ * This catches companies like Stripe that publish their OpenAPI spec on GitHub
+ * rather than self-hosting it at a standard path on their own domain.
+ */
+async function lookupApisGuru(
+  domain: string,
+  timeout?: number,
+): Promise<string | null> {
+  const result = await httpGet(`https://api.apis.guru/v2/${domain}.json`, {
+    timeout,
+    headers: { Accept: "application/json" },
+  });
+  if (!result.ok) return null;
+
+  try {
+    const parsed = JSON.parse(result.body);
+    const apis = parsed?.apis;
+    if (!apis || typeof apis !== "object") return null;
+
+    // Take the first API entry (most providers have exactly one)
+    const firstApi = Object.values(apis)[0] as Record<string, unknown> | null;
+    if (!firstApi) return null;
+
+    return (
+      (firstApi.swaggerUrl as string | undefined) ??
+      (firstApi.swaggerYamlUrl as string | undefined) ??
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -547,7 +589,29 @@ export async function checkOpenApi(
     }
   }
 
-  // Phase 5: No valid spec found at any path
+  // Phase 5: APIs.guru public registry lookup
+  // Catches companies like Stripe that publish specs on GitHub rather than
+  // self-hosting at a standard path on their own domain.
+  const domain = new URL(baseUrl).hostname;
+  const registrySpecUrl = await lookupApisGuru(domain, timeout);
+  if (registrySpecUrl) {
+    return {
+      check: {
+        id,
+        label,
+        status: "partial",
+        detail: "OpenAPI spec found via APIs.guru registry (not self-hosted on domain)",
+        data: { specUrl: registrySpecUrl, registry: "apis.guru" },
+        why: "The spec exists but isn't directly discoverable from your domain — AI agents navigating your site won't find it without going through an external registry.",
+      },
+      detected: true,
+      hasWebhooks: false,
+      hasCallbacks: false,
+      parsedSpec: null,
+    };
+  }
+
+  // Phase 6: No valid spec found at any path
   return {
     check: {
       id,

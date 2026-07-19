@@ -293,31 +293,31 @@ describe("checkOpenApi", () => {
     expect(result.detected).toBe(true);
   });
 
-  it("probes exactly 24 paths", async () => {
+  it("probes exactly 24 paths then falls through to APIs.guru", async () => {
     mockHttpGet.mockResolvedValue(make404());
 
     await checkOpenApi("https://example.com");
 
-    // httpGet should be called exactly 24 times (17 spec + 7 doc UI)
-    expect(mockHttpGet).toHaveBeenCalledTimes(24);
+    // 17 spec paths + 7 doc UI paths + 1 APIs.guru lookup = 25
+    expect(mockHttpGet).toHaveBeenCalledTimes(25);
   });
 
-  it("fires all 24 requests in parallel via Promise.all", async () => {
+  it("fires all 24 path probes in parallel via Promise.all, then APIs.guru sequentially", async () => {
     const callOrder: string[] = [];
     let resolveCount = 0;
 
     mockHttpGet.mockImplementation(async (url: string) => {
       callOrder.push(url);
       resolveCount++;
-      // All should be called before any resolves (parallel)
       return make404();
     });
 
     await checkOpenApi("https://example.com");
 
-    // All 24 calls were initiated
-    expect(callOrder).toHaveLength(24);
-    expect(resolveCount).toBe(24);
+    // 24 parallel probes + 1 sequential APIs.guru lookup
+    expect(callOrder).toHaveLength(25);
+    expect(resolveCount).toBe(25);
+    expect(callOrder[24]).toContain("apis.guru");
   });
 
   it("rejects application/xhtml+xml Content-Type as HTML", async () => {
@@ -788,8 +788,8 @@ paths:
 
     await checkOpenApi("https://example.com");
 
-    // Should only have the initial 24 calls, no secondary fetch for /openapi.json
-    expect(mockHttpGet).toHaveBeenCalledTimes(24);
+    // 24 primary probes + 1 APIs.guru lookup (no secondary fetch for /openapi.json)
+    expect(mockHttpGet).toHaveBeenCalledTimes(25);
   });
 
   it("cross-origin extracted URL is rejected, not fetched", async () => {
@@ -809,8 +809,8 @@ paths:
 
     await checkOpenApi("https://example.com");
 
-    // No secondary fetch -- only the 24 primary probes
-    expect(mockHttpGet).toHaveBeenCalledTimes(24);
+    // 24 primary probes + 1 APIs.guru lookup (no secondary fetch for cross-origin URL)
+    expect(mockHttpGet).toHaveBeenCalledTimes(25);
   });
 
   it("max 3 secondary fetches enforced", async () => {
@@ -836,8 +836,101 @@ swaggerUrl: "/custom2/spec.json"
 
     await checkOpenApi("https://example.com");
 
-    // 24 primary + 3 secondary (capped)
-    expect(mockHttpGet).toHaveBeenCalledTimes(27);
+    // 24 primary + 3 secondary (capped) + 1 APIs.guru lookup
+    expect(mockHttpGet).toHaveBeenCalledTimes(28);
+  });
+
+  // --- APIs.guru Registry Tests ---
+
+  it("returns partial when APIs.guru registry finds a spec for the domain", async () => {
+    const registryBody = JSON.stringify({
+      apis: {
+        "example.com": {
+          swaggerUrl: "https://api.apis.guru/v2/specs/example.com/v1/openapi.json",
+          swaggerYamlUrl: "https://api.apis.guru/v2/specs/example.com/v1/openapi.yaml",
+        },
+      },
+    });
+
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.includes("apis.guru")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "application/json" },
+          body: registryBody,
+        });
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("partial");
+    expect(result.detected).toBe(true);
+    expect(result.check.detail).toContain("APIs.guru");
+    expect(result.check.data).toMatchObject({
+      specUrl: "https://api.apis.guru/v2/specs/example.com/v1/openapi.json",
+      registry: "apis.guru",
+    });
+    expect(result.hasWebhooks).toBe(false);
+    expect(result.hasCallbacks).toBe(false);
+    expect(result.parsedSpec).toBeNull();
+  });
+
+  it("falls back to swaggerYamlUrl when swaggerUrl is absent in registry response", async () => {
+    const registryBody = JSON.stringify({
+      apis: {
+        "example.com": {
+          swaggerYamlUrl: "https://api.apis.guru/v2/specs/example.com/v1/openapi.yaml",
+        },
+      },
+    });
+
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.includes("apis.guru")) {
+        return makeSuccess({
+          url,
+          headers: { "content-type": "application/json" },
+          body: registryBody,
+        });
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("partial");
+    expect(result.check.data).toMatchObject({
+      specUrl: "https://api.apis.guru/v2/specs/example.com/v1/openapi.yaml",
+    });
+  });
+
+  it("direct spec hit wins over APIs.guru (registry is last resort)", async () => {
+    const specBody = makeOpenApiJson("3.1.0", { "/users": {} });
+    const registryBody = JSON.stringify({
+      apis: { "example.com": { swaggerUrl: "https://api.apis.guru/v2/specs/example.com/v1/openapi.json" } },
+    });
+
+    mockHttpGet.mockImplementation(async (url: string) => {
+      if (url.endsWith("/openapi.json")) {
+        return makeSuccess({ url, headers: { "content-type": "application/json" }, body: specBody });
+      }
+      if (url.includes("apis.guru")) {
+        return makeSuccess({ url, headers: { "content-type": "application/json" }, body: registryBody });
+      }
+      return make404();
+    });
+
+    const result = await checkOpenApi("https://example.com");
+    // Direct hit returns pass, not partial from registry
+    expect(result.check.status).toBe("pass");
+    expect(result.check.data).toMatchObject({ path: "/openapi.json" });
+  });
+
+  it("returns fail when APIs.guru registry has no entry for the domain", async () => {
+    mockHttpGet.mockResolvedValue(make404());
+
+    const result = await checkOpenApi("https://unknown-domain.example");
+    expect(result.check.status).toBe("fail");
+    expect(result.detected).toBe(false);
   });
 
   // --- Path Expansion Tests ---
@@ -971,12 +1064,16 @@ SwaggerUIBundle({ url: defaultUrl })`;
 
     await checkOpenApi("https://example.com");
 
+    const docUiPaths = ["/", "/swagger-ui.html", "/swagger-ui/", "/docs", "/redoc", "/api/docs", "/documentation"];
+
     for (const call of mockHttpGet.mock.calls) {
       const url = call[0] as string;
       const opts = call[1] as { headers?: Record<string, string> };
-      const path = new URL(url).pathname;
 
-      const docUiPaths = ["/", "/swagger-ui.html", "/swagger-ui/", "/docs", "/redoc", "/api/docs", "/documentation"];
+      // Skip the APIs.guru registry lookup — it uses application/json for metadata
+      if (url.includes("apis.guru")) continue;
+
+      const path = new URL(url).pathname;
       if (docUiPaths.includes(path)) {
         expect(opts.headers?.Accept).toBe("text/html, */*");
       } else {
