@@ -42,6 +42,9 @@ export async function checkLlmsTxt(
   const result = await httpGet(`${baseUrl}/llms.txt`, { timeout });
 
   if (!result.ok) {
+    if (result.error.kind === "request_budget_exhausted") {
+      return { check: { id, label, status: "error", detail: "llms.txt probe skipped: scan request budget exhausted" }, body: null };
+    }
     return { check: { id, label, status: "fail", detail: "No llms.txt found" }, body: null };
   }
 
@@ -112,6 +115,10 @@ export async function checkLlmsFullTxt(
   const label = "llms-full.txt";
 
   const result = await httpGet(`${baseUrl}/llms-full.txt`, { timeout });
+
+  if (!result.ok && result.error.kind === "request_budget_exhausted") {
+    return { id, label, status: "error", detail: "llms-full.txt probe skipped: scan request budget exhausted" };
+  }
 
   if (!result.ok || result.body.trim().length === 0) {
     return { id, label, status: "fail", detail: "No llms-full.txt found" };

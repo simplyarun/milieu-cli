@@ -27,6 +27,13 @@ export async function checkRobotsTxt(
   });
 
   if (!result.ok) {
+    if (result.error.kind === "request_budget_exhausted") {
+      return {
+        check: { id, label, status: "error", detail: "robots.txt probe skipped: scan request budget exhausted" },
+        parsed: null,
+      };
+    }
+
     // 404 = no robots.txt
     if (
       result.error.kind === "http_error" &&

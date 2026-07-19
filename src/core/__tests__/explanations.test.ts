@@ -53,7 +53,7 @@ describe("CHECK_EXPLANATIONS structural sync", () => {
     // Bridge 2: Standards
     "openapi_spec", "graphql_endpoint", "sitemap", "markdown_negotiation",
     "llms_txt", "llms_full_txt", "mcp_endpoint", "json_ld", "schema_org",
-    "security_txt", "standards_webmcp", "standards_a2a_agent_card",
+    "security_txt", "standards_a2a_agent_card",
     // Bridge 3: Separation
     "api_presence", "developer_docs", "sdk_references", "webhook_support",
     // Bridge 4: Schema

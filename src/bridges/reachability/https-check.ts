@@ -37,6 +37,20 @@ export async function checkHttps(
   }
 
   const { kind, message } = result.error;
+
+  // A denied probe says nothing about connectivity — never abort on it.
+  if (kind === "request_budget_exhausted") {
+    return {
+      check: {
+        id: "https_available",
+        label: "HTTPS Available",
+        status: "error",
+        detail: "HTTPS probe skipped: scan request budget exhausted",
+      },
+      abort: false,
+    };
+  }
+
   const abort = ABORT_ERRORS.has(kind);
 
   return {

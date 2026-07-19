@@ -316,29 +316,33 @@ function isProtectedResponse(response: HttpResponse): boolean {
 async function lookupApisGuru(
   domain: string,
   timeout?: number,
-): Promise<string | null> {
+): Promise<{ specUrl: string | null; budgetDenied: boolean }> {
   const result = await httpGet(`https://api.apis.guru/v2/${domain}.json`, {
     timeout,
     headers: { Accept: "application/json" },
   });
-  if (!result.ok) return null;
+  if (!result.ok) {
+    return { specUrl: null, budgetDenied: result.error.kind === "request_budget_exhausted" };
+  }
 
   try {
     const parsed = JSON.parse(result.body);
     const apis = parsed?.apis;
-    if (!apis || typeof apis !== "object") return null;
+    if (!apis || typeof apis !== "object") return { specUrl: null, budgetDenied: false };
 
     // Take the first API entry (most providers have exactly one)
     const firstApi = Object.values(apis)[0] as Record<string, unknown> | null;
-    if (!firstApi) return null;
+    if (!firstApi) return { specUrl: null, budgetDenied: false };
 
-    return (
-      (firstApi.swaggerUrl as string | undefined) ??
-      (firstApi.swaggerYamlUrl as string | undefined) ??
-      null
-    );
+    return {
+      specUrl:
+        (firstApi.swaggerUrl as string | undefined) ??
+        (firstApi.swaggerYamlUrl as string | undefined) ??
+        null,
+      budgetDenied: false,
+    };
   } catch {
-    return null;
+    return { specUrl: null, budgetDenied: false };
   }
 }
 
@@ -347,7 +351,7 @@ async function lookupApisGuru(
 // ---------------------------------------------------------------------------
 
 /**
- * Probe 19 common OpenAPI / Swagger spec paths in parallel, then try
+ * Probe 24 common OpenAPI / Swagger spec and doc-UI paths in parallel, then try
  * extracting spec URLs from HTML doc pages, and finally detect protected specs.
  *
  * Optionally accepts sitemap-discovered API URLs as additional candidates
@@ -364,7 +368,7 @@ export async function checkOpenApi(
   const id = "openapi_spec";
   const label = "OpenAPI Spec";
 
-  // Phase 1: Fire all 19 probes in parallel
+  // Phase 1: Fire all 24 probes in parallel (17 spec paths + 7 doc UI paths)
   const responses = await Promise.all([
     ...SPEC_PATHS.map((path) =>
       httpGet(new URL(path, baseUrl).href, {
@@ -382,6 +386,11 @@ export async function checkOpenApi(
 
   const specPathResponses = responses.slice(0, SPEC_PATHS.length);
   const docUiResponses = responses.slice(SPEC_PATHS.length);
+
+  // Track budget denials across EVERY fetch wave (primary probes, script
+  // fetches, secondary candidates, registry lookup) — a denied probe is not
+  // evidence the spec is absent.
+  let budgetDenied = responses.some((r) => !r.ok && r.error.kind === "request_budget_exhausted");
 
   // Phase 2: Check spec-path responses for direct spec hits
   for (let i = 0; i < specPathResponses.length; i++) {
@@ -481,6 +490,7 @@ export async function checkOpenApi(
         }),
       ),
     );
+    budgetDenied ||= scriptResponses.some((r) => !r.ok && r.error.kind === "request_budget_exhausted");
 
     for (let i = 0; i < scriptResponses.length; i++) {
       const response = scriptResponses[i];
@@ -513,6 +523,7 @@ export async function checkOpenApi(
         }),
       ),
     );
+    budgetDenied ||= secondaryResponses.some((r) => !r.ok && r.error.kind === "request_budget_exhausted");
 
     for (let i = 0; i < secondaryResponses.length; i++) {
       const response = secondaryResponses[i];
@@ -593,15 +604,16 @@ export async function checkOpenApi(
   // Catches companies like Stripe that publish specs on GitHub rather than
   // self-hosting at a standard path on their own domain.
   const domain = new URL(baseUrl).hostname;
-  const registrySpecUrl = await lookupApisGuru(domain, timeout);
-  if (registrySpecUrl) {
+  const registry = await lookupApisGuru(domain, timeout);
+  budgetDenied ||= registry.budgetDenied;
+  if (registry.specUrl) {
     return {
       check: {
         id,
         label,
         status: "partial",
         detail: "OpenAPI spec found via APIs.guru registry (not self-hosted on domain)",
-        data: { specUrl: registrySpecUrl, registry: "apis.guru" },
+        data: { specUrl: registry.specUrl, registry: "apis.guru" },
         why: "The spec exists but isn't directly discoverable from your domain — AI agents navigating your site won't find it without going through an external registry.",
       },
       detected: true,
@@ -611,7 +623,24 @@ export async function checkOpenApi(
     };
   }
 
-  // Phase 6: No valid spec found at any path
+  // Phase 6: Budget starvation is not evidence of absence — probes that
+  // never ran cannot prove the spec is missing.
+  if (budgetDenied) {
+    return {
+      check: {
+        id,
+        label,
+        status: "error",
+        detail: "OpenAPI discovery incomplete: scan request budget exhausted",
+      },
+      detected: false,
+      hasWebhooks: false,
+      hasCallbacks: false,
+      parsedSpec: null,
+    };
+  }
+
+  // Phase 7: No valid spec found at any path
   return {
     check: {
       id,

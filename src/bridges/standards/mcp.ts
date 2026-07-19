@@ -1,4 +1,4 @@
-import type { Check } from "../../core/types.js";
+import type { Check, HttpResponse } from "../../core/types.js";
 import { httpGet } from "../../utils/http-client.js";
 
 // ---------------------------------------------------------------------------
@@ -65,13 +65,14 @@ export async function checkMcpEndpoint(
   timeout?: number,
   pageBody?: string,
   llmsTxtBody?: string,
+  endpointResponse?: HttpResponse,
 ): Promise<McpResult> {
   const id = "mcp_endpoint";
   const label = "MCP Endpoint";
 
   // --- Tier 1: Endpoint probe at /.well-known/mcp.json ---
 
-  const result = await httpGet(`${baseUrl}/.well-known/mcp.json`, {
+  const result = endpointResponse ?? await httpGet(`${baseUrl}/.well-known/mcp.json`, {
     timeout,
     headers: { Accept: "application/json" },
   });
@@ -185,6 +186,15 @@ export async function checkMcpEndpoint(
   }
 
   // --- Nothing found ---
+
+  // Content scanning above costs zero requests, so it always runs; only the
+  // final verdict distinguishes "endpoint absent" from "probe never ran".
+  if (!result.ok && result.error.kind === "request_budget_exhausted") {
+    return {
+      check: { id, label, status: "error", detail: "MCP endpoint probe skipped: scan request budget exhausted (no content signals found)" },
+      detected: false,
+    };
+  }
 
   return {
     check: { id, label, status: "fail", detail: "No MCP endpoint found" },

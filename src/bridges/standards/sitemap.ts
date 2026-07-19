@@ -1,6 +1,6 @@
 import { gunzipSync } from "node:zlib";
 import type { Check } from "../../core/types.js";
-import { httpGet } from "../../utils/http-client.js";
+import { httpGet, httpGetBytes } from "../../utils/http-client.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -27,6 +27,9 @@ const SITEMAP_PATHS = [
 
 /** Max body size for sitemap responses (1MB) */
 const MAX_BODY_BYTES = 1_048_576;
+
+/** Max decompressed size for .gz sitemaps (10MB) — bounds gzip-bomb expansion */
+const MAX_DECOMPRESSED_BYTES = 10 * 1_048_576;
 
 /** Max URLs to extract from a single sitemap */
 const MAX_URLS_PER_SITEMAP = 1000;
@@ -108,34 +111,29 @@ function isGzUrl(url: string): boolean {
 async function fetchSitemapBody(
   url: string,
   timeout?: number,
-): Promise<{ ok: true; body: string } | { ok: false }> {
+): Promise<{ ok: true; body: string } | { ok: false; budgetExhausted?: boolean }> {
   if (!isGzUrl(url)) {
     const response = await httpGet(url, {
       timeout,
       maxBodyBytes: MAX_BODY_BYTES,
       headers: { Accept: "application/xml, text/xml, */*" },
     });
-    if (!response.ok) return { ok: false };
+    if (!response.ok) return { ok: false, budgetExhausted: response.error.kind === "request_budget_exhausted" };
     return { ok: true, body: response.body };
   }
 
-  // For .gz URLs, httpGet's response.text() mangles binary data.
-  // Fetch raw bytes and decompress with zlib instead.
+  // Binary responses use the same SSRF, redirect, timeout, and budget controls.
   try {
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(timeout ?? 10_000),
-      redirect: "follow",
-      headers: {
-        "User-Agent": "milieu-cli/0.1.0",
-        Accept: "application/xml, application/gzip, */*",
-      },
+    const response = await httpGetBytes(url, {
+      timeout,
+      maxBodyBytes: MAX_BODY_BYTES,
+      headers: { Accept: "application/xml, application/gzip, */*" },
     });
-    if (!response.ok) return { ok: false };
+    if (!response.ok) return { ok: false, budgetExhausted: response.error.kind === "request_budget_exhausted" };
 
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (buffer.length > MAX_BODY_BYTES) return { ok: false };
-
-    const decompressed = gunzipSync(buffer);
+    // maxOutputLength makes zlib throw before allocating a decompression
+    // bomb (a 1 MiB gzip body can otherwise expand ~1000x in memory).
+    const decompressed = gunzipSync(response.body, { maxOutputLength: MAX_DECOMPRESSED_BYTES });
     return { ok: true, body: decompressed.toString("utf-8") };
   } catch {
     return { ok: false };
@@ -193,10 +191,11 @@ export async function checkSitemap(
   let childTotal = 0;
   let childFailed = 0;
   let hitUrlLimit = false;
+  let budgetExhausted = false;
 
   for (let i = 0; i < responses.length; i++) {
     const response = responses[i];
-    if (!response.ok) continue;
+    if (!response.ok) { budgetExhausted ||= response.budgetExhausted === true; continue; }
 
     // Verify it looks like XML
     if (!/<[^>]+>/.test(response.body)) continue;
@@ -221,6 +220,7 @@ export async function checkSitemap(
 
         for (const childResponse of childResponses) {
           if (!childResponse.ok) {
+            budgetExhausted ||= childResponse.budgetExhausted === true;
             childFailed++;
             continue;
           }
@@ -247,7 +247,7 @@ export async function checkSitemap(
 
   if (sitemapPaths.length === 0) {
     return {
-      check: { id, label, status: "fail", detail: "No XML sitemap found" },
+      check: { id, label, status: budgetExhausted ? "error" : "fail", detail: budgetExhausted ? "Sitemap probe skipped: scan request budget exhausted" : "No XML sitemap found" },
       urls: [],
       apiRelevantUrls: [],
     };

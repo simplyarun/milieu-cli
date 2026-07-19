@@ -207,7 +207,6 @@ describe("integration: minimal site scan", () => {
       "json_ld",
       "schema_org",
       "security_txt",
-      "standards_webmcp",
       "standards_a2a_agent_card",
     ];
 

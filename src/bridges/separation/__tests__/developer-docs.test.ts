@@ -210,3 +210,23 @@ describe("checkDeveloperDocs", () => {
     expect(pages[1].content).toBe("dev body");
   });
 });
+
+describe("checkDeveloperDocs under request-budget exhaustion", () => {
+  const budgetDenied = {
+    ok: false as const,
+    error: { kind: "request_budget_exhausted" as const, message: "Scan request budget exhausted", url: "https://example.com/docs" },
+  };
+
+  it("reports error when all probes were denied and no doc links exist", async () => {
+    vi.mocked(httpGet).mockResolvedValue(budgetDenied);
+    const result = await checkDeveloperDocs("https://example.com", "<html><body>nothing here</body></html>");
+    expect(result.check.status).toBe("error");
+    expect(result.pages).toHaveLength(0);
+  });
+
+  it("still passes via homepage links when probes were denied", async () => {
+    vi.mocked(httpGet).mockResolvedValue(budgetDenied);
+    const result = await checkDeveloperDocs("https://example.com", '<a href="/docs">Docs</a>');
+    expect(result.check.status).toBe("pass");
+  });
+});

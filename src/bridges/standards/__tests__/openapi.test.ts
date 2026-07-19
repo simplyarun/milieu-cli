@@ -1242,3 +1242,15 @@ paths:
     expect(result.hasCallbacks).toBe(false);
   });
 });
+
+describe("checkOpenApi under request-budget exhaustion", () => {
+  it("reports error (not fail) when probes were denied and nothing was found", async () => {
+    mockHttpGet.mockResolvedValue({
+      ok: false as const,
+      error: { kind: "request_budget_exhausted" as const, message: "Scan request budget exhausted", url: "https://example.com/openapi.json" },
+    });
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("error");
+    expect(result.detected).toBe(false);
+  });
+});

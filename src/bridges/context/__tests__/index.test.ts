@@ -52,19 +52,21 @@ describe("runContextBridge", () => {
     expect(result.scoreLabel).toBe("fail");
   });
 
-  it("uses dynamic denominator when no spec (rate-limit pass + auth-legibility partial = 4.5/11 = 41%)", async () => {
-    // No spec → spec-gated checks (auth_clarity=3, versioning=2) excluded from denominator
-    // Denominator: rate_limit(3) + auth_legibility(3) + tos_url(2) + contact_info(1) + agents_json(2) = 11
+  it("uses a fixed denominator so a missing spec cannot raise the score (4.5/16 = 28%)", async () => {
+    // Fixed denominator = every check counts regardless of spec presence.
+    // Denominator: rate_limit(3) + auth_clarity(3) + auth_legibility(3) + tos_url(2)
+    //   + versioning(2) + contact_info(1) + agents_json(2) = 16
     // /api probe succeeds with rate-limit header → rate-limit pass (3pts)
     // auth-legibility also probes /api, gets 200 → partial (1.5pts)
-    // Total: 4.5/11 = 41
+    // Spec-gated checks (auth_clarity, versioning) fail with no spec → 0pts, still counted.
+    // Total: 4.5/16 = 28
     mockHttpGet.mockImplementation(async (url: string) => {
       if (url.includes("/api")) return makeSuccess("", { "x-ratelimit-limit": "100" });
       return makeFailure(404);
     });
     const result = await runContextBridge(makeCtx());
-    expect(result.score).toBe(41);
-    expect(result.scoreLabel).toBe("partial");
+    expect(result.score).toBe(28);
+    expect(result.scoreLabel).toBe("fail");
   });
 
   it("uses lower thresholds (>=60 pass, >=30 partial)", async () => {

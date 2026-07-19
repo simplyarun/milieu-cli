@@ -84,6 +84,19 @@ export async function checkDeveloperDocs(
   const allFound = [...new Set([...reachablePaths, ...linkedPaths])];
 
   if (allFound.length === 0) {
+    // Denied probes never ran — without link evidence either way, the
+    // check is unmeasured rather than failing.
+    if (results.some((r) => !r.ok && r.error.kind === "request_budget_exhausted")) {
+      return {
+        check: {
+          id,
+          label,
+          status: "error",
+          detail: "Developer documentation probes skipped: scan request budget exhausted",
+        },
+        pages: [],
+      };
+    }
     return {
       check: {
         id,

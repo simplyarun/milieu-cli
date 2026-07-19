@@ -215,3 +215,23 @@ describe("analyzeLlmsContent", () => {
     expect(result.sectionCount).toBe(0);
   });
 });
+
+describe("llms.txt checks under request-budget exhaustion", () => {
+  const budgetDenied = {
+    ok: false as const,
+    error: { kind: "request_budget_exhausted" as const, message: "Scan request budget exhausted", url: "https://example.com/llms.txt" },
+  };
+
+  it("checkLlmsTxt reports error when the probe was denied", async () => {
+    mockHttpGet.mockResolvedValue(budgetDenied);
+    const result = await checkLlmsTxt("https://example.com");
+    expect(result.check.status).toBe("error");
+    expect(result.body).toBeNull();
+  });
+
+  it("checkLlmsFullTxt reports error when the probe was denied", async () => {
+    mockHttpGet.mockResolvedValue(budgetDenied);
+    const check = await checkLlmsFullTxt("https://example.com");
+    expect(check.status).toBe("error");
+  });
+});

@@ -74,3 +74,15 @@ describe("checkRobotsTxt", () => {
     expect(check.detail).toContain("sub.example.com");
   });
 });
+
+describe("checkRobotsTxt under request-budget exhaustion", () => {
+  it("reports error when the probe was denied", async () => {
+    mockHttpGet.mockResolvedValue({
+      ok: false as const,
+      error: { kind: "request_budget_exhausted" as const, message: "Scan request budget exhausted", url: "https://example.com/robots.txt" },
+    });
+    const result = await checkRobotsTxt("example.com");
+    expect(result.check.status).toBe("error");
+    expect(result.parsed).toBeNull();
+  });
+});

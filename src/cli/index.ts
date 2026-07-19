@@ -20,6 +20,8 @@ export function buildProgram(): Command {
     .option("--json", "Output result as JSON")
     .option("--pretty", "Pretty-print JSON output (use with --json)")
     .option("--timeout <ms>", "Per-request timeout in milliseconds", "10000")
+    .option("--max-concurrency <n>", "Maximum simultaneous outbound requests (default: 8)")
+    .option("--max-requests <n>", "Maximum request attempts for the whole scan, counting redirects and retries (default: 150)")
     .option("--threshold <score>", "Exit non-zero if overall score below threshold")
     .option("--verbose", "Show individual check details")
     .option("--explain-all", "Show explanations on all checks, not just failures (use with --verbose)")
@@ -36,41 +38,63 @@ export function buildProgram(): Command {
         const timeout = Number(opts.timeout) || 10_000;
         const threshold =
           opts.threshold !== undefined ? Number(opts.threshold) : undefined;
+        const maxConcurrency =
+          opts.maxConcurrency !== undefined ? Number(opts.maxConcurrency) : undefined;
+        const maxRequests =
+          opts.maxRequests !== undefined ? Number(opts.maxRequests) : undefined;
 
-        try {
-          const result = await scan(url, {
-            timeout,
-            verbose,
-            silent: jsonMode || quiet,
-          });
-
-          // Attach "why this matters" explanations to each check
-          for (const bridge of result.bridges) {
-            for (const check of bridge.checks) {
-              check.why = resolveExplanation(check.id, check.status);
-            }
-          }
-
-          if (jsonMode) {
-            const output = opts.pretty
-              ? JSON.stringify(result, null, 2)
-              : JSON.stringify(result);
-            process.stdout.write(output + "\n");
-          } else if (!quiet) {
-            console.log(formatScanOutput(result, verbose, explainAll));
-          }
-
-          if (threshold !== undefined && result.overallScore < threshold) {
+        // A zero/negative/NaN limit would deadlock or disable the budget.
+        for (const [flag, value] of [
+          ["--max-concurrency", maxConcurrency],
+          ["--max-requests", maxRequests],
+        ] as const) {
+          if (value !== undefined && (!Number.isInteger(value) || value < 1)) {
+            process.stderr.write(`Error: ${flag} requires a positive integer\n`);
             process.exitCode = 1;
+            return;
           }
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
+        }
+
+        // scan() never throws — it returns a discriminated outcome.
+        const outcome = await scan(url, {
+          timeout,
+          verbose,
+          silent: jsonMode || quiet,
+          maxConcurrency,
+          maxRequests,
+        });
+
+        if (!outcome.ok) {
           if (jsonMode) {
-            const errorObj = { error: message, version: getVersion() };
-            process.stdout.write(JSON.stringify(errorObj) + "\n");
+            process.stdout.write(
+              JSON.stringify({ ok: false, error: outcome.error, version: getVersion() }) + "\n",
+            );
           } else {
-            process.stderr.write(`Error: ${message}\n`);
+            process.stderr.write(`Error: ${outcome.error.message}\n`);
           }
+          process.exitCode = 1;
+          return;
+        }
+
+        const result = outcome;
+
+        // Attach "why this matters" explanations to each check
+        for (const bridge of result.bridges) {
+          for (const check of bridge.checks) {
+            check.why = resolveExplanation(check.id, check.status);
+          }
+        }
+
+        if (jsonMode) {
+          const output = opts.pretty
+            ? JSON.stringify(result, null, 2)
+            : JSON.stringify(result);
+          process.stdout.write(output + "\n");
+        } else if (!quiet) {
+          console.log(formatScanOutput(result, verbose, explainAll));
+        }
+
+        if (threshold !== undefined && result.overallScore < threshold) {
           process.exitCode = 1;
         }
       },

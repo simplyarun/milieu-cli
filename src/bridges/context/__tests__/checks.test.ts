@@ -250,3 +250,30 @@ describe("checkAgentsJson", () => {
     expect((await checkAgentsJson("https://example.com")).status).toBe("fail");
   });
 });
+
+describe("context checks under request-budget exhaustion", () => {
+  const budgetDenied = {
+    ok: false as const,
+    error: { kind: "request_budget_exhausted" as const, message: "Scan request budget exhausted", url: "https://example.com/api" },
+  };
+
+  it("rate-limit check reports error and clears probe headers", async () => {
+    mockHttpGet.mockResolvedValue(budgetDenied);
+    const ctx = makeCtx();
+    const check = await checkRateLimitHeaders(ctx);
+    expect(check.status).toBe("error");
+    expect(ctx.shared.contextProbeHeaders).toEqual({});
+  });
+
+  it("auth legibility reports error when the probe was denied", async () => {
+    mockHttpGet.mockResolvedValue(budgetDenied);
+    const check = await checkAuthLegibility(makeCtx());
+    expect(check.status).toBe("error");
+  });
+
+  it("agents.json reports error when the probe was denied", async () => {
+    mockHttpGet.mockResolvedValue(budgetDenied);
+    const check = await checkAgentsJson("https://example.com");
+    expect(check.status).toBe("error");
+  });
+});

@@ -20,8 +20,11 @@ vi.mock("../../render/format-scan.js", () => ({
 
 // --- Mock ScanResult for controlled test data ---
 const mockScanResult = {
+  ok: true,
   version: "0.1.0",
   url: "https://example.com",
+  scannedOrigin: "https://example.com",
+  incomplete: false,
   timestamp: "2026-01-01T00:00:00.000Z",
   durationMs: 1500,
   overallScore: 74,
@@ -131,7 +134,10 @@ describe("CLI", () => {
 
   // Test 3 (CLI-06): invalid URL writes error to stderr and sets exitCode 1
   it("invalid URL writes error to stderr and sets exitCode 1", async () => {
-    mockScan.mockRejectedValueOnce(new Error("Invalid URL: not-a-url"));
+    mockScan.mockResolvedValueOnce({
+      ok: false,
+      error: { kind: "invalid_url", message: "Invalid URL: not-a-url" },
+    });
 
     const program = createProgram();
     await program.parseAsync(["node", "milieu", "scan", "not-a-url"]);
@@ -249,14 +255,19 @@ describe("CLI", () => {
 
   // Test 11 (CLI-06): --json with invalid URL outputs JSON error object to stdout
   it("--json with invalid URL outputs JSON error to stdout", async () => {
-    mockScan.mockRejectedValueOnce(new Error("Invalid URL: bad-url"));
+    mockScan.mockResolvedValueOnce({
+      ok: false,
+      error: { kind: "invalid_url", message: "Invalid URL: bad-url" },
+    });
 
     const program = createProgram();
     await program.parseAsync(["node", "milieu", "scan", "bad-url", "--json"]);
 
     const output = stdoutSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
     const parsed = JSON.parse(output.trim());
-    expect(parsed.error).toContain("Invalid URL");
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error.kind).toBe("invalid_url");
+    expect(parsed.error.message).toContain("Invalid URL");
     expect(parsed.version).toBe("0.1.0");
     expect(process.exitCode).toBe(1);
     // Error should go to stdout (not stderr) in JSON mode
@@ -301,5 +312,56 @@ describe("CLI", () => {
         expect((check as Record<string, unknown>).why).toBeUndefined();
       }
     }
+  });
+});
+
+describe("scan request-limit flags", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockScan.mockImplementation(() => Promise.resolve(structuredClone(mockScanResult)));
+  });
+
+  it("passes --max-concurrency and --max-requests through to scan()", async () => {
+    const program = buildProgram().exitOverride();
+    await program.parseAsync([
+      "node", "milieu", "scan", "https://example.com",
+      "--quiet", "--max-concurrency", "4", "--max-requests", "80",
+    ]);
+
+    expect(mockScan).toHaveBeenCalledWith(
+      "https://example.com",
+      expect.objectContaining({ maxConcurrency: 4, maxRequests: 80 }),
+    );
+  });
+
+  it("leaves the limits undefined when the flags are not given", async () => {
+    const program = buildProgram().exitOverride();
+    await program.parseAsync(["node", "milieu", "scan", "https://example.com", "--quiet"]);
+
+    const options = mockScan.mock.calls[0][1] as Record<string, unknown>;
+    expect(options.maxConcurrency).toBeUndefined();
+    expect(options.maxRequests).toBeUndefined();
+  });
+});
+
+describe("scan request-limit flag validation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.exitCode = undefined as unknown as number;
+    mockScan.mockImplementation(() => Promise.resolve(structuredClone(mockScanResult)));
+  });
+
+  it("rejects non-numeric --max-requests before scanning", async () => {
+    const program = buildProgram().exitOverride();
+    await program.parseAsync(["node", "milieu", "scan", "https://example.com", "--quiet", "--max-requests", "abc"]);
+    expect(process.exitCode).toBe(1);
+    expect(mockScan).not.toHaveBeenCalled();
+  });
+
+  it("rejects zero --max-concurrency before scanning", async () => {
+    const program = buildProgram().exitOverride();
+    await program.parseAsync(["node", "milieu", "scan", "https://example.com", "--quiet", "--max-concurrency", "0"]);
+    expect(process.exitCode).toBe(1);
+    expect(mockScan).not.toHaveBeenCalled();
   });
 });

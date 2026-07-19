@@ -7,6 +7,9 @@ export async function checkA2aAgentCard(baseUrl: string, timeout?: number): Prom
   const url = `${baseUrl}/.well-known/agent.json`;
   const result = await httpGet(url, { timeout, headers: { Accept: "application/json" } });
   if (!result.ok) {
+    if (result.error.kind === "request_budget_exhausted") {
+      return { id, label, status: "error", detail: "A2A Agent Card probe skipped: scan request budget exhausted", data: { url } };
+    }
     return { id, label, status: "fail", detail: "No A2A Agent Card found at /.well-known/agent.json", data: { url, statusCode: result.error.statusCode ?? null } };
   }
   try {

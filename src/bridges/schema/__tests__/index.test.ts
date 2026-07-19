@@ -60,10 +60,12 @@ describe("runSchemaBridge", () => {
     expect(result.scoreLabel).toBe("pass");
   });
 
-  it("returns score null with nuanced no-spec messages when no spec available", async () => {
+  it("scores 0 over a fixed 5-check denominator with nuanced no-spec messages", async () => {
+    // Fixed denominator keeps scoring monotone: an unanswerable schema is a
+    // failure of the milieu, not "not applicable", so no-spec = 0 (not null).
     const result = await runSchemaBridge(makeCtx(null));
-    expect(result.score).toBeNull();
-    expect(result.scoreLabel).toBeNull();
+    expect(result.score).toBe(0);
+    expect(result.scoreLabel).toBe("fail");
     expect(result.checks).toHaveLength(5);
     for (const check of result.checks) {
       expect(check.status).toBe("fail");

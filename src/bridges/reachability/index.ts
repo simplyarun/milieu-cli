@@ -27,10 +27,14 @@ function calculateScore(checks: Check[]): {
       continue;
     }
 
+    // Error = probe never ran (e.g. request budget exhausted): unmeasured,
+    // excluded from both numerator and denominator.
+    if (check.status === "error") continue;
+
     maxPoints += 1;
     if (check.status === "pass") points += 1;
     else if (check.status === "partial") points += 0.5;
-    // fail and error = 0 points
+    // fail = 0 points
   }
 
   const score = maxPoints === 0 ? 0 : Math.round((points / maxPoints) * 100);
@@ -114,6 +118,11 @@ export async function runReachabilityBridge(
   if (pageResponse.ok) {
     metaRobotsCheck = checkMetaRobots(pageResponse.body);
     xRobotsCheck = checkXRobotsTag(pageResponse.headers);
+  } else if (pageResponse.error.kind === "request_budget_exhausted") {
+    // The page was never fetched — an unmeasured surface must not award
+    // the "no restrictive tags found" free pass.
+    metaRobotsCheck = { id: "meta_robots", label: "Meta Robots Tags", status: "error", detail: "Meta robots probe skipped: scan request budget exhausted" };
+    xRobotsCheck = { id: "x_robots_tag", label: "X-Robots-Tag Header", status: "error", detail: "X-Robots-Tag probe skipped: scan request budget exhausted" };
   } else {
     // Page unavailable -- pass empty content (absence of restrictive tags = pass)
     metaRobotsCheck = checkMetaRobots("");

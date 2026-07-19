@@ -29,6 +29,9 @@ export async function checkAuthLegibility(ctx: ScanContext): Promise<Check> {
   const probeTimeout = Math.min(ctx.options.timeout ?? 10000, 5000);
   const result = await httpGet(probeUrl, { timeout: probeTimeout });
   if (!result.ok) {
+    if (result.error.kind === "request_budget_exhausted") {
+      return { id, label, status: "error", detail: "Auth legibility probe skipped: scan request budget exhausted", data: { probeUrl, signals: [] } };
+    }
     return { id, label, status: "fail", detail: `Could not reach ${probeUrl} to test auth response quality`, data: { probeUrl, signals: [] } };
   }
   const status = result.status;

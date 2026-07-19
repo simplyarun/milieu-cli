@@ -90,3 +90,15 @@ describe("checkSecurityTxt", () => {
     expect(result.body).toBeNull();
   });
 });
+
+describe("checkSecurityTxt under request-budget exhaustion", () => {
+  it("reports error when the probe was denied", async () => {
+    mockHttpGet.mockResolvedValue({
+      ok: false as const,
+      error: { kind: "request_budget_exhausted" as const, message: "Scan request budget exhausted", url: "https://example.com/.well-known/security.txt" },
+    });
+    const result = await checkSecurityTxt("https://example.com");
+    expect(result.check.status).toBe("error");
+    expect(result.body).toBeNull();
+  });
+});

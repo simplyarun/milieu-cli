@@ -41,9 +41,10 @@ milieu-cli is a **read-only network scanner** that makes outbound HTTP requests 
 
 Since the tool fetches arbitrary URLs, Server-Side Request Forgery is the most relevant attack class. Mitigations in place:
 
-- **DNS validation at every redirect hop** — hostnames are re-resolved and checked before each request, preventing DNS rebinding and redirect-to-internal attacks
+- **DNS validation at every redirect hop** — the hostname is resolved and every resolved address is checked (rejecting if *any* is private) before each request
+- **Connection pinning** — the socket is pinned to the exact IP that validation approved (via an undici dispatcher with a fixed `connect.lookup`), so a low-TTL hostname cannot return a public IP to the validator and a private one to the actual connection. This closes the DNS-rebinding TOCTOU that per-hop validation alone leaves open. The original hostname is preserved for the Host header and TLS SNI/certificate checks.
 - **Private IP blocking** — all RFC 1918, loopback, link-local, CGNAT, IPv6 ULA, and IPv4-mapped IPv6 addresses are rejected
-- **Manual redirect handling** — redirects are followed explicitly (not by the HTTP client) so SSRF checks cannot be bypassed via 3xx chains
+- **Manual redirect handling** — redirects are followed explicitly (not by the HTTP client) so SSRF checks cannot be bypassed via 3xx chains; each hop is re-validated and re-pinned
 - **Redirect depth limit** — maximum of 5 hops prevents infinite redirect loops
 
 ### Resource Limits

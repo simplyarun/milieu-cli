@@ -44,6 +44,8 @@ npx milieu-cli scan petstore.swagger.io
 
 No config, no API keys. You'll get a scored report showing what AI agents can see when they visit that product surface.
 
+Scans are **origin-scoped**: whatever URL you pass, milieu scans the site's origin (`https://domain`). Paths and query strings do not narrow the scan — `milieu scan stripe.com/docs` scans `https://stripe.com`, and the report's `scannedOrigin` field records exactly what was scanned.
+
 ### Example products to try
 
 Each of these exercises different parts of the scanner:
@@ -74,7 +76,7 @@ Milieu evaluates your product through five progressive bridges. Each one represe
 | | Bridge | Question | What milieu checks | Score |
 |---|---|---|---|---|
 | 1 | **Reachability** | **Can agents reach you?** | HTTPS, HTTP status, robots.txt (RFC 9309), per-bot crawler policies (GPTBot, ClaudeBot, CCBot, Googlebot, Bingbot, PerplexityBot), meta robots, X-Robots-Tag | 0–100 |
-| 2 | **Standards** | **Can agents read you?** | OpenAPI spec, GraphQL introspection, XML sitemap, markdown content negotiation, llms.txt, llms-full.txt, MCP endpoint, JSON-LD, Schema.org, security.txt, WebMCP, A2A Agent Card | 0–100 |
+| 2 | **Standards** | **Can agents read you?** | OpenAPI spec, GraphQL introspection, XML sitemap, markdown content negotiation, llms.txt, llms-full.txt, MCP discovery, JSON-LD, Schema.org, security.txt, A2A Agent Card | 0–100 |
 | 3 | **Separation** | **Can agents integrate with you?** | API endpoints, developer docs, SDK/package references, webhook support | Detection only* |
 | 4 | **Schema** | **Can agents use your APIs correctly?** | Operation IDs, schema types, error response schemas, required fields, field descriptions | 0–100 |
 | 5 | **Context** | **Can agents trust and operate your APIs?** | Rate-limit headers, auth clarity, auth legibility, Terms of Service, API versioning, contact info, agents.json | 0–100 |
@@ -85,7 +87,7 @@ The bridges are progressive: there's no point checking your OpenAPI spec (Bridge
 
 **Bridge 1 — Reachability** is the front door. Can AI agents get to your content at all? Are you blocking specific crawlers without realizing it? This is the most actionable bridge for most products — many are unknowingly blocking GPTBot or ClaudeBot in their robots.txt.
 
-**Bridge 2 — Standards** is the shared language. Do you speak the protocols AI agents understand? OpenAPI specs, GraphQL endpoints, XML sitemaps, markdown content negotiation, llms.txt, MCP endpoints, structured data — these are the machine-readable standards that let agents go beyond scraping your HTML. milieu also checks for [WebMCP](https://spec.modelcontextprotocol.io/) discovery at `/.well-known/mcp.json` and [A2A Agent Cards](https://google.github.io/A2A/) at `/.well-known/agent.json`.
+**Bridge 2 — Standards** is the shared language. Do you speak the protocols AI agents understand? OpenAPI specs, GraphQL endpoints, XML sitemaps, markdown content negotiation, llms.txt, structured data — these are the machine-readable standards that let agents go beyond scraping your HTML. milieu also checks for [MCP](https://modelcontextprotocol.io/) discovery at `/.well-known/mcp.json` and [A2A Agent Cards](https://a2a-protocol.org/) at `/.well-known/agent.json`.
 
 **Bridge 3 — Separation** is the developer surface. Do you have a clear API boundary? Developer docs? SDKs? Webhooks? This is where agents look to determine if your product is something they can build with, not just read from.
 
@@ -155,6 +157,8 @@ Exit codes: `0` = score meets threshold (or no threshold set), `1` = score below
 | `--timeout <ms>` | Per-request timeout in milliseconds | 10000 |
 | `--threshold <n>` | Exit non-zero if overall score < n | off |
 | `--quiet` | Suppress terminal output | off |
+| `--max-concurrency <n>` | Maximum simultaneous outbound requests | 8 |
+| `--max-requests <n>` | Maximum request attempts for the whole scan, counting every redirect hop and retry. If the budget runs out, affected checks report `error` (skipped, not failed) and the result is marked `incomplete` | 150 |
 
 ### Check explanations
 
@@ -164,15 +168,19 @@ These explanations also appear in `--json` output as a `why` field on every chec
 
 ## How scoring works
 
-The **overall score** is the average of scored bridges (Bridges 1, 2, 4, and 5). Bridge 3 reports detection status only and is excluded from the average.
+The **overall score** is the average of Bridges 1, 2, 4, and 5. Bridge 3 reports detection status only (`score: null`) and is the sole bridge excluded from the average.
 
-**Bridges 1, 2, and 4** use equal-weight scoring: each check contributes **pass = 1**, **partial = 0.5**, **fail = 0**. Bridge score = `(points / total_checks) * 100`. Thresholds: ≥80 = pass, ≥40 = partial, <40 = fail.
+Scoring is **monotone**: adding a machine-readable signal can only raise your score, never lower it. Bridge 4 scores `0` (not "not applicable") when no OpenAPI spec is found, and every Bridge-5 check counts toward a fixed denominator whether or not you publish a spec — so publishing one can only help. Deleting signals to game the number doesn't work.
 
-**Bridge 5** uses weighted scoring to reflect real-world importance to agents. Rate-limit headers and auth checks carry more weight than contact info. Thresholds are lower (≥60 = pass, ≥30 = partial) because governance signals are nascent — few sites implement all of them today.
+**Bridges 1 and 4** use equal-weight scoring: each check contributes **pass = 1**, **partial = 0.5**, **fail = 0**. Bridge score = `(points / total_checks) * 100`. Thresholds: ≥80 = pass, ≥40 = partial, <40 = fail.
+
+**Bridges 2 and 5** use weighted scoring to reflect real-world importance to agents. In Bridge 2, core standards carry weight 2 (`openapi_spec`, `sitemap`, `llms_txt`, `security_txt`, `json_ld`, `schema_org`) and emerging standards weight 1 (GraphQL, markdown negotiation, llms-full.txt, MCP, A2A). In Bridge 5, rate-limit headers and auth checks carry more weight than contact info. Thresholds for both: ≥60 = pass, ≥30 = partial — lower because these signals are nascent.
+
+Checks with status `error` (probes that never ran because the scan request budget was exhausted) are excluded from scoring entirely — neither numerator nor denominator — and the result is flagged `incomplete`.
 
 A "partial" means the signal exists but is incomplete: an OpenAPI spec served as YAML (detected but not fully parseable), a 401 response with a JSON body but no `WWW-Authenticate` header, or a robots.txt with valid structure but no explicit allow/disallow rules.
 
-Bridge 4 returns all-fail when no OpenAPI spec is detected, with a specific message per check explaining what the agent loses. Bridge 5 still runs most of its checks (rate limits, auth legibility, agents.json, versioning via headers) even without a spec — governance signals exist independently.
+When no OpenAPI spec is detected, Bridge 4's five checks all `fail` — each with a message explaining what the agent loses — and the bridge scores `0` (included in the average). Bridge 5 still runs all of its checks even without a spec; the spec-dependent ones (auth clarity, versioning) simply fail rather than being excused, keeping the score monotone.
 
 All checks are reproducible: same product surface state produces the same score every time.
 
@@ -180,22 +188,27 @@ All checks are reproducible: same product surface state produces the same score 
 
 ```typescript
 import { scan } from "milieu-cli";
-import type { ScanResult, ScanOptions, BridgeResult, Check, CheckStatus } from "milieu-cli";
+import type { ScanResult, ScanOutcome, ScanOptions, BridgeResult, Check, CheckStatus } from "milieu-cli";
 
 const options: ScanOptions = {
   timeout: 15000,  // per-request timeout in ms (default: 10000)
-  verbose: true,   // include check details in result
   silent: true,    // suppress spinner output (recommended for library use)
 };
 
-const result = await scan("https://petstore.swagger.io", options);
+// scan() never throws. It returns a discriminated union — narrow on `.ok`,
+// exactly like the HTTP client's HttpResponse.
+const outcome: ScanOutcome = await scan("https://petstore.swagger.io", options);
 
-console.log(result.overallScore);      // number (average of Bridges 1, 2, 4, 5)
-console.log(result.overallScoreLabel); // "pass" | "partial" | "fail"
-console.log(result.bridges);           // 5-element tuple of BridgeResult
+if (!outcome.ok) {
+  console.error(outcome.error.kind, outcome.error.message); // "invalid_url" | "scan_failed"
+} else {
+  console.log(outcome.overallScore);      // number (average of Bridges 1, 2, 4, 5)
+  console.log(outcome.overallScoreLabel); // "pass" | "partial" | "fail"
+  console.log(outcome.bridges);           // 5-element tuple of BridgeResult
+}
 ```
 
-> **Note:** `result.bridges` always returns 5 elements. Bridges 1, 2, 4, and 5 have numeric scores. Bridge 3 has `score: null` (detection inventory). Handle nulls when mapping:
+> **Note:** `result.bridges` always returns 5 elements. Only Bridge 3 has `score: null` (detection inventory); Bridges 1, 2, 4, and 5 are always numeric. Handle the null when mapping:
 >
 > ```typescript
 > const scoredBridges = result.bridges.filter(b => b.score !== null);

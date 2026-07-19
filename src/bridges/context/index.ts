@@ -17,19 +17,17 @@ const CHECK_WEIGHTS: Record<string, number> = {
   context_agents_json: 2,
 };
 
-/** Checks that require an OpenAPI spec to produce meaningful results */
-const SPEC_GATED_CHECKS = new Set([
-  "context_auth_clarity",
-  "context_versioning_signal",
-]);
-
-function calculateWeightedScore(checks: Check[], hasSpec: boolean): { score: number | null; scoreLabel: "pass" | "partial" | "fail" | null } {
+function calculateWeightedScore(checks: Check[]): { score: number | null; scoreLabel: "pass" | "partial" | "fail" | null } {
   let earned = 0;
   let maxPoints = 0;
   for (const check of checks) {
     const weight = CHECK_WEIGHTS[check.id] ?? 1;
-    // Skip spec-gated checks from denominator when no spec exists
-    if (!hasSpec && SPEC_GATED_CHECKS.has(check.id)) continue;
+    // Error = probe never ran (e.g. request budget exhausted): unmeasured,
+    // excluded from both numerator and denominator.
+    if (check.status === "error") continue;
+    // Every other check counts toward a FIXED denominator regardless of spec
+    // presence — a spec-gated check that can't be answered without a spec
+    // fails, it isn't excused. Excusing it made the score non-monotone.
     maxPoints += weight;
     if (check.status === "pass") earned += weight;
     else if (check.status === "partial") earned += weight * 0.5;
@@ -69,7 +67,7 @@ export async function runContextBridge(ctx: ScanContext): Promise<BridgeResult> 
     tosCheck, versioningCheck, contactCheck, agentsJsonCheck,
   ];
 
-  const { score, scoreLabel } = calculateWeightedScore(checks, hasSpec);
+  const { score, scoreLabel } = calculateWeightedScore(checks);
 
   return {
     id: 5, name: "Context", status: "evaluated", score, scoreLabel, checks,

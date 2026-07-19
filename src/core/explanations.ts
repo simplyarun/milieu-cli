@@ -117,11 +117,6 @@ export const CHECK_EXPLANATIONS: Record<string, ExplanationEntry> = {
   },
   security_txt:
     "security.txt tells AI agents and automated systems how to report security issues. Its presence signals operational maturity.",
-  standards_webmcp: {
-    pass: "Your WebMCP endpoint lets AI agents discover available tools and capabilities at a well-known URL.",
-    fail: "No WebMCP endpoint found — AI agents can't discover your MCP tools via the standard /.well-known/mcp.json path.",
-    default: "WebMCP (/.well-known/mcp.json) is the emerging standard for AI agents to discover MCP tool providers.",
-  },
   standards_a2a_agent_card: {
     pass: "Your A2A Agent Card lets other AI agents discover your agent's capabilities and communication protocols.",
     fail: "No A2A Agent Card found — other AI agents can't discover your agent at /.well-known/agent.json.",

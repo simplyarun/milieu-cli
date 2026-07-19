@@ -4,16 +4,14 @@ import type { HttpSuccess, HttpFailure } from "../../../core/types.js";
 
 vi.mock("../../../utils/http-client.js", () => ({
   httpGet: vi.fn(),
+  httpGetBytes: vi.fn(),
 }));
 
-// Mock global fetch for .gz requests
-const mockFetch = vi.fn();
-vi.stubGlobal("fetch", mockFetch);
-
 import { checkSitemap } from "../sitemap.js";
-import { httpGet } from "../../../utils/http-client.js";
+import { httpGet, httpGetBytes, type HttpBytesSuccess } from "../../../utils/http-client.js";
 
 const mockHttpGet = vi.mocked(httpGet);
+const mockHttpGetBytes = vi.mocked(httpGetBytes);
 
 // --- Helpers ---
 
@@ -37,6 +35,19 @@ function make404(): HttpFailure {
   };
 }
 
+function makeBytesSuccess(bytes: Uint8Array, overrides: Partial<HttpBytesSuccess> = {}): HttpBytesSuccess {
+  return {
+    ok: true,
+    url: "https://example.com/sitemap.xml.gz",
+    status: 200,
+    headers: { "content-type": "application/gzip" },
+    body: bytes,
+    redirects: [],
+    durationMs: 50,
+    ...overrides,
+  };
+}
+
 function makeSitemap(urls: string[]): string {
   const locs = urls.map((u) => `  <url><loc>${u}</loc></url>`).join("\n");
   return `<?xml version="1.0"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${locs}\n</urlset>`;
@@ -52,12 +63,12 @@ function makeSitemapIndex(sitemapUrls: string[]): string {
 describe("checkSitemap", () => {
   beforeEach(() => {
     mockHttpGet.mockReset();
-    mockFetch.mockReset();
+    mockHttpGetBytes.mockReset();
   });
 
   it("returns Check with id 'sitemap' and label 'XML Sitemap'", async () => {
     mockHttpGet.mockResolvedValue(make404());
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    mockHttpGetBytes.mockResolvedValue(make404());
     const result = await checkSitemap("https://example.com", []);
     expect(result.check.id).toBe("sitemap");
     expect(result.check.label).toBe("XML Sitemap");
@@ -65,20 +76,20 @@ describe("checkSitemap", () => {
 
   it("probes /sitemap.xml, /sitemap_index.xml, and /sitemap.xml.gz by default", async () => {
     mockHttpGet.mockResolvedValue(make404());
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    mockHttpGetBytes.mockResolvedValue(make404());
     await checkSitemap("https://example.com", []);
-    // httpGet called for non-.gz paths, fetch called for .gz path
+    // httpGet called for non-.gz paths, httpGetBytes for the .gz path
     expect(mockHttpGet).toHaveBeenCalledTimes(2);
     const urls = mockHttpGet.mock.calls.map((c) => c[0]);
     expect(urls).toContain("https://example.com/sitemap.xml");
     expect(urls).toContain("https://example.com/sitemap_index.xml");
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(mockFetch.mock.calls[0][0]).toBe("https://example.com/sitemap.xml.gz");
+    expect(mockHttpGetBytes).toHaveBeenCalledTimes(1);
+    expect(mockHttpGetBytes.mock.calls[0][0]).toBe("https://example.com/sitemap.xml.gz");
   });
 
   it("also probes robots.txt sitemap URLs", async () => {
     mockHttpGet.mockResolvedValue(make404());
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    mockHttpGetBytes.mockResolvedValue(make404());
     await checkSitemap("https://example.com", [
       "https://example.com/custom-sitemap.xml",
     ]);
@@ -90,7 +101,7 @@ describe("checkSitemap", () => {
 
   it("deduplicates probe URLs", async () => {
     mockHttpGet.mockResolvedValue(make404());
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    mockHttpGetBytes.mockResolvedValue(make404());
     await checkSitemap("https://example.com", [
       "https://example.com/sitemap.xml", // same as default
     ]);
@@ -99,7 +110,7 @@ describe("checkSitemap", () => {
 
   it("ignores cross-origin robots.txt sitemap URLs", async () => {
     mockHttpGet.mockResolvedValue(make404());
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    mockHttpGetBytes.mockResolvedValue(make404());
     await checkSitemap("https://example.com", [
       "https://other-site.com/sitemap.xml",
     ]);
@@ -113,7 +124,7 @@ describe("checkSitemap", () => {
       "https://example.com/page3",
     ]);
     mockHttpGet.mockResolvedValue(make404());
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    mockHttpGetBytes.mockResolvedValue(make404());
     mockHttpGet.mockResolvedValueOnce(makeSuccess(sitemap));
 
     const result = await checkSitemap("https://example.com", []);
@@ -127,7 +138,7 @@ describe("checkSitemap", () => {
     const urls = Array.from({ length: 1001 }, (_, i) => `https://example.com/page${i}`);
     const sitemap = makeSitemap(urls);
     mockHttpGet.mockResolvedValue(make404());
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    mockHttpGetBytes.mockResolvedValue(make404());
     mockHttpGet.mockResolvedValueOnce(makeSuccess(sitemap));
 
     const result = await checkSitemap("https://example.com", []);
@@ -139,7 +150,7 @@ describe("checkSitemap", () => {
   it("returns partial when sitemap exists but has no URLs", async () => {
     const emptySitemap = '<?xml version="1.0"?><urlset></urlset>';
     mockHttpGet.mockResolvedValue(make404());
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    mockHttpGetBytes.mockResolvedValue(make404());
     mockHttpGet.mockResolvedValueOnce(makeSuccess(emptySitemap));
 
     const result = await checkSitemap("https://example.com", []);
@@ -149,7 +160,7 @@ describe("checkSitemap", () => {
 
   it("returns fail when no sitemap found", async () => {
     mockHttpGet.mockResolvedValue(make404());
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    mockHttpGetBytes.mockResolvedValue(make404());
 
     const result = await checkSitemap("https://example.com", []);
     expect(result.check.status).toBe("fail");
@@ -166,7 +177,7 @@ describe("checkSitemap", () => {
       "https://example.com/graphql",
     ]);
     mockHttpGet.mockResolvedValue(make404());
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    mockHttpGetBytes.mockResolvedValue(make404());
     mockHttpGet.mockResolvedValueOnce(makeSuccess(sitemap));
 
     const result = await checkSitemap("https://example.com", []);
@@ -188,7 +199,7 @@ describe("checkSitemap", () => {
     ]);
 
     mockHttpGet.mockResolvedValue(make404());
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    mockHttpGetBytes.mockResolvedValue(make404());
     mockHttpGet.mockResolvedValueOnce(makeSuccess(index));
     // Child sitemap fetches
     mockHttpGet.mockResolvedValueOnce(makeSuccess(childSitemap));
@@ -210,7 +221,7 @@ describe("checkSitemap", () => {
     ]);
 
     mockHttpGet.mockResolvedValue(make404());
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    mockHttpGetBytes.mockResolvedValue(make404());
     mockHttpGet.mockResolvedValueOnce(makeSuccess(index));
     // Only 3 child fetches should happen
     mockHttpGet.mockResolvedValue(
@@ -229,7 +240,7 @@ describe("checkSitemap", () => {
       "https://evil.com/page2",
     ]);
     mockHttpGet.mockResolvedValue(make404());
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    mockHttpGetBytes.mockResolvedValue(make404());
     mockHttpGet.mockResolvedValueOnce(makeSuccess(sitemap));
 
     const result = await checkSitemap("https://example.com", []);
@@ -238,7 +249,7 @@ describe("checkSitemap", () => {
 
   it("ignores non-XML responses", async () => {
     mockHttpGet.mockResolvedValue(make404());
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    mockHttpGetBytes.mockResolvedValue(make404());
     mockHttpGet.mockResolvedValueOnce(makeSuccess("Just plain text, not XML"));
 
     const result = await checkSitemap("https://example.com", []);
@@ -249,7 +260,7 @@ describe("checkSitemap", () => {
     const sitemap1 = makeSitemap(["https://example.com/page1", "https://example.com/page2"]);
     const sitemap2 = makeSitemap(["https://example.com/page2", "https://example.com/page3"]);
 
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    mockHttpGetBytes.mockResolvedValue(make404());
     mockHttpGet.mockResolvedValueOnce(makeSuccess(sitemap1));
     mockHttpGet.mockResolvedValueOnce(makeSuccess(sitemap2));
 
@@ -259,7 +270,7 @@ describe("checkSitemap", () => {
 
   it("passes timeout to httpGet", async () => {
     mockHttpGet.mockResolvedValue(make404());
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    mockHttpGetBytes.mockResolvedValue(make404());
     await checkSitemap("https://example.com", [], 5000);
 
     for (const call of mockHttpGet.mock.calls) {
@@ -277,9 +288,7 @@ describe("checkSitemap", () => {
     const gzipped = gzipSync(Buffer.from(sitemap, "utf-8"));
 
     mockHttpGet.mockResolvedValue(make404());
-    mockFetch.mockResolvedValue(
-      new Response(gzipped, { status: 200, headers: { "content-type": "application/gzip" } }),
-    );
+    mockHttpGetBytes.mockResolvedValue(makeBytesSuccess(gzipped));
 
     const result = await checkSitemap("https://example.com", []);
     expect(result.check.status).toBe("pass");
@@ -301,11 +310,9 @@ describe("checkSitemap", () => {
     mockHttpGet.mockResolvedValue(make404());
     mockHttpGet.mockResolvedValueOnce(makeSuccess(index));
     // .gz probe returns 404
-    mockFetch.mockResolvedValueOnce(new Response(null, { status: 404 }));
+    mockHttpGetBytes.mockResolvedValueOnce(make404());
     // Child .gz fetch returns gzipped sitemap
-    mockFetch.mockResolvedValueOnce(
-      new Response(gzippedChild, { status: 200, headers: { "content-type": "application/gzip" } }),
-    );
+    mockHttpGetBytes.mockResolvedValueOnce(makeBytesSuccess(gzippedChild));
 
     const result = await checkSitemap("https://example.com", []);
     expect(result.check.status).toBe("pass");
@@ -321,16 +328,68 @@ describe("checkSitemap", () => {
 
     mockHttpGet.mockResolvedValue(make404());
     // .gz probes: first is the default /sitemap.xml.gz (404), second is the robots.txt one (success)
-    mockFetch.mockResolvedValueOnce(new Response(null, { status: 404 }));
-    mockFetch.mockResolvedValueOnce(
-      new Response(gzipped, { status: 200, headers: { "content-type": "application/gzip" } }),
-    );
+    mockHttpGetBytes.mockResolvedValueOnce(make404());
+    mockHttpGetBytes.mockResolvedValueOnce(makeBytesSuccess(gzipped));
 
     const result = await checkSitemap("https://example.com", [
       "https://example.com/custom-sitemap.xml.gz",
     ]);
     expect(result.check.status).toBe("pass");
     expect(result.urls).toContain("https://example.com/page1");
+  });
+
+  it("accepts a .gz sitemap that decompresses to more than 1 MiB", async () => {
+    // Real-world sitemaps routinely exceed 1 MiB decompressed; only the
+    // 10 MiB decompression-bomb cap should reject a .gz body.
+    const sitemap =
+      makeSitemap(["https://example.com/page1", "https://example.com/page2"]) +
+      "\n<!-- " + "x".repeat(2 * 1024 * 1024) + " -->";
+    const gzipped = gzipSync(Buffer.from(sitemap, "utf-8"));
+
+    mockHttpGet.mockResolvedValue(make404());
+    mockHttpGetBytes.mockResolvedValue(makeBytesSuccess(gzipped));
+
+    const result = await checkSitemap("https://example.com", []);
+    expect(result.check.status).toBe("pass");
+    expect(result.urls).toContain("https://example.com/page1");
+  });
+
+  it("rejects a .gz sitemap that decompresses beyond 10 MiB without keeping it", async () => {
+    // The bomb must be VALID sitemap XML: uncapped code would decompress it,
+    // pass the XML sniff, and extract page1 — so this test discriminates
+    // between capped and uncapped decompression.
+    const bombXml =
+      makeSitemap(["https://example.com/page1"]) +
+      "\n<!-- " + "x".repeat(11 * 1024 * 1024) + " -->";
+    const bomb = gzipSync(Buffer.from(bombXml, "utf-8"));
+
+    mockHttpGet.mockResolvedValue(make404());
+    mockHttpGetBytes.mockResolvedValue(makeBytesSuccess(bomb));
+
+    const result = await checkSitemap("https://example.com", []);
+    expect(result.check.status).toBe("fail");
+    expect(result.urls).toHaveLength(0);
+  });
+
+  it("handles malformed gzip data safely", async () => {
+    mockHttpGet.mockResolvedValue(make404());
+    mockHttpGetBytes.mockResolvedValue(
+      makeBytesSuccess(new Uint8Array([0x1f, 0x8b, 0xff, 0x00, 0x01, 0x02])),
+    );
+
+    const result = await checkSitemap("https://example.com", []);
+    expect(result.check.status).toBe("fail");
+  });
+
+  it("fails safely when the compressed .gz body exceeds the download cap", async () => {
+    mockHttpGet.mockResolvedValue(make404());
+    mockHttpGetBytes.mockResolvedValue({
+      ok: false,
+      error: { kind: "body_too_large", message: "Response body exceeds 1048576 bytes", url: "https://example.com/sitemap.xml.gz" },
+    });
+
+    const result = await checkSitemap("https://example.com", []);
+    expect(result.check.status).toBe("fail");
   });
 
   // --- Improved diagnostic messages ---
@@ -341,7 +400,7 @@ describe("checkSitemap", () => {
     ]);
 
     mockHttpGet.mockResolvedValue(make404());
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    mockHttpGetBytes.mockResolvedValue(make404());
     mockHttpGet.mockResolvedValueOnce(makeSuccess(index));
     // Child sitemap fetch fails
     mockHttpGet.mockResolvedValueOnce(make404());
@@ -356,7 +415,7 @@ describe("checkSitemap", () => {
     const emptyIndex = '<?xml version="1.0"?><sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></sitemapindex>';
 
     mockHttpGet.mockResolvedValue(make404());
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    mockHttpGetBytes.mockResolvedValue(make404());
     mockHttpGet.mockResolvedValueOnce(makeSuccess(emptyIndex));
 
     const result = await checkSitemap("https://example.com", []);

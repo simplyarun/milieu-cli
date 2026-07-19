@@ -53,8 +53,14 @@ import type {
   Check,
   BridgeResult,
   ScanResult,
+  ScanOutcome,
   ScanOptions,
 } from "../types.js";
+
+/** Narrow a scan outcome to a success, failing the test if it isn't one. */
+function assertOk(outcome: ScanOutcome): asserts outcome is ScanResult {
+  expect(outcome.ok).toBe(true);
+}
 
 // Standard mock bridge results for reuse across tests
 const bridge1Result: BridgeResult = {
@@ -122,6 +128,7 @@ describe("Programmatic API contract", () => {
     it("returns ScanResult with all required fields", async () => {
       setupNormalBridges();
       const result = await scan("https://example.com");
+      assertOk(result);
 
       expect(result).toHaveProperty("version");
       expect(result).toHaveProperty("url");
@@ -143,6 +150,7 @@ describe("Programmatic API contract", () => {
     it("bridges is a 5-element tuple", async () => {
       setupNormalBridges();
       const result = await scan("https://example.com");
+      assertOk(result);
 
       expect(result.bridges).toHaveLength(5);
       expect(result.bridges[0].id).toBe(1);
@@ -155,6 +163,7 @@ describe("Programmatic API contract", () => {
     it("each bridge has required BridgeResult shape", async () => {
       setupNormalBridges();
       const result = await scan("https://example.com");
+      assertOk(result);
 
       for (const bridge of result.bridges) {
         expect(bridge).toHaveProperty("id");
@@ -175,6 +184,7 @@ describe("Programmatic API contract", () => {
     it("overallScore is a number 0-100", async () => {
       setupNormalBridges();
       const result = await scan("https://example.com");
+      assertOk(result);
 
       expect(result.overallScore).toBeGreaterThanOrEqual(0);
       expect(result.overallScore).toBeLessThanOrEqual(100);
@@ -183,6 +193,7 @@ describe("Programmatic API contract", () => {
     it("overallScoreLabel is pass, partial, or fail", async () => {
       setupNormalBridges();
       const result = await scan("https://example.com");
+      assertOk(result);
 
       expect(["pass", "partial", "fail"]).toContain(result.overallScoreLabel);
     });
@@ -192,6 +203,7 @@ describe("Programmatic API contract", () => {
     it("accepts timeout option", async () => {
       setupNormalBridges();
       const result = await scan("https://example.com", { timeout: 5000 });
+      assertOk(result);
 
       // Verify scan completed -- timeout was accepted without error
       expect(result.version).toBe("0.1.0");
@@ -204,6 +216,7 @@ describe("Programmatic API contract", () => {
     it("accepts verbose option", async () => {
       setupNormalBridges();
       const result = await scan("https://example.com", { verbose: true });
+      assertOk(result);
 
       expect(result.version).toBe("0.1.0");
 
@@ -214,6 +227,7 @@ describe("Programmatic API contract", () => {
     it("accepts silent option", async () => {
       setupNormalBridges();
       const result = await scan("https://example.com", { silent: true });
+      assertOk(result);
 
       expect(result.version).toBe("0.1.0");
 
@@ -224,6 +238,7 @@ describe("Programmatic API contract", () => {
     it("all options are optional -- scan(url) works with no options", async () => {
       setupNormalBridges();
       const result = await scan("https://example.com");
+      assertOk(result);
 
       expect(result.version).toBe("0.1.0");
       expect(result.bridges).toHaveLength(5);
@@ -239,8 +254,11 @@ describe("Programmatic API contract", () => {
       const options: ScanOptions = { timeout: 5000, verbose: true };
       const bridgeResult: BridgeResult = { ...bridge1Result };
       const scanResult: ScanResult = {
+        ok: true,
         version: "0.1.0",
         url: "https://example.com",
+        scannedOrigin: "https://example.com",
+        incomplete: false,
         timestamp: new Date().toISOString(),
         durationMs: 100,
         overallScore: 70,

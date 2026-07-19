@@ -33,6 +33,10 @@ export function formatScanOutput(
   const domain = result.url.replace(/^https?:\/\//, "").replace(/\/$/, "");
   lines.push(bold(`Milieu Scan: ${domain}`));
   lines.push(dim(`Scanned: ${formatTimestamp(result.timestamp)}`));
+  const originStripped = result.scannedOrigin.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  if (originStripped !== domain) {
+    lines.push(dim(`Scanned origin: ${result.scannedOrigin} (paths and query strings do not narrow the scan)`));
+  }
   lines.push("");
 
   // Bridges
@@ -49,6 +53,10 @@ export function formatScanOutput(
   const colorize = scoreColorFn(result.overallScoreLabel);
   const scoreLine = `Overall Score: ${colorize(String(result.overallScore))} (${result.overallScoreLabel})`;
   lines.push(bold(scoreLine));
+
+  if (result.incomplete) {
+    lines.push(yellow("⚠ Scan incomplete: request budget exhausted — some checks were skipped, not failed. Raise --max-requests to cover the full scan."));
+  }
 
   // Total time
   lines.push(dim(`Total: ${formatTotalTime(result.durationMs)}`));

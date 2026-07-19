@@ -229,3 +229,46 @@ describe("checkMcpEndpoint", () => {
     expect(result.detected).toBe(false);
   });
 });
+
+describe("checkMcpEndpoint under request-budget exhaustion", () => {
+  const budgetDenied = {
+    ok: false as const,
+    error: { kind: "request_budget_exhausted" as const, message: "Scan request budget exhausted", url: "https://example.com/.well-known/mcp.json" },
+  };
+
+  it("reports error when the probe was denied and no content signals exist", async () => {
+    mockHttpGet.mockResolvedValue(budgetDenied);
+    const result = await checkMcpEndpoint("https://example.com");
+    expect(result.check.status).toBe("error");
+    expect(result.detected).toBe(false);
+  });
+
+  it("still detects MCP from page content when the probe was denied", async () => {
+    // Tier 2 content scanning costs zero HTTP requests, so budget
+    // exhaustion must not skip it.
+    mockHttpGet.mockResolvedValue(budgetDenied);
+    const result = await checkMcpEndpoint(
+      "https://example.com",
+      5000,
+      "We support the Model Context Protocol",
+      undefined,
+    );
+    expect(result.check.status).toBe("partial");
+    expect(result.detected).toBe(true);
+  });
+});
+
+describe("checkMcpEndpoint orchestrator seam", () => {
+  it("does not fetch when an endpointResponse is supplied", async () => {
+    mockHttpGet.mockClear();
+    const result = await checkMcpEndpoint(
+      "https://example.com",
+      5000,
+      undefined,
+      undefined,
+      makeJsonSuccess('{"mcp_version":"2025-06-18"}'),
+    );
+    expect(result.check.status).toBe("pass");
+    expect(mockHttpGet).not.toHaveBeenCalled();
+  });
+});

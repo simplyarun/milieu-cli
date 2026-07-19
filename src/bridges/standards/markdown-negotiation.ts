@@ -87,6 +87,17 @@ export async function checkMarkdownNegotiation(
   });
 
   if (!response.ok) {
+    if (response.error.kind === "request_budget_exhausted") {
+      return {
+        check: {
+          id,
+          label,
+          status: "error",
+          detail: "Markdown negotiation probe skipped: scan request budget exhausted",
+        },
+        supported: false,
+      };
+    }
     return {
       check: {
         id,

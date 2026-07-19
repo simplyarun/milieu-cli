@@ -75,6 +75,14 @@ export function checkHttpStatus(pageResponse: HttpResponse): Check {
         detail: statusCode ? `HTTP ${statusCode}` : message,
       };
 
+    case "request_budget_exhausted":
+      return {
+        id,
+        label,
+        status: "error",
+        detail: "HTTP status probe skipped: scan request budget exhausted",
+      };
+
     default:
       return {
         id,

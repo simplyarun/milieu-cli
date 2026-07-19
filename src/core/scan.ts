@@ -1,22 +1,26 @@
 import ora from "ora";
-import type { ScanResult, ScanContext, ScanOptions, BridgeResult } from "./types.js";
+import type { ScanResult, ScanOutcome, ScanContext, ScanOptions, BridgeResult } from "./types.js";
 import { normalizeUrl } from "../utils/index.js";
 import {
   runReachabilityBridge, runStandardsBridge, runSeparationBridge,
   runSchemaBridge, runContextBridge,
 } from "../bridges/index.js";
 import { getVersion } from "./version.js";
+import { runWithScanRequestContext, getScanRequestStats } from "../utils/http-client.js";
 
-export async function scan(url: string, options: ScanOptions = {}): Promise<ScanResult> {
+export async function scan(url: string, options: ScanOptions = {}): Promise<ScanOutcome> {
   const start = performance.now();
   const normalized = normalizeUrl(url);
-  if (!normalized.ok) throw new Error(`Invalid URL: ${url}`);
+  if (!normalized.ok) {
+    return { ok: false, error: { kind: "invalid_url", message: `Invalid URL: ${url}` } };
+  }
   const { domain, baseUrl } = normalized;
 
   const ctx: ScanContext = { url, domain, baseUrl, options, shared: {} };
   const isSilent = options.silent ?? false;
   const spinner = ora({ text: "Scanning...", color: "cyan", isSilent }).start();
 
+  return runWithScanRequestContext(options, async () => {
   try {
     spinner.text = "Bridge 1: Reachability...";
     const bridge1 = await runReachabilityBridge(ctx);
@@ -50,16 +54,22 @@ export async function scan(url: string, options: ScanOptions = {}): Promise<Scan
     const overallScoreLabel = overallScore >= 80 ? ("pass" as const) : overallScore >= 40 ? ("partial" as const) : ("fail" as const);
 
     const result: ScanResult = {
-      version: getVersion(), url, timestamp: new Date().toISOString(),
+      ok: true,
+      version: getVersion(), url, scannedOrigin: baseUrl, timestamp: new Date().toISOString(),
       durationMs: Math.round(performance.now() - start),
       overallScore, overallScoreLabel,
+      incomplete: (getScanRequestStats()?.denied ?? 0) > 0,
       bridges: [bridge1, bridge2, bridge3, bridge4, bridge5],
     };
 
     spinner.stop();
     return result;
   } catch (err) {
+    // Bridges are built on a never-throwing HTTP client, so this is a
+    // defensive backstop: surface it as a failure outcome, never a throw.
     spinner.fail("Scan failed");
-    throw err;
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: { kind: "scan_failed", message } };
   }
+  });
 }

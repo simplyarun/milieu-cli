@@ -79,6 +79,10 @@ export interface ScanOptions {
   verbose?: boolean;
   /** Suppress spinner and terminal output (for JSON/quiet modes) */
   silent?: boolean;
+  /** Maximum simultaneous outbound HTTP requests (default: 8) */
+  maxConcurrency?: number;
+  /** Maximum outbound HTTP request attempts for the whole scan, counting every redirect hop and retry (default: 150) */
+  maxRequests?: number;
 }
 
 /** Context shared across bridge checks during a single scan */
@@ -95,12 +99,18 @@ export interface ScanContext {
   shared: Record<string, unknown>;
 }
 
-/** Complete scan result -- this is the JSON output public API contract */
+/** A completed scan -- this is the JSON output public API contract */
 export interface ScanResult {
+  /** Discriminant: a completed scan. Mirrors HttpResponse's `ok` field. */
+  ok: true;
   /** Schema version for JSON output stability (semver) */
   version: string;
   /** The URL that was scanned */
   url: string;
+  /** Normalized origin actually scanned; paths and query strings are not scoped */
+  scannedOrigin: string;
+  /** True when the scan request budget ran out and at least one probe was skipped — treat affected checks as unmeasured, not failing */
+  incomplete: boolean;
   /** ISO 8601 timestamp when scan started */
   timestamp: string;
   /** Total scan duration in milliseconds */
@@ -112,6 +122,22 @@ export interface ScanResult {
   /** Results for each bridge (always 5 entries, in order) */
   bridges: [BridgeResult, BridgeResult, BridgeResult, BridgeResult, BridgeResult];
 }
+
+/** Why a scan could not produce a result. */
+export type ScanErrorKind = "invalid_url" | "scan_failed";
+
+/** A scan that never produced a result. Mirrors HttpFailure. */
+export interface ScanFailure {
+  ok: false;
+  error: { kind: ScanErrorKind; message: string };
+}
+
+/**
+ * The outcome of `scan()`: either a completed `ScanResult` (`ok: true`) or a
+ * `ScanFailure` (`ok: false`). Like the HTTP client, `scan()` never throws —
+ * narrow on `.ok` before using the result.
+ */
+export type ScanOutcome = ScanResult | ScanFailure;
 
 // === HTTP Error Types ===
 
@@ -125,6 +151,7 @@ export type HttpErrorKind =
   | "connection_refused"
   | "ssl_error"
   | "body_too_large"
+  | "request_budget_exhausted"
   | "unknown";
 
 /** HTTP error with discriminated kind field */

@@ -6,3 +6,5 @@ dist/
 # Internal planning docs — never commit publicly
 .planning/
 docs/superpowers/
+AGENTS.md
+CLAUDE.md

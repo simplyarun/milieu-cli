@@ -29,3 +29,14 @@ describe("checkA2aAgentCard", () => {
     expect((await checkA2aAgentCard("https://example.com")).status).toBe("fail");
   });
 });
+
+describe("checkA2aAgentCard under request-budget exhaustion", () => {
+  it("reports error when the probe was denied", async () => {
+    mockHttpGet.mockResolvedValue({
+      ok: false as const,
+      error: { kind: "request_budget_exhausted" as const, message: "Scan request budget exhausted", url: "https://example.com/.well-known/agent.json" },
+    });
+    const check = await checkA2aAgentCard("https://example.com");
+    expect(check.status).toBe("error");
+  });
+});

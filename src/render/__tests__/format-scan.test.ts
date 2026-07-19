@@ -10,8 +10,11 @@ function stripAnsi(str: string): string {
 }
 
 const mockScanResult: ScanResult = {
+  ok: true,
   version: "0.1.0",
   url: "https://example.com",
+  scannedOrigin: "https://example.com",
+  incomplete: false,
   timestamp: "2026-03-18T14:30:00.000Z",
   durationMs: 2100,
   overallScore: 74,
@@ -141,5 +144,30 @@ describe("formatScanOutput", () => {
     expect(output).toContain("llms.txt");
     expect(output).toContain("API presence");
     expect(output).toContain("Developer docs");
+  });
+});
+
+describe("scanned origin and incomplete banner", () => {
+  it("shows the scanned origin when it differs from the input URL", () => {
+    const result: ScanResult = { ...mockScanResult, url: "https://example.com/docs/page?q=1", scannedOrigin: "https://example.com" };
+    const output = stripAnsi(formatScanOutput(result, false));
+    expect(output).toContain("Scanned origin: https://example.com");
+  });
+
+  it("omits the scanned-origin line when it matches the input", () => {
+    const output = stripAnsi(formatScanOutput(mockScanResult, false));
+    expect(output).not.toContain("Scanned origin:");
+  });
+
+  it("shows an incomplete warning when the request budget was exhausted", () => {
+    const result: ScanResult = { ...mockScanResult, incomplete: true };
+    const output = stripAnsi(formatScanOutput(result, false));
+    expect(output).toContain("Scan incomplete");
+    expect(output).toContain("max-requests");
+  });
+
+  it("shows no incomplete warning on a complete scan", () => {
+    const output = stripAnsi(formatScanOutput(mockScanResult, false));
+    expect(output).not.toContain("Scan incomplete");
   });
 });

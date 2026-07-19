@@ -194,3 +194,15 @@ describe("checkMarkdownNegotiation", () => {
     expect(result.check.data).toBeUndefined(); // fail case has no data
   });
 });
+
+describe("checkMarkdownNegotiation under request-budget exhaustion", () => {
+  it("reports error when the probe was denied", async () => {
+    mockHttpGet.mockResolvedValue({
+      ok: false as const,
+      error: { kind: "request_budget_exhausted" as const, message: "Scan request budget exhausted", url: "https://example.com" },
+    });
+    const result = await checkMarkdownNegotiation("https://example.com");
+    expect(result.check.status).toBe("error");
+    expect(result.supported).toBe(false);
+  });
+});

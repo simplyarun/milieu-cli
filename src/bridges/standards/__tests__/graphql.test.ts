@@ -246,3 +246,18 @@ describe("checkGraphql", () => {
     expect(result.check.data?.path).toBe("/api/v1/graphql");
   });
 });
+
+describe("checkGraphql under request-budget exhaustion", () => {
+  const budgetDenied = {
+    ok: false as const,
+    error: { kind: "request_budget_exhausted" as const, message: "Scan request budget exhausted", url: "https://example.com/graphql" },
+  };
+
+  it("reports error (not fail) when probes were denied by the scan budget", async () => {
+    mockHttpGet.mockResolvedValue(budgetDenied);
+    const result = await checkGraphql("https://example.com");
+    expect(result.check.status).toBe("error");
+    expect(result.check.detail).toContain("budget");
+    expect(result.detected).toBe(false);
+  });
+});

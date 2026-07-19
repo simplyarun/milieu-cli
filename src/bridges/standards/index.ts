@@ -8,8 +8,8 @@ import { checkSecurityTxt } from "./well-known.js";
 import { checkGraphql } from "./graphql.js";
 import { checkSitemap } from "./sitemap.js";
 import { checkMarkdownNegotiation } from "./markdown-negotiation.js";
-import { checkWebMcp } from "./webmcp.js";
 import { checkA2aAgentCard } from "./a2a-agent-card.js";
+import { httpGet } from "../../utils/http-client.js";
 
 /**
  * Check weights by adoption maturity.
@@ -28,8 +28,8 @@ const CHECK_WEIGHTS: Record<string, number> = {
   graphql_endpoint: 1,
   markdown_negotiation: 1,
   llms_full_txt: 1,
+  // MCP discovery (mcp_endpoint) is the single scored signal for /.well-known/mcp.json.
   mcp_endpoint: 1,
-  standards_webmcp: 1,
   standards_a2a_agent_card: 1,
 };
 
@@ -37,6 +37,9 @@ function calculateScore(checks: Check[]): { score: number; scoreLabel: "pass" | 
   let points = 0;
   let maxPoints = 0;
   for (const check of checks) {
+    // Error = probe never ran (e.g. request budget exhausted): unmeasured,
+    // excluded from both numerator and denominator.
+    if (check.status === "error") continue;
     const weight = CHECK_WEIGHTS[check.id] ?? 1;
     maxPoints += weight;
     if (check.status === "pass") points += weight;
@@ -53,13 +56,13 @@ export async function runStandardsBridge(ctx: ScanContext): Promise<BridgeResult
   const robotsSitemaps = (ctx.shared.robotsSitemaps as string[]) ?? [];
 
   // Phase 1: parallel independent probes
-  const [sitemapResult, markdownResult, llmsTxtResult, llmsFullTxtCheck, securityTxtResult, webMcpCheck, a2aAgentCardCheck] = await Promise.all([
+  const [sitemapResult, markdownResult, llmsTxtResult, llmsFullTxtCheck, securityTxtResult, mcpDiscoveryResponse, a2aAgentCardCheck] = await Promise.all([
     checkSitemap(ctx.baseUrl, robotsSitemaps, ctx.options.timeout),
     checkMarkdownNegotiation(ctx.baseUrl, ctx.options.timeout),
     checkLlmsTxt(ctx.baseUrl, ctx.options.timeout),
     checkLlmsFullTxt(ctx.baseUrl, ctx.options.timeout),
     checkSecurityTxt(ctx.baseUrl, ctx.options.timeout),
-    checkWebMcp(ctx.baseUrl, ctx.options.timeout),
+    httpGet(`${ctx.baseUrl}/.well-known/mcp.json`, { timeout: ctx.options.timeout, headers: { Accept: "application/json" } }),
     checkA2aAgentCard(ctx.baseUrl, ctx.options.timeout),
   ]);
 
@@ -67,7 +70,7 @@ export async function runStandardsBridge(ctx: ScanContext): Promise<BridgeResult
   const [openApiResult, graphqlResult, mcpResult] = await Promise.all([
     checkOpenApi(ctx.baseUrl, ctx.options.timeout, sitemapResult.apiRelevantUrls),
     checkGraphql(ctx.baseUrl, ctx.options.timeout),
-    checkMcpEndpoint(ctx.baseUrl, ctx.options.timeout, pageBody, llmsTxtResult.body ?? undefined),
+    checkMcpEndpoint(ctx.baseUrl, ctx.options.timeout, pageBody, llmsTxtResult.body ?? undefined, mcpDiscoveryResponse),
   ]);
 
   // Synchronous HTML-based checks
@@ -89,7 +92,7 @@ export async function runStandardsBridge(ctx: ScanContext): Promise<BridgeResult
     openApiResult.check, graphqlResult.check, sitemapResult.check,
     markdownResult.check, llmsTxtResult.check, llmsFullTxtCheck,
     mcpResult.check, jsonLdCheck, schemaOrgCheck, securityTxtResult.check,
-    webMcpCheck, a2aAgentCardCheck,
+    a2aAgentCardCheck,
   ];
 
   const { score, scoreLabel } = calculateScore(checks);

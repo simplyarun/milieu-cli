@@ -41,6 +41,7 @@ vi.mock("../../utils/index.js", () => ({
 }));
 
 import { scan } from "../scan.js";
+import { normalizeUrl } from "../../utils/index.js";
 import ora from "ora";
 import {
   runReachabilityBridge,
@@ -50,7 +51,12 @@ import {
   runContextBridge,
 } from "../../bridges/index.js";
 
-import type { BridgeResult } from "../types.js";
+import type { BridgeResult, ScanResult, ScanOutcome } from "../types.js";
+
+/** Narrow a scan outcome to a success, failing the test if it isn't one. */
+function assertOk(outcome: ScanOutcome): asserts outcome is ScanResult {
+  expect(outcome.ok).toBe(true);
+}
 
 const mockBridge1Normal: BridgeResult = {
   id: 1,
@@ -125,6 +131,7 @@ describe("scan", () => {
     vi.mocked(runSeparationBridge).mockResolvedValue(mockBridge3Normal);
 
     const result = await scan("https://example.com");
+    assertOk(result);
 
     expect(result.bridges).toHaveLength(5);
     // Overall score = Math.round((85 + 63 + 50 + 30) / 4) = 57
@@ -139,6 +146,7 @@ describe("scan", () => {
     vi.mocked(runReachabilityBridge).mockResolvedValue(mockBridge1Abort);
 
     const result = await scan("https://example.com");
+    assertOk(result);
 
     expect(runStandardsBridge).not.toHaveBeenCalled();
     expect(runSeparationBridge).not.toHaveBeenCalled();
@@ -162,6 +170,7 @@ describe("scan", () => {
     vi.mocked(runSeparationBridge).mockResolvedValue(mockBridge3Normal);
 
     const result = await scan("https://example.com");
+    assertOk(result);
 
     // Math.round((90 + 70 + 50 + 30) / 4) = 60
     expect(result.overallScore).toBe(60);
@@ -180,15 +189,29 @@ describe("scan", () => {
     expect(mockSpinner.fail).not.toHaveBeenCalled();
   });
 
-  it("calls spinner.fail on error and rethrows", async () => {
+  it("returns a scan_failed outcome (never throws) when a bridge rejects", async () => {
     const testError = new Error("connection refused");
     vi.mocked(runReachabilityBridge).mockRejectedValue(testError);
 
-    await expect(scan("https://example.com")).rejects.toThrow(
-      "connection refused",
-    );
+    const outcome = await scan("https://example.com");
+
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) {
+      expect(outcome.error.kind).toBe("scan_failed");
+      expect(outcome.error.message).toContain("connection refused");
+    }
     expect(mockSpinner.fail).toHaveBeenCalledWith("Scan failed");
     expect(mockSpinner.stop).not.toHaveBeenCalled();
+  });
+
+  it("returns an invalid_url outcome for an unparseable URL", async () => {
+    vi.mocked(normalizeUrl).mockReturnValueOnce({ ok: false, error: "bad url" });
+    const outcome = await scan("not a url");
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) {
+      expect(outcome.error.kind).toBe("invalid_url");
+    }
+    expect(runReachabilityBridge).not.toHaveBeenCalled();
   });
 
   it("passes isSilent to ora when options.silent is true", async () => {
@@ -213,5 +236,51 @@ describe("scan", () => {
     expect(vi.mocked(ora)).toHaveBeenCalledWith(
       expect.objectContaining({ isSilent: false }),
     );
+  });
+});
+
+describe("scan incomplete flag", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("reports incomplete: false and scannedOrigin when no requests were denied", async () => {
+    vi.mocked(runReachabilityBridge).mockResolvedValue(mockBridge1Normal);
+    vi.mocked(runStandardsBridge).mockResolvedValue(mockBridge2Normal);
+    vi.mocked(runSeparationBridge).mockResolvedValue(mockBridge3Normal);
+
+    const result = await scan("https://example.com");
+    assertOk(result);
+
+    expect(result.incomplete).toBe(false);
+    expect(result.scannedOrigin).toBe("https://example.com");
+  });
+});
+
+// Real http-client, mocked DNS: lets a bridge mock consume the scan budget.
+vi.mock("../../utils/ssrf.js", () => ({
+  validateDns: vi.fn(async () => ({ safe: true, ip: "93.184.216.34" })),
+}));
+import { httpGet } from "../../utils/http-client.js";
+
+describe("scan incomplete flag under budget exhaustion", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 404 })));
+  });
+
+  it("reports incomplete: true when the request budget denies a probe", async () => {
+    vi.mocked(runReachabilityBridge).mockImplementation(async () => {
+      await httpGet("https://example.com/first");   // consumes the whole budget
+      await httpGet("https://example.com/denied");  // denied
+      return mockBridge1Normal;
+    });
+    vi.mocked(runStandardsBridge).mockResolvedValue(mockBridge2Normal);
+    vi.mocked(runSeparationBridge).mockResolvedValue(mockBridge3Normal);
+
+    const result = await scan("https://example.com", { maxRequests: 1 });
+    assertOk(result);
+
+    expect(result.incomplete).toBe(true);
   });
 });

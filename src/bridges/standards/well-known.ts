@@ -23,6 +23,10 @@ export async function checkSecurityTxt(
     timeout,
   });
 
+  if (!result.ok && result.error.kind === "request_budget_exhausted") {
+    return { check: { id, label, status: "error", detail: "security.txt probe skipped: scan request budget exhausted" }, body: null };
+  }
+
   if (!result.ok || result.body.trim().length === 0) {
     return { check: { id, label, status: "fail", detail: "No security.txt found" }, body: null };
   }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createRequire } from "node:module";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -17,6 +17,10 @@ const pkg = require("../../../package.json") as {
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const projectRoot = resolve(__dirname, "..", "..", "..");
 const distDir = join(projectRoot, "dist");
+// The two tests below inspect build output. On a fresh checkout `dist/` may
+// not exist yet (`npm test` has no build step), so they skip rather than fail
+// with ENOENT. `npm run build && npm test` exercises them fully.
+const hasDist = existsSync(distDir);
 
 /**
  * Recursively walk a directory and return all file paths.
@@ -36,9 +40,10 @@ function walkDir(dir: string): string[] {
 }
 
 describe("packaging", () => {
-  it("has exactly 3 runtime dependencies", () => {
+  it("has exactly 4 runtime dependencies", () => {
+    // undici backs SSRF connection pinning (see SECURITY.md); the rest are CLI/render.
     const deps = Object.keys(pkg.dependencies).sort();
-    expect(deps).toEqual(["chalk", "commander", "ora"]);
+    expect(deps).toEqual(["chalk", "commander", "ora", "undici"]);
   });
 
   it("is ESM-only", () => {
@@ -62,7 +67,7 @@ describe("packaging", () => {
     expect(pkg.bin.milieu).toBe("./dist/cli/index.js");
   });
 
-  it("CLI entry has shebang", () => {
+  it.skipIf(!hasDist)("CLI entry has shebang", () => {
     const cliEntryPath = join(distDir, "cli", "index.js");
     const firstLine = readFileSync(cliEntryPath, "utf-8").split("\n")[0];
     expect(firstLine).toBe("#!/usr/bin/env node");
@@ -73,7 +78,7 @@ describe("packaging", () => {
     expect(typeof pkg.scripts.prepublishOnly).toBe("string");
   });
 
-  it("dist contains no test files", () => {
+  it.skipIf(!hasDist)("dist contains no test files", () => {
     const allPaths = walkDir(distDir);
 
     const testDirs = allPaths.filter((p) => p.includes("__tests__"));

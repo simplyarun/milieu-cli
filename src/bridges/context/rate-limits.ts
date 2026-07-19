@@ -27,6 +27,9 @@ export async function checkRateLimitHeaders(ctx: ScanContext): Promise<Check> {
   const result = await httpGet(probeUrl, { timeout: probeTimeout });
   if (!result.ok) {
     ctx.shared.contextProbeHeaders = {};
+    if (result.error.kind === "request_budget_exhausted") {
+      return { id, label, status: "error", detail: "Rate-limit probe skipped: scan request budget exhausted", data: { probeUrl, headerFound: null } };
+    }
     return { id, label, status: "fail", detail: `Could not reach ${probeUrl} to check rate-limit headers`, data: { probeUrl, headerFound: null } };
   }
   ctx.shared.contextProbeHeaders = result.headers;

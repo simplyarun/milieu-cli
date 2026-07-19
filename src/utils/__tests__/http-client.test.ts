@@ -10,7 +10,8 @@ vi.mock("../url.js", () => ({
   resolveRedirectUrl: vi.fn(),
 }));
 
-import { httpGet } from "../http-client.js";
+import { httpGet, RequestCoordinator, runWithScanRequestContext, getScanRequestStats, pinnedLookup } from "../http-client.js";
+import { getVersion } from "../../core/version.js";
 import { validateDns } from "../ssrf.js";
 import { resolveRedirectUrl } from "../url.js";
 
@@ -54,6 +55,161 @@ function mockResponse(options: {
     bytes: () => Promise.resolve(new Uint8Array()),
   } as Response;
 }
+
+describe("SSRF connection pinning", () => {
+  it("pinnedLookup resolves ANY hostname to the validated IP (defeats DNS rebinding)", () => {
+    const lookup = pinnedLookup("93.184.216.34");
+    const cb = vi.fn();
+    // A rebinding attacker would return a private IP here on the second lookup.
+    lookup("rebind.evil.example", {}, cb);
+    expect(cb).toHaveBeenCalledWith(null, "93.184.216.34", 4);
+  });
+
+  it("pinnedLookup reports family 6 for an IPv6 address", () => {
+    const lookup = pinnedLookup("2606:2800:220:1:248:1893:25c8:1946");
+    const cb = vi.fn();
+    lookup("example.com", {}, cb);
+    expect(cb).toHaveBeenCalledWith(null, "2606:2800:220:1:248:1893:25c8:1946", 6);
+  });
+});
+
+describe("RequestCoordinator", () => {
+  it("defaults to 8 concurrent and 150 total requests", () => {
+    const c = new RequestCoordinator();
+    expect(c.maxConcurrency).toBe(8);
+    // A full scan against a 404-everything site makes ~50 physical requests
+    // (before redirects/retries), so the default budget must sit well above
+    // that floor or every ordinary scan exhausts it mid-flight.
+    expect(c.maxRequests).toBe(150);
+  });
+
+  it("counts started and denied requests", async () => {
+    const c = new RequestCoordinator(2, 3);
+    expect(await c.acquire()).toBe(true);
+    expect(await c.acquire()).toBe(true);
+    c.release();
+    expect(await c.acquire()).toBe(true);
+    c.release();
+    expect(await c.acquire()).toBe(false);
+    expect(c.startedCount).toBe(3);
+    expect(c.deniedCount).toBe(1);
+  });
+
+  it("holds acquire() at max concurrency until a slot frees", async () => {
+    const c = new RequestCoordinator(2, 10);
+    await c.acquire();
+    await c.acquire();
+    let granted = false;
+    const third = c.acquire().then((g) => { granted = true; return g; });
+    await new Promise((r) => setImmediate(r));
+    expect(granted).toBe(false);
+    c.release();
+    await expect(third).resolves.toBe(true);
+  });
+});
+
+describe("scan request context", () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    mockValidateDns.mockResolvedValue({ safe: true, ip: "93.184.216.34" });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  it("returns request_budget_exhausted through httpGet once the budget is spent", async () => {
+    fetchSpy.mockResolvedValue(mockResponse({ status: 404, statusText: "Not Found" }));
+    await runWithScanRequestContext({ maxRequests: 1 }, async () => {
+      const first = await httpGet("https://example.com/a");
+      expect(first.ok).toBe(false);
+      const second = await httpGet("https://example.com/b");
+      expect(second.ok).toBe(false);
+      if (!second.ok) {
+        expect(second.error.kind).toBe("request_budget_exhausted");
+      }
+      expect(getScanRequestStats()).toEqual({ started: 1, denied: 1 });
+    });
+  });
+
+  it("counts retry attempts against the budget", async () => {
+    // A timeout is retriable; with budget for both attempts, the retry
+    // consumes a second slot — proving retries are charged.
+    fetchSpy.mockRejectedValue(new DOMException("The operation timed out", "TimeoutError"));
+    await runWithScanRequestContext({ maxRequests: 2 }, async () => {
+      const result = await httpGet("https://example.com/a", { timeout: 50 });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.kind).toBe("timeout");
+      }
+      expect(getScanRequestStats()).toEqual({ started: 2, denied: 0 });
+    });
+  });
+
+  it("skips the retry entirely when the budget cannot grant it", async () => {
+    // Budget of 1: the first attempt spends it; the retry is not started
+    // and the genuine timeout (not request_budget_exhausted) is returned.
+    fetchSpy.mockRejectedValue(new DOMException("The operation timed out", "TimeoutError"));
+    await runWithScanRequestContext({ maxRequests: 1 }, async () => {
+      const result = await httpGet("https://example.com/a", { timeout: 50 });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.kind).toBe("timeout");
+      }
+      expect(getScanRequestStats()).toEqual({ started: 1, denied: 0 });
+    });
+  });
+
+  it("returns the genuine first-attempt failure when the retry would be denied by the budget", async () => {
+    // connection_refused is retriable AND drives scan-abort decisions; a
+    // budget-denied retry must not mask it with request_budget_exhausted.
+    const refused = new TypeError("fetch failed");
+    Object.assign(refused, { cause: { code: "ECONNREFUSED" } });
+    fetchSpy.mockRejectedValue(refused);
+
+    const result = await runWithScanRequestContext({ maxRequests: 1 }, () =>
+      httpGet("https://example.com/a", { timeout: 50 }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.kind).toBe("connection_refused");
+    }
+  });
+
+  it("falls back to safe defaults when configured limits are invalid", async () => {
+    fetchSpy.mockResolvedValue(mockResponse({ status: 404, statusText: "Not Found" }));
+
+    const result = await runWithScanRequestContext(
+      { maxConcurrency: Number.NaN, maxRequests: -5 },
+      () => httpGet("https://example.com/a"),
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.kind).toBe("http_error");
+    }
+  });
+
+  it("shares one DNS cache across all requests in a scan context", async () => {
+    fetchSpy.mockResolvedValue(mockResponse({ status: 404, statusText: "Not Found" }));
+    await runWithScanRequestContext({}, async () => {
+      await httpGet("https://example.com/a");
+      await httpGet("https://example.com/b");
+    });
+    const caches = mockValidateDns.mock.calls.map((call) => call[1]);
+    expect(caches.length).toBeGreaterThanOrEqual(2);
+    expect(caches[0]).toBe(caches[1]);
+  });
+
+  it("getScanRequestStats returns null outside a scan context", () => {
+    expect(getScanRequestStats()).toBeNull();
+  });
+});
 
 describe("httpGet", () => {
   let fetchSpy: ReturnType<typeof vi.fn>;
@@ -482,7 +638,7 @@ describe("httpGet", () => {
   // User-Agent test
   // -----------------------------------------------------------------------
   describe("User-Agent header", () => {
-    it("sends User-Agent milieu-cli/0.1.0", async () => {
+    it("sends a User-Agent derived from the package version", async () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse({ status: 200, body: "OK" }),
       );
@@ -492,7 +648,18 @@ describe("httpGet", () => {
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       const callArgs = fetchSpy.mock.calls[0];
       const requestOptions = callArgs[1];
-      expect(requestOptions.headers["User-Agent"]).toBe("milieu-cli/0.1.0");
+      expect(requestOptions.headers["User-Agent"]).toBe(`milieu-cli/${getVersion()}`);
+      // Never ship the stale hardcoded 0.1.0 again.
+      expect(requestOptions.headers["User-Agent"]).not.toBe("milieu-cli/0.1.0");
+    });
+
+    it("passes a connection-pinning dispatcher to fetch (SSRF hardening)", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse({ status: 200, body: "OK" }));
+
+      await httpGet("https://example.com");
+
+      const init = fetchSpy.mock.calls[0][1] as { dispatcher?: unknown };
+      expect(init.dispatcher).toBeDefined();
     });
   });
 

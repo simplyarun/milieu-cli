@@ -40,13 +40,18 @@ export async function runSchemaBridge(ctx: ScanContext): Promise<BridgeResult> {
   const hasSpec = ctx.shared.openApiDetected === true && ctx.shared.openApiSpec != null;
   const spec = hasSpec ? (ctx.shared.openApiSpec as ParsedOpenApiSpec) : undefined;
 
-  // No spec → score: null (excluded from overall average, like Bridge 3)
+  // No spec → all five checks fail over a FIXED denominator (score 0), not
+  // null. Excluding Bridge 4 from the average when there's no spec made the
+  // overall score non-monotone: publishing a mediocre spec could lower it.
+  // From an agent's view, unanswerable schema questions are failures of the
+  // milieu, not "not applicable".
   if (!hasSpec) {
     const checks: Check[] = NO_SPEC_CHECKS.map(({ id, label }) => ({
       id, label, status: "fail" as const, detail: NO_SPEC_MESSAGES[id],
     }));
+    const { score, scoreLabel } = calculateScore(checks);
     return {
-      id: 4, name: "Schema", status: "evaluated", score: null, scoreLabel: null, checks,
+      id: 4, name: "Schema", status: "evaluated", score, scoreLabel, checks,
       durationMs: Math.round(performance.now() - start),
     };
   }

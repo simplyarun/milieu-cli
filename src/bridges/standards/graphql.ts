@@ -202,7 +202,20 @@ export async function checkGraphql(
     }
   }
 
-  // Phase 4: Nothing found
+  // Phase 4: Budget starvation is not evidence of absence
+  if (responses.some((r) => !r.ok && r.error.kind === "request_budget_exhausted")) {
+    return {
+      check: {
+        id,
+        label,
+        status: "error",
+        detail: "GraphQL discovery incomplete: scan request budget exhausted",
+      },
+      detected: false,
+    };
+  }
+
+  // Phase 5: Nothing found
   return {
     check: {
       id,
