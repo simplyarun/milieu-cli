@@ -63,8 +63,11 @@ describe("packaging", () => {
     expect(pkg.files).toContain("dist");
   });
 
-  it("has bin entry", () => {
-    expect(pkg.bin.milieu).toBe("./dist/cli/index.js");
+  it("has bin entries without a ./ prefix (npm >=11 strips ./-prefixed bins)", () => {
+    // npm 11 rejects "./dist/..." as an invalid bin and drops the entry,
+    // which would silently break `npx milieu-cli` / the global command.
+    expect(pkg.bin.milieu).toBe("dist/cli/index.js");
+    expect(pkg.bin["milieu-cli"]).toBe("dist/cli/index.js");
   });
 
   it.skipIf(!hasDist)("CLI entry has shebang", () => {
