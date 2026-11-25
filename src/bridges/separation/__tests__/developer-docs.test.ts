@@ -121,6 +121,26 @@ describe("checkDeveloperDocs", () => {
     expect(check.data?.paths).toContain("/developers");
   });
 
+  it("recognizes relative and off-site links by pathname", async () => {
+    mockAllProbesFail();
+    const html = '<a HREF = developers/start>Dev</a><a class="menu" href="https://help.example.org/en/docs/start">Docs</a>';
+    const { check } = await checkDeveloperDocs("https://example.com", html);
+    expect(check.data?.paths).toEqual(["/docs", "/developers"]);
+  });
+
+  it("ignores doc-like text outside anchor href path segments", async () => {
+    mockAllProbesFail();
+    const html = [
+      '<a href="/docsarchive">Archive</a>',
+      '<a data-href="/docs">Label</a>',
+      `<a title="see href='/docs'" href="/help">Help</a>`,
+      '<a href="/search?next=/docs">Search</a>',
+      '<a href="https://docs.example.com/">Home</a>',
+    ].join("");
+    const { check } = await checkDeveloperDocs("https://example.com", html);
+    expect(check.status).toBe("fail");
+  });
+
   it("returns fail when all 5 probes fail and no doc links in HTML", async () => {
     mockAllProbesFail();
     const { check } = await checkDeveloperDocs(
