@@ -49,7 +49,7 @@ function calculateScore(checks: Check[]): {
  * Makes 3 HTTP calls:
  *   1. HEAD https://<domain> (HTTPS availability)
  *   2. GET  <baseUrl> (page content for meta robots)
- *   3. GET  https://<domain>/robots.txt (robots.txt fetch)
+ *   3. GET  <baseUrl>/robots.txt (robots.txt fetch)
  *
  * Aborts on dns/connection_refused/ssl_error from HTTPS check.
  */
@@ -59,10 +59,13 @@ export async function runReachabilityBridge(
   const start = performance.now();
 
   // 1. HTTPS check (HEAD request)
-  const httpsResult = await checkHttps(ctx.domain, ctx.options.timeout);
+  const origin = new URL(ctx.baseUrl);
+  const httpsResult = await checkHttps(origin.host, ctx.options.timeout);
 
   // Abort on fatal HTTPS errors
-  if (httpsResult.abort) {
+  // An HTTP-only origin can still be scanned after a failed TLS handshake.
+  if (httpsResult.abort && (origin.protocol === "https:" ||
+      httpsResult.abortReason === "ssrf_blocked" || httpsResult.abortReason === "dns")) {
     return {
       id: 1,
       name: "Reachability",
@@ -92,7 +95,7 @@ export async function runReachabilityBridge(
 
   // 4. robots.txt fetch + parse
   const robotsResult = await checkRobotsTxt(
-    ctx.domain,
+    ctx.baseUrl,
     ctx.options.timeout,
   );
 
@@ -100,15 +103,9 @@ export async function runReachabilityBridge(
   ctx.shared.robotsSitemaps = robotsResult.parsed?.sitemaps ?? [];
 
   // 5. Crawler policies (uses parsed robots.txt data)
-  let targetPath: string;
-  try {
-    targetPath = new URL(ctx.baseUrl).pathname;
-  } catch {
-    targetPath = "/";
-  }
   const crawlerChecks = evaluateCrawlerPolicies(
     robotsResult.parsed,
-    targetPath,
+    !robotsResult.parsed && robotsResult.check.status !== "partial",
   );
 
   // 6. Meta robots (uses page response)
@@ -118,15 +115,10 @@ export async function runReachabilityBridge(
   if (pageResponse.ok) {
     metaRobotsCheck = checkMetaRobots(pageResponse.body);
     xRobotsCheck = checkXRobotsTag(pageResponse.headers);
-  } else if (pageResponse.error.kind === "request_budget_exhausted") {
-    // The page was never fetched — an unmeasured surface must not award
-    // the "no restrictive tags found" free pass.
-    metaRobotsCheck = { id: "meta_robots", label: "Meta Robots Tags", status: "error", detail: "Meta robots probe skipped: scan request budget exhausted" };
-    xRobotsCheck = { id: "x_robots_tag", label: "X-Robots-Tag Header", status: "error", detail: "X-Robots-Tag probe skipped: scan request budget exhausted" };
   } else {
-    // Page unavailable -- pass empty content (absence of restrictive tags = pass)
-    metaRobotsCheck = checkMetaRobots("");
-    xRobotsCheck = checkXRobotsTag({});
+    const detail = `Page could not be evaluated: ${pageResponse.error.message}`;
+    metaRobotsCheck = { id: "meta_robots", label: "Meta Robots Tags", status: "error", detail };
+    xRobotsCheck = { id: "x_robots_tag", label: "X-Robots-Tag Header", status: "error", detail };
   }
 
   // 7. Collect all checks

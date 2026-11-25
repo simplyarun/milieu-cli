@@ -15,6 +15,9 @@ function bridgeLabel(bridge: BridgeResult): string {
 }
 
 export function formatBridge(bridge: BridgeResult, verbose: boolean): string {
+  if (bridge.status === "not_evaluated") {
+    return `  ${bold(bridgeLabel(bridge))}  ${dim("Skipped")}`;
+  }
   if (bridge.score !== null) {
     return formatScoredBridge(bridge, verbose);
   }

@@ -113,28 +113,22 @@ export function parseRobotsTxt(content: string): RobotsTxtResult {
  * Supports * wildcards and $ end anchor per RFC 9309.
  */
 export function matchesPath(pattern: string, path: string): boolean {
-  // 1. Empty pattern matches everything
-  if (pattern === "") return true;
+  const anchored = pattern.endsWith("$");
+  const glob = anchored ? pattern.slice(0, -1) : pattern;
+  const [prefix, ...parts] = glob.split("*");
+  if (!parts.length) return anchored ? path === prefix : path.startsWith(prefix);
+  if (!path.startsWith(prefix)) return false;
 
-  // 2. Check for $ end anchor
-  let anchorEnd = false;
-  let pat = pattern;
-  if (pat.endsWith("$")) {
-    anchorEnd = true;
-    pat = pat.slice(0, -1);
+  // Consume literal segments in order. Only a trailing $ anchors the suffix.
+  const suffix = anchored ? parts.pop()! : "";
+  const limit = path.length - suffix.length;
+  if (!path.endsWith(suffix) || prefix.length > limit) return false;
+  let offset = prefix.length;
+  for (const part of parts) {
+    if (!part) continue;
+    const index = path.indexOf(part, offset);
+    if (index < 0 || index + part.length > limit) return false;
+    offset = index + part.length;
   }
-
-  // 3. Escape regex special chars except * (already removed $ if present)
-  // Escape: \ . + ? [ ] ( ) { } | ^ /
-  const escaped = pat.replace(/([\\.\+\?\[\]\(\)\{\}\|\^\/])/g, "\\$1");
-
-  // 4. Replace * with .*
-  const regexStr = escaped.replace(/\*/g, ".*");
-
-  // 5. Build regex: prefix match unless $ anchor
-  const fullRegex = anchorEnd
-    ? new RegExp("^" + regexStr + "$")
-    : new RegExp("^" + regexStr);
-
-  return fullRegex.test(path);
+  return true;
 }

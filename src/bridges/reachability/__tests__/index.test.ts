@@ -55,7 +55,7 @@ describe("runReachabilityBridge under request-budget exhaustion", () => {
     expect(byId.robots_txt.status).toBe("error");
   });
 
-  it("keeps the free-pass semantics for ordinary page failures", async () => {
+  it("reports page controls as unmeasured on a failed page request", async () => {
     mockHttpGet.mockImplementation(async (url: string, opts?: { method?: string }) => {
       if (opts?.method === "HEAD") return makeSuccess(url);
       return {
@@ -67,9 +67,29 @@ describe("runReachabilityBridge under request-budget exhaustion", () => {
     const result = await runReachabilityBridge(makeCtx());
     const byId = Object.fromEntries(result.checks.map((c) => [c.id, c]));
 
-    // Absence of restrictive tags on an unreachable page keeps the
-    // long-standing "no restrictions found" pass.
-    expect(byId.meta_robots.status).toBe("pass");
-    expect(byId.x_robots_tag.status).toBe("pass");
+    expect(byId.meta_robots.status).toBe("error");
+    expect(byId.x_robots_tag.status).toBe("error");
+    expect(byId.crawler_policy_gptbot.status).toBe("error");
+  });
+
+  it("uses the scanned origin for robots.txt and retains its port for the HTTPS probe", async () => {
+    const baseUrl = "http://example.com:8080";
+    mockHttpGet.mockImplementation(async (url, opts) => opts?.method === "HEAD"
+      ? { ok: false, error: { kind: "ssl_error", message: "TLS unavailable", url } }
+      : makeSuccess(url));
+
+    const result = await runReachabilityBridge({ ...makeCtx(), baseUrl });
+    expect(result.abort).toBeUndefined();
+    expect(mockHttpGet.mock.calls.map(([url]) => url)).toEqual([
+      "https://example.com:8080", baseUrl, baseUrl + "/robots.txt",
+    ]);
+  });
+
+  it("aborts immediately when SSRF policy blocks the target", async () => {
+    mockHttpGet.mockResolvedValue({ ok: false, error: {
+      kind: "ssrf_blocked", message: "Blocked address", url: "https://example.com",
+    } });
+    expect((await runReachabilityBridge(makeCtx())).abortReason).toBe("ssrf_blocked");
+    expect(mockHttpGet).toHaveBeenCalledTimes(1);
   });
 });

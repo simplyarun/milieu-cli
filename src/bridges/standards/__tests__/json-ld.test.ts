@@ -73,6 +73,11 @@ describe("checkJsonLd", () => {
     expect(result.status).toBe("fail");
   });
 
+  it("ignores non-string types in JSON-LD", () => {
+    const html = '<script type="application/ld+json">{"@type":[{}]}</script>';
+    expect(checkJsonLd(html).status).toBe("fail");
+  });
+
   it("skips JSON-LD blocks missing @type", () => {
     const html = `
       <html><head>

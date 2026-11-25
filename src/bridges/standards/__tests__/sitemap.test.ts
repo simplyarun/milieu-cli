@@ -99,6 +99,26 @@ describe("checkSitemap", () => {
     expect(urls).toContain("https://example.com/custom-sitemap.xml");
   });
 
+  it("caps the number of additional sitemap requests from robots.txt", async () => {
+    mockHttpGet.mockResolvedValue(make404());
+    mockHttpGetBytes.mockResolvedValue(make404());
+    await checkSitemap("https://example.com", Array.from({length: 10}, (_, i) => `https://example.com/map-${i}.xml`));
+    expect(mockHttpGet).toHaveBeenCalledTimes(5);
+  });
+
+  it("rejects an HTML soft 404 at the sitemap path", async () => {
+    mockHttpGet.mockResolvedValue(makeSuccess("<html><body>Page unavailable</body></html>"));
+    mockHttpGetBytes.mockResolvedValue(make404());
+    expect((await checkSitemap("https://example.com", [])).check.status).toBe("fail");
+  });
+
+  it("reads gzip content already decoded by the HTTP client", async () => {
+    const sitemap = makeSitemap(["https://example.com/docs"]);
+    mockHttpGet.mockResolvedValue(make404());
+    mockHttpGetBytes.mockResolvedValue(makeBytesSuccess(new TextEncoder().encode(sitemap), { headers: { "content-encoding": "gzip" } }));
+    expect((await checkSitemap("https://example.com", [])).urls).toEqual(["https://example.com/docs"]);
+  });
+
   it("deduplicates probe URLs", async () => {
     mockHttpGet.mockResolvedValue(make404());
     mockHttpGetBytes.mockResolvedValue(make404());

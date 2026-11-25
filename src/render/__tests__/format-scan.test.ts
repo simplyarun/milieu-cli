@@ -124,6 +124,23 @@ describe("formatScanOutput", () => {
     expect(output).toContain("partial");
   });
 
+  it("renders untrusted URL and check text on single lines without terminal controls", () => {
+    const result = structuredClone(mockScanResult);
+    result.url += "/first\nsecond";
+    result.bridges[0].checks[0].detail = "first\r\u009bsecond";
+    const output = formatScanOutput(result, true);
+    expect(output).not.toContain("\r");
+    expect(output).not.toContain("\u009b");
+    expect(output.split("\n")[0]).toContain("first second");
+  });
+
+  it("shows skipped bridges without a score or signal count", () => {
+    const output = stripAnsi(formatScanOutput(mockScanResult, false));
+    const line = output.split("\n").find(text => text.includes("Schema:"));
+    expect(line).toContain("Skipped");
+    expect(line).not.toContain("0 of 0");
+  });
+
   it("shows total time formatted", () => {
     const output = stripAnsi(formatScanOutput(mockScanResult, false));
     expect(output).toContain("2.1s");

@@ -4,7 +4,36 @@ All notable changes to milieu-cli are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/). Pre-1.0, breaking changes bump the
 minor version.
 
-## [0.3.1] — unreleased
+## [0.3.2] — unreleased
+
+### Fixed
+
+- **Scans no longer fail every request (every site collapsed to the same
+  score).** The DNS-pinning dispatcher added in 0.3.0 handed an
+  external-`undici` `Agent` to Node's global `fetch`, which is backed by Node's
+  *internal* undici. When the two undici versions' request-handler contracts
+  diverge (as on Node 25), every `fetch` throws `UND_ERR_INVALID_ARG` before it
+  reaches the network — so all network-backed checks failed and, thanks to
+  monotone scoring, every site bottomed out at the same low score instead of
+  erroring visibly. The client now uses undici's own `fetch`, version-matched to
+  the dispatcher, so SSRF connection-pinning works end-to-end on every supported
+  Node. Also fixes the pinned DNS lookup to return an array on the Happy-Eyeballs
+  (`{ all: true }`) path, which otherwise failed with "Invalid IP address". A new
+  real-transport regression test (loopback server, unmocked fetch) now exercises
+  the actual socket path so a future version mismatch fails CI, not production.
+
+- Corrected the Node.js minimum to 22.19.0, aligned the lockfile with the
+  package, and updated dependencies with published security fixes. CI builds
+  and tests the minimum version and the maintained Node 22, 24, and 26 lines.
+- Fixed address validation for IPv6 and redirects, and restricted URLs
+  derived from OpenAPI operation paths to the scanned origin. Terminal output
+  escapes or neutralizes control characters in site-provided text.
+- Fixed HTTPS and crawler grading, sitemap detection, and A2A Agent Card
+  discovery. An aborted scan now marks the remaining bridges as skipped.
+- Invalid timeout, request limit and threshold values now produce errors
+  before scanning. This prevents a mistyped threshold from passing a CI check.
+
+## [0.3.1] — 2026-07-19
 
 ### Fixed
 

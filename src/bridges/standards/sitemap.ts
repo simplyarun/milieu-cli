@@ -36,6 +36,7 @@ const MAX_URLS_PER_SITEMAP = 1000;
 
 /** Max child sitemaps to follow from a sitemap index */
 const MAX_CHILD_SITEMAPS = 3;
+const MAX_ROBOTS_SITEMAPS = 3;
 
 /** Patterns that identify API-relevant URLs in sitemaps */
 const API_URL_PATTERNS = [
@@ -54,18 +55,23 @@ const API_URL_PATTERNS = [
 /** Extract URLs from XML sitemap content via regex */
 function extractLocs(xml: string, limit: number): string[] {
   const urls: string[] = [];
-  const regex = /<loc>\s*(.*?)\s*<\/loc>/gi;
+  const regex = /<loc>([^<]*)<\/loc>/gi;
   let match;
   while ((match = regex.exec(xml)) !== null && urls.length < limit) {
-    const url = match[1].trim();
+    const url = match[1].trim().replace(/&amp;/g, "&");
     if (url) urls.push(url);
   }
   return urls;
 }
 
-/** Check if XML content is a sitemap index */
-function isSitemapIndex(xml: string): boolean {
-  return /<sitemapindex[\s>]/i.test(xml);
+function sitemapRoot(xml: string): string | undefined {
+  // Skip XML declarations, stylesheet processing instructions and comments.
+  const preamble = /\s+|<\?[\s\S]*?\?>|<!--[\s\S]*?-->/y;
+  let offset = 0;
+  while (preamble.test(xml)) offset = preamble.lastIndex;
+  const root = /<(urlset|sitemapindex)(?=[\s/>])/iy;
+  root.lastIndex = offset;
+  return root.exec(xml)?.[1].toLowerCase();
 }
 
 /** Filter URLs matching API-relevant patterns */
@@ -127,12 +133,18 @@ async function fetchSitemapBody(
     const response = await httpGetBytes(url, {
       timeout,
       maxBodyBytes: MAX_BODY_BYTES,
-      headers: { Accept: "application/xml, application/gzip, */*" },
+      headers: { Accept: "application/xml, application/gzip, */*", "Accept-Encoding": "identity" },
     });
     if (!response.ok) return { ok: false, budgetExhausted: response.error.kind === "request_budget_exhausted" };
 
     // maxOutputLength makes zlib throw before allocating a decompression
     // bomb (a 1 MiB gzip body can otherwise expand ~1000x in memory).
+    // Fetch already decodes HTTP Content-Encoding. A server may serve either a
+    // gzip file or XML with that content encoding at the same .gz URL.
+    if (response.headers["content-encoding"]?.toLowerCase().includes("gzip") &&
+        !(response.body[0] === 0x1f && response.body[1] === 0x8b)) {
+      return { ok: true, body: new TextDecoder().decode(response.body) };
+    }
     const decompressed = gunzipSync(response.body, { maxOutputLength: MAX_DECOMPRESSED_BYTES });
     return { ok: true, body: decompressed.toString("utf-8") };
   } catch {
@@ -168,11 +180,13 @@ export async function checkSitemap(
   for (const path of SITEMAP_PATHS) {
     probeUrls.add(new URL(path, baseUrl).href);
   }
+  const origin = new URL(baseUrl).origin;
   for (const url of robotsSitemapUrls) {
     try {
       const parsed = new URL(url);
-      if (parsed.origin === new URL(baseUrl).origin) {
+      if (parsed.origin === origin) {
         probeUrls.add(parsed.href);
+        if (probeUrls.size >= SITEMAP_PATHS.length + MAX_ROBOTS_SITEMAPS) break;
       }
     } catch {
       // Skip invalid URLs
@@ -197,13 +211,13 @@ export async function checkSitemap(
     const response = responses[i];
     if (!response.ok) { budgetExhausted ||= response.budgetExhausted === true; continue; }
 
-    // Verify it looks like XML
-    if (!/<[^>]+>/.test(response.body)) continue;
+    const root = sitemapRoot(response.body);
+    if (!root) continue;
 
     const probePath = new URL(probeUrlArray[i]).pathname;
     sitemapPaths.push(probePath);
 
-    if (isSitemapIndex(response.body)) {
+    if (root === "sitemapindex") {
       isIndex = true;
       // Sitemap index — follow child sitemaps
       const childUrls = filterSameOrigin(
@@ -221,6 +235,10 @@ export async function checkSitemap(
         for (const childResponse of childResponses) {
           if (!childResponse.ok) {
             budgetExhausted ||= childResponse.budgetExhausted === true;
+            childFailed++;
+            continue;
+          }
+          if (sitemapRoot(childResponse.body) !== "urlset") {
             childFailed++;
             continue;
           }

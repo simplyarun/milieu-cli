@@ -83,6 +83,27 @@ describe("checkRateLimitHeaders", () => {
   });
 });
 
+describe("OpenAPI-derived requests", () => {
+  it("ignores non-path keys and falls back to the scanned origin", async () => {
+    mockHttpGet.mockReset().mockResolvedValue(makeSuccess(""));
+    const ctx = makeCtx({ shared: { openApiSpec: {
+      paths: { "x-vendor-extension": { get: { security: [{ apiKey: [] }] } } },
+    } } });
+    await checkRateLimitHeaders(ctx);
+    await checkAuthLegibility(ctx);
+    expect(mockHttpGet.mock.calls.map(([url]) => url)).toEqual([ctx.baseUrl + "/api", ctx.baseUrl + "/api"]);
+  });
+
+  it("skips invalid parameter lists and path templates when choosing a rate-limit probe", async () => {
+    mockHttpGet.mockReset().mockResolvedValue(makeSuccess(""));
+    const ctx = makeCtx({ shared: { openApiSpec: {
+      paths: { "/legacy": { get: { parameters: {} } }, "/users/{id}": { get: {} }, "/list": { get: {} } },
+    } } });
+    await checkRateLimitHeaders(ctx);
+    expect(mockHttpGet.mock.calls[0][0]).toBe(ctx.baseUrl + "/list");
+  });
+});
+
 describe("checkAuthLegibility (reachable rejections)", () => {
   beforeEach(() => mockHttpGet.mockReset());
 
@@ -171,6 +192,10 @@ describe("checkAuthLegibility", () => {
 });
 
 describe("extractTosUrl", () => {
+  it("accepts path segments and ignores unrelated words or query parameters", () => {
+    expect(extractTosUrl("https://example.com/termstore https://example.com/?next=/terms")).toBeNull();
+    expect(extractTosUrl("https://example.com/tos?lang=en")).toBe("https://example.com/tos?lang=en");
+  });
   it("extracts clean URL with /terms as path segment", () => {
     expect(extractTosUrl("See https://example.com/terms for details")).toBe("https://example.com/terms");
   });

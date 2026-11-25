@@ -119,8 +119,8 @@ export const CHECK_EXPLANATIONS: Record<string, ExplanationEntry> = {
     "security.txt tells AI agents and automated systems how to report security issues. Its presence signals operational maturity.",
   standards_a2a_agent_card: {
     pass: "Your A2A Agent Card lets other AI agents discover your agent's capabilities and communication protocols.",
-    fail: "No A2A Agent Card found — other AI agents can't discover your agent at /.well-known/agent.json.",
-    default: "The A2A Agent Card (/.well-known/agent.json) is Google's standard for agent-to-agent capability discovery.",
+    fail: "Publish an A2A Agent Card at /.well-known/agent-card.json so other agents can discover your agent.",
+    default: "The A2A Agent Card at /.well-known/agent-card.json describes the capabilities your agent offers.",
   },
 
   // Bridge 3: Separation

@@ -63,6 +63,11 @@ describe("checkSchemaOrg", () => {
     expect(data.sources).toEqual(["json-ld", "microdata"]);
   });
 
+  it("matches the context host rather than names elsewhere in a URL", () => {
+    const check = makeJsonLdCheck("pass", [{ type: "Organization", context: "https://example.org/schema.org" }]);
+    expect(checkSchemaOrg("", check).status).toBe("fail");
+  });
+
   it("returns fail when JSON-LD has non-schema.org @context", () => {
     const jsonLdCheck = makeJsonLdCheck("pass", [
       { type: "Thing", context: "https://example.org/vocab" },

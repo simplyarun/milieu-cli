@@ -130,6 +130,18 @@ describe("isPrivateIp", () => {
     expect(isPrivateIp("::ffff:8.8.8.8")).toBe(false);
   });
 
+  it.each([
+    "0:0:0:0:0:0:0:1", "fe9f::1", "febf::1", "::ffff:a00:1",
+    "0:0:0:0:0:ffff:7f00:1", "64:ff9b::7f00:1", "ff02::1",
+    "224.0.0.1", "255.255.255.255",
+  ])("blocks private and special-use address %s", (ip) => {
+    expect(isPrivateIp(ip)).toBe(true);
+  });
+
+  it("permits a public IPv4 destination on a NAT64 network", () => {
+    expect(isPrivateIp("64:ff9b::808:808")).toBe(false);
+  });
+
   // --- IPv6 documentation / public ---
   it("returns false for 2001:db8::1 (documentation, not blocked)", () => {
     expect(isPrivateIp("2001:db8::1")).toBe(false);
@@ -193,6 +205,26 @@ describe("validateDns", () => {
     const result = await validateDns("127.0.0.1", cache);
     expect(result.safe).toBe(false);
     expect(mockLookup).not.toHaveBeenCalled();
+  });
+
+  it("validates bracketed IPv6 literals without DNS or cache overrides", async () => {
+    cache.set("[::1]", "8.8.8.8");
+    expect((await validateDns("[::1]", cache)).safe).toBe(false);
+    expect(await validateDns("[2606:4700:4700::1111]", cache)).toEqual({
+      safe: true, ip: "2606:4700:4700::1111",
+    });
+    expect(mockLookup).not.toHaveBeenCalled();
+  });
+
+  it("clears the DNS deadline after a successful lookup", async () => {
+    vi.useFakeTimers();
+    try {
+      mockLookup.mockResolvedValueOnce([{ address: "8.8.8.8", family: 4 }]);
+      await validateDns("example.org", cache);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("uses cache hit instead of calling dns.lookup", async () => {

@@ -7,7 +7,7 @@ export interface HttpsCheckResult {
   abortReason?: string;
 }
 
-const ABORT_ERRORS = new Set(["dns", "connection_refused", "ssl_error"]);
+const ABORT_ERRORS = new Set(["dns", "connection_refused", "ssl_error", "ssrf_blocked"]);
 
 /**
  * Check HTTPS availability via HEAD request to https://<domain>.
@@ -24,7 +24,7 @@ export async function checkHttps(
     timeout,
   });
 
-  if (result.ok) {
+  if (result.ok || result.response) {
     return {
       check: {
         id: "https_available",

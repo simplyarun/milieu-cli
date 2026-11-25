@@ -11,8 +11,8 @@ function findSimpleGetPath(spec: ParsedOpenApiSpec | undefined): string | null {
   const ops = collectOperations(spec);
   for (const [path, method, op] of ops) {
     if (method !== "get") continue;
-    const hasRequiredParams = op.parameters?.some((p) => p.required) ?? false;
-    if (!hasRequiredParams) return path;
+    if (path.includes("{")) continue;
+    if (op.parameters == null || (Array.isArray(op.parameters) && op.parameters.every((p) => p && !p.required))) return path;
   }
   return null;
 }

@@ -9,140 +9,88 @@ export type SsrfResult =
   | { safe: true; ip: string }
   | { safe: false; error: string; ip?: string };
 
-// ---------------------------------------------------------------------------
-// IPv4 private/reserved range checks
-// ---------------------------------------------------------------------------
-
-function isPrivateIPv4(ip: string): boolean {
-  const parts = ip.split(".").map(Number);
-  if (parts.length !== 4 || parts.some((p) => isNaN(p))) return false;
-
-  const [a, b] = parts;
-
-  // 10.0.0.0/8
-  if (a === 10) return true;
-  // 172.16.0.0/12 (172.16.x.x - 172.31.x.x)
-  if (a === 172 && b >= 16 && b <= 31) return true;
-  // 192.168.0.0/16
-  if (a === 192 && b === 168) return true;
-  // 127.0.0.0/8 (loopback)
-  if (a === 127) return true;
-  // 0.0.0.0/8
-  if (a === 0) return true;
-  // 169.254.0.0/16 (link-local, includes AWS metadata 169.254.169.254)
-  if (a === 169 && b === 254) return true;
-  // 100.64.0.0/10 (CGNAT: 100.64.x.x - 100.127.x.x)
-  if (a === 100 && b >= 64 && b <= 127) return true;
-
-  return false;
+// BlockList compares address bytes. Its IPv4 rules also match IPv4-mapped
+// IPv6 addresses in either dotted or hexadecimal notation.
+const blocked = new net.BlockList();
+for (const [address, prefix] of [
+  ["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10],
+  ["127.0.0.0", 8], ["169.254.0.0", 16], ["172.16.0.0", 12],
+  ["192.168.0.0", 16], ["198.18.0.0", 15],
+  ["224.0.0.0", 4], ["240.0.0.0", 4],
+] as const) {
+  blocked.addSubnet(address, prefix, "ipv4");
+  // The well-known NAT64 prefix embeds an IPv4 destination in the low 32 bits.
+  blocked.addSubnet(`64:ff9b::${address}`, 96 + prefix, "ipv6");
+}
+for (const [address, prefix] of [
+  ["::", 96],           // Unspecified, loopback and IPv4-compatible addresses
+  ["64:ff9b:1::", 48],  // Local-use NAT64 networks
+  ["2001::", 32],       // Teredo
+  ["2002::", 16],       // 6to4
+  ["fc00::", 7],        // Unique local
+  ["fe80::", 10],       // Link local
+  ["fec0::", 10],       // Deprecated site local
+  ["ff00::", 8],        // Multicast
+] as const) {
+  blocked.addSubnet(address, prefix, "ipv6");
 }
 
-// ---------------------------------------------------------------------------
-// IPv6 private/reserved range checks
-// ---------------------------------------------------------------------------
-
-function isPrivateIPv6(ip: string): boolean {
-  const lower = ip.toLowerCase();
-
-  // IPv4-mapped IPv6 (::ffff:x.x.x.x) -- extract and check IPv4 portion
-  if (lower.startsWith("::ffff:")) {
-    const v4Part = lower.slice(7);
-    if (net.isIPv4(v4Part)) return isPrivateIPv4(v4Part);
-  }
-
-  // ::1 loopback
-  if (lower === "::1") return true;
-  // :: unspecified
-  if (lower === "::") return true;
-  // fe80::/10 link-local
-  if (lower.startsWith("fe80:")) return true;
-  // fc00::/7 unique local address (fc00:: and fd00::)
-  if (lower.startsWith("fc") || lower.startsWith("fd")) return true;
-
-  return false;
-}
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-
-/**
- * Check whether an IP address falls in a private/reserved range.
- *
- * Covers all RFC 1918 ranges, loopback, link-local, CGNAT, IPv6 ULA,
- * and IPv4-mapped IPv6 addresses.
- */
 export function isPrivateIp(ip: string): boolean {
-  if (net.isIPv4(ip)) return isPrivateIPv4(ip);
-  if (net.isIPv6(ip)) return isPrivateIPv6(ip);
-  return false;
+  if (net.isIPv4(ip)) return blocked.check(ip, "ipv4");
+  if (!net.isIPv6(ip)) return false;
+  return blocked.check(ip, "ipv6");
+}
+
+function validateAddress(ip: string): SsrfResult {
+  if (!net.isIP(ip)) return { safe: false, error: "DNS resolution failed: invalid address" };
+  if (isPrivateIp(ip)) {
+    return { safe: false, error: `Hostname resolves to private address ${ip}`, ip };
+  }
+  return { safe: true, ip };
 }
 
 /**
  * Validate that a hostname does not resolve to a private/reserved IP.
  *
- * - Checks cache first (scan-scoped, avoids duplicate lookups)
+ * - Reuses cached hostname lookups for the duration of a scan
  * - Skips DNS if hostname is already an IP literal
  * - Resolves ALL addresses and rejects if ANY is private
  * - Caches the first resolved IP on success
- * - Uses a 3-second DNS timeout via AbortSignal
+ * - Uses a 3-second DNS deadline
  */
 export async function validateDns(
   hostname: string,
   cache: DnsCache,
 ): Promise<SsrfResult> {
-  // Check cache first
+  // URL.hostname encloses IPv6 literals in brackets. A literal is the
+  // socket destination even when a cached DNS entry happens to exist.
+  const literal = hostname.startsWith("[") && hostname.endsWith("]")
+    ? hostname.slice(1, -1)
+    : hostname;
+  if (net.isIP(literal)) return validateAddress(literal);
+
   const cached = cache.get(hostname);
-  if (cached !== undefined) {
-    if (isPrivateIp(cached)) {
-      return {
-        safe: false,
-        error: `Hostname resolves to private address ${cached}`,
-        ip: cached,
-      };
-    }
-    return { safe: true, ip: cached };
-  }
+  if (cached !== undefined) return validateAddress(cached);
 
-  // If hostname is already an IP literal, skip DNS lookup
-  if (net.isIP(hostname) !== 0) {
-    if (isPrivateIp(hostname)) {
-      return {
-        safe: false,
-        error: `Hostname resolves to private address ${hostname}`,
-        ip: hostname,
-      };
-    }
-    return { safe: true, ip: hostname };
-  }
-
-  // DNS resolution with 3-second timeout
+  let timer: NodeJS.Timeout | undefined;
   try {
-    const DNS_TIMEOUT_MS = 3000;
-    const lookupPromise = dns.lookup(hostname, { all: true });
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("DNS lookup timed out")), DNS_TIMEOUT_MS),
-    );
-    const records = await Promise.race([lookupPromise, timeoutPromise]);
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("DNS lookup timed out")), 3000);
+    });
+    const records = await Promise.race([dns.lookup(hostname, { all: true }), deadline]);
+    if (records.length === 0) return { safe: false, error: "DNS resolution failed: no addresses" };
 
-    // Check ALL resolved addresses -- reject if ANY is private
     for (const record of records) {
-      if (isPrivateIp(record.address)) {
-        return {
-          safe: false,
-          error: `Hostname resolves to private address ${record.address}`,
-          ip: record.address,
-        };
-      }
+      const result = validateAddress(record.address);
+      if (!result.safe) return result;
     }
-
-    // Cache the first resolved IP
     const ip = records[0].address;
     cache.set(hostname, ip);
-
     return { safe: true, ip };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { safe: false, error: `DNS resolution failed: ${message}` };
+  } finally {
+    clearTimeout(timer);
   }
 }

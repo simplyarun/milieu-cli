@@ -34,6 +34,14 @@ describe("checkHttps", () => {
     expect(result.abort).toBe(false);
   });
 
+  it("recognizes working HTTPS even when the server rejects HEAD", async () => {
+    mockHttpGet.mockResolvedValue({
+      ok: false, error: { kind: "http_error", statusCode: 405, message: "Method not allowed", url: "https://example.com" },
+      response: { status: 405, headers: {}, body: "" },
+    });
+    expect((await checkHttps("example.com")).check.status).toBe("pass");
+  });
+
   it("aborts on DNS failure", async () => {
     mockHttpGet.mockResolvedValue({
       ok: false,

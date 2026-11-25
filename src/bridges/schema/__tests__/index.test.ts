@@ -54,6 +54,17 @@ describe("runSchemaBridge", () => {
     ]);
   });
 
+  it("grades remaining fields when a remote spec has malformed parameters or properties", async () => {
+    const spec = { paths: {
+      "/users": { get: { parameters: {} }, post: {
+        parameters: [null, { in: "query", description: "Name filter" }],
+        requestBody: { content: { "application/json": { schema: { properties: { name: null } } } } },
+      } },
+    } };
+    const result = await runSchemaBridge(makeCtx(spec));
+    expect(result.checks.find(c => c.id === "schema_descriptions")?.data).toEqual({ sampled: 2, withDescription: 1 });
+  });
+
   it("returns high score for well-formed spec", async () => {
     const result = await runSchemaBridge(makeCtx(FULL_SPEC));
     expect(result.score).toBeGreaterThanOrEqual(80);

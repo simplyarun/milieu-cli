@@ -51,7 +51,7 @@ export interface BridgeResult {
   id: BridgeId;
   /** Bridge name */
   name: BridgeName;
-  /** Whether this bridge was evaluated or is a stub */
+  /** Whether this bridge ran or was skipped after a fatal reachability error */
   status: BridgeStatus;
   /** Score 0-100 for scored bridges (1, 2, 4, 5), null for detection-only (3) */
   score: number | null;
@@ -61,11 +61,11 @@ export interface BridgeResult {
   checks: Check[];
   /** Time in milliseconds to evaluate this bridge */
   durationMs: number;
-  /** Human-readable message for stubs (bridges 4-5) */
+  /** Optional message about the bridge's evaluation */
   message?: string;
   /** If true, scan should abort -- no further bridges attempted */
   abort?: boolean;
-  /** Reason for abort (dns, connection_refused, ssl_error) */
+  /** Network error that stopped the scan */
   abortReason?: string;
 }
 

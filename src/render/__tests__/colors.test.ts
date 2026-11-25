@@ -10,6 +10,7 @@ function hasAnsi(text: string): boolean {
 
 describe("color functions (default, colors enabled)", () => {
   beforeEach(() => {
+    vi.stubEnv("NO_COLOR", undefined);
     vi.stubEnv("FORCE_COLOR", "1");
     vi.resetModules();
   });
@@ -103,6 +104,7 @@ describe("with NO_COLOR=1", () => {
 describe("with NO_COLOR empty string", () => {
   beforeEach(() => {
     vi.stubEnv("NO_COLOR", "");
+    vi.stubEnv("FORCE_COLOR", "1");
     vi.resetModules();
   });
 

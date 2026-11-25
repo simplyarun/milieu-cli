@@ -18,6 +18,18 @@ export interface NormalizeUrlErr {
 /** Discriminated union result -- never throws */
 export type NormalizeUrlResult = NormalizeUrlOk | NormalizeUrlErr;
 
+/** Only HTTP(S) requests without URL credentials are valid scan targets. */
+export function parseHttpUrl(input: string, base?: string): URL {
+  const url = new URL(input, base);
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new TypeError("Expected an HTTP or HTTPS URL");
+  }
+  if (url.username || url.password) {
+    throw new TypeError("URL credentials are unsupported");
+  }
+  return url;
+}
+
 /**
  * Normalize a user-provided URL string into a fully-qualified URL.
  *
@@ -27,6 +39,7 @@ export type NormalizeUrlResult = NormalizeUrlOk | NormalizeUrlErr;
  * - Returns a discriminated union -- never throws
  */
 export function normalizeUrl(input: string): NormalizeUrlResult {
+  if (typeof input !== "string") return { ok: false, error: "Expected a URL string" };
   const trimmed = input.trim();
 
   if (trimmed === "") {
@@ -36,7 +49,9 @@ export function normalizeUrl(input: string): NormalizeUrlResult {
   let raw = trimmed;
 
   // Add protocol if missing
-  if (!raw.startsWith("http://") && !raw.startsWith("https://")) {
+  const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(raw);
+  const isHostWithPort = /^[^/?#:@]+:\d+(?:[/?#]|$)/.test(raw);
+  if (!hasScheme || isHostWithPort) {
     // Strip leading // if present (protocol-relative)
     if (raw.startsWith("//")) {
       raw = raw.slice(2);
@@ -45,7 +60,7 @@ export function normalizeUrl(input: string): NormalizeUrlResult {
   }
 
   try {
-    const url = new URL(raw);
+    const url = parseHttpUrl(raw);
     return {
       ok: true,
       href: url.href,
@@ -53,7 +68,7 @@ export function normalizeUrl(input: string): NormalizeUrlResult {
       baseUrl: url.origin,
     };
   } catch {
-    return { ok: false, error: `Invalid URL: ${trimmed}` };
+    return { ok: false, error: "Invalid URL. Provide an HTTP or HTTPS address without credentials." };
   }
 }
 
@@ -99,9 +114,9 @@ export function resolveRedirectUrl(
   }
 
   try {
-    const resolved = new URL(trimmed, currentUrl).href;
+    const resolved = parseHttpUrl(trimmed, currentUrl).href;
     return { ok: true, url: resolved };
   } catch {
-    return { ok: false, error: `Invalid redirect URL: ${trimmed}` };
+    return { ok: false, error: "Invalid redirect URL" };
   }
 }
