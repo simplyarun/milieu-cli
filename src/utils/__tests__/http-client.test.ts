@@ -383,6 +383,12 @@ describe("httpGet", () => {
       }
     });
 
+    it("preserves partial body coverage on a 401 response", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse({ status: 401, body: '{"error":"unauthorized"}' }));
+      const result = await httpGet("https://example.com/protected", { maxBodyBytes: 8 });
+      expect(result).toMatchObject({ ok: false, response: { status: 401, bodyIncomplete: true, body: '{"error"' } });
+    });
+
     it("attaches the response (status/headers/body) to a 4xx failure", async () => {
       // A 401 is a reachable, gradeable rejection — its headers and body must
       // survive so auth-legibility / rate-limit checks can inspect them.
@@ -769,6 +775,7 @@ describe("httpGet", () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.body.length).toBe(100);
+        expect(result.bodyIncomplete).toBe(true);
       }
     });
 
@@ -905,6 +912,7 @@ describe("httpGet", () => {
       const result = await httpGet("https://example.com", { timeout: 200 });
       expect(result.ok).toBe(true);
       if (result.ok) {
+        expect(result.bodyIncomplete).toBe(true);
         // Should get the first chunk that arrived before timeout
         expect(result.body).toBe("fast-data");
       }

@@ -63,8 +63,10 @@ The following are **not** considered vulnerabilities for this project:
 
 ## Security-Relevant Design Decisions
 
-- **No code execution** — responses are parsed as text/JSON only; no `eval`, no script execution, no dynamic `import()`
+- **Response parsing.** Milieu reads text, JSON, bounded YAML and HTML. Parsing HTML does not execute page scripts. Schema reference resolution stays within the inspected document.
 - **No secrets or credentials** — milieu-cli does not use API keys, tokens, or any form of authentication
 - **No persistent storage** — no databases, no caches on disk, no config files written
-- **Runtime dependencies.** The CLI uses `chalk`, `commander`, and `ora`. The HTTP client uses `undici` for fetching and connection pinning.
+- **Runtime dependencies.** The CLI uses `chalk`, `commander` and `ora`. The HTTP client uses `undici` for fetching and connection pinning. `js-yaml` reads YAML documents, and `parse5` parses HTML link evidence.
+- **Registry discovery.** When direct OpenAPI discovery is unsuccessful, Milieu can send the scanned hostname to the public APIs.guru registry.
+- **Saved reports.** Raw scan JSON and detailed local comparisons can contain original URLs, response-derived text and internal resource names. The shareable Markdown renderer selects structured evidence and limits output size. Check any origins or resource names before posting publicly.
 - **No network listeners** — the tool is purely an outbound client; it never binds to a port

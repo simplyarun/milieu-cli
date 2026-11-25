@@ -131,8 +131,22 @@ describe("checkOpenApi", () => {
       specType: "openapi",
       endpointCount: 5,
       path: "/openapi.json",
+      documentUrl: "https://example.com/openapi.json",
     });
     expect(result.detected).toBe(true);
+  });
+
+  it("records the final document identity after a redirect and omits private URL components", async () => {
+    mockHttpGet.mockResolvedValue(make404()).mockResolvedValueOnce(makeSuccess({
+      url: "https://user:password@docs.example.net:8443/spec/v1.json?revision=private#fragment",
+      redirects: ["https://example.com/openapi.json"],
+      body: makeOpenApiJson(),
+    }));
+    const { check } = await checkOpenApi("https://example.com");
+    expect(check.data).toMatchObject({
+      path: "/openapi.json", documentUrl: "https://docs.example.net:8443/spec/v1.json", documentHasQuery: true,
+    });
+    expect(JSON.stringify(check)).not.toMatch(/user:password|revision|private|fragment/);
   });
 
   it('returns pass with specType "swagger" for valid Swagger 2.0 JSON spec', async () => {
@@ -160,7 +174,7 @@ describe("checkOpenApi", () => {
     expect(result.detected).toBe(true);
   });
 
-  it("returns partial for YAML spec with version extracted via regex", async () => {
+  it("returns a parsed YAML spec with the same evidence as a JSON spec", async () => {
     const body = makeYamlBody("3.0.2");
 
     mockHttpGet.mockImplementation(async (url: string) => {
@@ -175,8 +189,8 @@ describe("checkOpenApi", () => {
     });
 
     const result = await checkOpenApi("https://example.com");
-    expect(result.check.status).toBe("partial");
-    expect(result.check.detail).toContain("YAML format");
+    expect(result.check.status).toBe("pass");
+    expect(result.parsedSpec).toMatchObject({ paths: { "/users": { get: { summary: "List users" } } } });
     expect(result.check.detail).toContain("3.0.2");
     expect(result.check.data).toMatchObject({
       version: "3.0.2",
@@ -184,6 +198,43 @@ describe("checkOpenApi", () => {
       path: "/api-docs",
     });
     expect(result.detected).toBe(true);
+  });
+
+  it("accepts ordinary reusable YAML definitions through anchors and aliases", async () => {
+    const body = "openapi: 3.1.0\npaths:\n  /users: &list { get: { operationId: list } }\n  /members: *list";
+    mockHttpGet.mockResolvedValue(make404()).mockResolvedValueOnce(makeSuccess({
+      headers: { "content-type": "application/yaml" }, body,
+    }));
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("pass");
+    expect(result.parsedSpec).toMatchObject({ paths: { "/members": { get: { operationId: "list" } } } });
+  });
+
+  it("rejects expanded YAML trees above the node limit even with only a few aliases", async () => {
+    const values = Array(20_000).fill("1").join(", ");
+    const body = `openapi: 3.1.0\npaths: {}\nx-values: &values [${values}]\nx-copy: [*values, *values, *values, *values]`;
+    mockHttpGet.mockResolvedValue(make404()).mockResolvedValueOnce(makeSuccess({
+      headers: { "content-type": "application/yaml" }, body,
+    }));
+    expect((await checkOpenApi("https://example.com")).detected).toBe(false);
+  });
+
+  it.each([
+    ["malformed document", "paths: [unterminated"],
+    ["wrong paths shape", "paths: []"],
+    ["custom tag", "paths: !custom {}"],
+    ["cyclic alias", "paths: &paths { /users: *paths }"],
+    ["excessive aliases", "paths: {}\nx-item: &entry 1\nx-list: [" + Array(65).fill("*entry").join(", ") + "]"],
+    ["multiple documents", "paths: {}\n---\nopenapi: 3.0.0"],
+    ["excessive depth", "paths: {}\nx-deep: " + "[".repeat(110) + "]".repeat(110)],
+  ])("does not pass YAML with %s", async (_label, payload) => {
+    mockHttpGet.mockResolvedValue(make404()).mockResolvedValueOnce(makeSuccess({
+      headers: { "content-type": "application/yaml" },
+      body: "openapi: 3.1.0\n" + payload,
+    }));
+    const result = await checkOpenApi("https://example.com");
+    expect(result.detected).toBe(false);
+    expect(result.parsedSpec).toBeNull();
   });
 
   it("rejects HTML response at /swagger (Content-Type text/html) -- returns fail", async () => {
@@ -298,16 +349,16 @@ describe("checkOpenApi", () => {
     expect(result.detected).toBe(true);
   });
 
-  it("probes exactly 24 paths then falls through to APIs.guru", async () => {
+  it("probes exactly 24 paths then falls through to the API catalog and registry", async () => {
     mockHttpGet.mockResolvedValue(make404());
 
     await checkOpenApi("https://example.com");
 
-    // 17 spec paths + 7 doc UI paths + 1 APIs.guru lookup = 25
-    expect(mockHttpGet).toHaveBeenCalledTimes(25);
+    // 17 spec paths + 7 doc UI paths + 1 catalog + 1 registry lookup = 26
+    expect(mockHttpGet).toHaveBeenCalledTimes(26);
   });
 
-  it("fires all 24 path probes in parallel via Promise.all, then APIs.guru sequentially", async () => {
+  it("fires all 24 path probes in parallel, then checks the API catalog and registry", async () => {
     const callOrder: string[] = [];
     let resolveCount = 0;
 
@@ -319,10 +370,11 @@ describe("checkOpenApi", () => {
 
     await checkOpenApi("https://example.com");
 
-    // 24 parallel probes + 1 sequential APIs.guru lookup
-    expect(callOrder).toHaveLength(25);
-    expect(resolveCount).toBe(25);
-    expect(callOrder[24]).toContain("apis.guru");
+    // 24 parallel probes followed by the API catalog and registry
+    expect(callOrder).toHaveLength(26);
+    expect(resolveCount).toBe(26);
+    expect(callOrder[24]).toContain("/.well-known/api-catalog");
+    expect(callOrder[25]).toContain("apis.guru");
   });
 
   it("rejects application/xhtml+xml Content-Type as HTML", async () => {
@@ -375,7 +427,7 @@ describe("checkOpenApi", () => {
     }
   });
 
-  it("returns partial for Swagger 2.0 YAML spec", async () => {
+  it("returns pass for Swagger 2.0 YAML spec", async () => {
     const yamlBody = `swagger: "2.0"
 info:
   title: Test
@@ -396,7 +448,7 @@ paths:
     });
 
     const result = await checkOpenApi("https://example.com");
-    expect(result.check.status).toBe("partial");
+    expect(result.check.status).toBe("pass");
     expect(result.check.data).toMatchObject({
       specType: "swagger",
       version: "2.0",
@@ -484,7 +536,7 @@ paths:
     });
 
     const result = await checkOpenApi("https://example.com");
-    expect(result.check.status).toBe("partial");
+    expect(result.check.status).toBe("pass");
     expect(result.check.data).toMatchObject({ endpointCount: 3 });
   });
 
@@ -509,7 +561,7 @@ paths:
     });
 
     const result = await checkOpenApi("https://example.com");
-    expect(result.check.status).toBe("partial");
+    expect(result.check.status).toBe("pass");
     expect(result.check.data).toMatchObject({
       specType: "openapi",
       version: "3.1.0",
@@ -563,7 +615,7 @@ paths:
     });
 
     const result = await checkOpenApi("https://example.com");
-    expect(result.check.status).toBe("partial");
+    expect(result.check.status).toBe("pass");
     expect(result.check.data).toMatchObject({
       specType: "openapi",
       version: "3.0.1",
@@ -648,7 +700,7 @@ paths:
     });
 
     const result = await checkOpenApi("https://example.com");
-    expect(result.check.status).toBe("fail");
+    expect(result.check.status).toBe("error");
     expect(result.detected).toBe(false);
   });
 
@@ -669,8 +721,17 @@ paths:
     });
 
     const result = await checkOpenApi("https://example.com");
-    expect(result.check.status).toBe("fail");
+    expect(result.check.status).toBe("error");
     expect(result.detected).toBe(false);
+  });
+
+  it("does not grade a truncated but syntactically valid contract", async () => {
+    mockHttpGet.mockResolvedValue(make404()).mockResolvedValueOnce(
+      makeSuccess({ body: makeOpenApiJson(), bodyIncomplete: true }),
+    );
+    const result = await checkOpenApi("https://example.com");
+    expect(result.check.status).toBe("error");
+    expect(result.parsedSpec).toBeNull();
   });
 
   // --- HTML Spec Extraction Tests ---
@@ -747,7 +808,7 @@ paths:
     });
 
     const result = await checkOpenApi("https://example.com");
-    expect(result.check.status).toBe("partial");
+    expect(result.check.status).toBe("pass");
     expect(result.detected).toBe(true);
     expect(result.check.data).toMatchObject({
       version: "3.0.2",
@@ -793,8 +854,8 @@ paths:
 
     await checkOpenApi("https://example.com");
 
-    // 24 primary probes + 1 APIs.guru lookup (no secondary fetch for /openapi.json)
-    expect(mockHttpGet).toHaveBeenCalledTimes(25);
+    // 24 primary probes + catalog and registry lookups (no secondary fetch for /openapi.json)
+    expect(mockHttpGet).toHaveBeenCalledTimes(26);
   });
 
   it("cross-origin extracted URL is rejected, not fetched", async () => {
@@ -814,8 +875,8 @@ paths:
 
     await checkOpenApi("https://example.com");
 
-    // 24 primary probes + 1 APIs.guru lookup (no secondary fetch for cross-origin URL)
-    expect(mockHttpGet).toHaveBeenCalledTimes(25);
+    // 24 primary probes + catalog and registry lookups (no secondary fetch for cross-origin URL)
+    expect(mockHttpGet).toHaveBeenCalledTimes(26);
   });
 
   it("max 3 secondary fetches enforced", async () => {
@@ -841,8 +902,8 @@ swaggerUrl: "/custom2/spec.json"
 
     await checkOpenApi("https://example.com");
 
-    // 24 primary + 3 secondary (capped) + 1 APIs.guru lookup
-    expect(mockHttpGet).toHaveBeenCalledTimes(28);
+    // 24 primary + 3 secondary (capped) + catalog and registry lookups
+    expect(mockHttpGet).toHaveBeenCalledTimes(29);
   });
 
   // --- APIs.guru Registry Tests ---
@@ -940,7 +1001,7 @@ swaggerUrl: "/custom2/spec.json"
 
   // --- Path Expansion Tests ---
 
-  it("finds YAML spec at /openapi.yaml", async () => {
+  it("finds a YAML spec served as plain text at /openapi.yaml", async () => {
     const yamlBody = `openapi: "3.0.0"
 info:
   title: YAML Test
@@ -953,7 +1014,7 @@ paths:
       if (url.endsWith("/openapi.yaml")) {
         return makeSuccess({
           url,
-          headers: { "content-type": "application/yaml" },
+          headers: { "content-type": "text/plain" },
           body: yamlBody,
         });
       }
@@ -961,7 +1022,7 @@ paths:
     });
 
     const result = await checkOpenApi("https://example.com");
-    expect(result.check.status).toBe("partial");
+    expect(result.check.status).toBe("pass");
     expect(result.check.data).toMatchObject({
       version: "3.0.0",
       path: "/openapi.yaml",
@@ -1079,7 +1140,9 @@ SwaggerUIBundle({ url: defaultUrl })`;
       if (url.includes("apis.guru")) continue;
 
       const path = new URL(url).pathname;
-      if (docUiPaths.includes(path)) {
+      if (path === "/.well-known/api-catalog") {
+        expect(opts.headers?.Accept).toBe("application/linkset+json");
+      } else if (docUiPaths.includes(path)) {
         expect(opts.headers?.Accept).toBe("text/html, */*");
       } else {
         expect(opts.headers?.Accept).toBe("application/json, application/yaml, */*");
@@ -1161,6 +1224,27 @@ SwaggerUIBundle({ url: defaultUrl })`;
     mockHttpGet.mockResolvedValueOnce(makeSuccess({ body: spec }));
     const result = await checkOpenApi("https://example.com");
     expect(result.hasCallbacks).toBe(false);
+  });
+
+  it("preserves a declared callback when a 3.1 operation moves into a referenced path item", async () => {
+    const subscribe = { post: { callbacks: {
+      onEvent: { "{$request.body#/callbackUrl}": { post: { responses: { "200": { description: "Received" } } } } },
+    }, responses: { "200": { description: "Subscribed" } } } };
+    mockHttpGet.mockResolvedValue(make404());
+    for (const item of [subscribe, { $ref: "#/components/pathItems/Subscribe" }]) {
+      const body = JSON.stringify({ openapi: "3.1.0", info: { title: "Subscriptions", version: "1" },
+        components: { pathItems: { Subscribe: subscribe } }, paths: { "/subscribe": item } });
+      mockHttpGet.mockResolvedValueOnce(makeSuccess({ body }));
+      expect((await checkOpenApi("https://example.com")).hasCallbacks).toBe(true);
+    }
+  });
+
+  it("requires a named callback on an operation", async () => {
+    const body = makeOpenApiJson("3.1.0", { "/subscribe": {
+      post: { callbacks: {} }, "x-notes": { callbacks: { unused: {} } },
+    } });
+    mockHttpGet.mockResolvedValue(make404()).mockResolvedValueOnce(makeSuccess({ body }));
+    expect((await checkOpenApi("https://example.com")).hasCallbacks).toBe(false);
   });
 
   it("returns both hasWebhooks and hasCallbacks true when spec has both", async () => {
@@ -1245,6 +1329,109 @@ paths:
     const result = await checkOpenApi("https://example.com");
     expect(result.hasWebhooks).toBe(false);
     expect(result.hasCallbacks).toBe(false);
+  });
+});
+
+describe("OpenAPI discovery from an API catalog", () => {
+  const origin = "https://example.com";
+  const catalogUrl = origin + "/.well-known/api-catalog";
+  function catalog(body: unknown): HttpSuccess {
+    return makeSuccess({
+      url: catalogUrl,
+      body: JSON.stringify(body),
+      headers: { "content-type": 'application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"' },
+    });
+  }
+  const targets = (links: unknown[]) => ({ linkset: [{ anchor: origin, "service-desc": links }] });
+
+  beforeEach(() => mockHttpGet.mockReset());
+
+  it("validates same-origin service-desc links and reports the source without consulting the registry", async () => {
+    const specUrl = origin + "/published/contract";
+    mockHttpGet.mockImplementation(async url => {
+      if (url === catalogUrl) return catalog(targets([
+        { href: "/openapi.json" }, { href: specUrl + "#section" }, { href: specUrl },
+      ]));
+      if (url === specUrl) return makeSuccess({ url, body: makeOpenApiJson() });
+      return make404();
+    });
+    const result = await checkOpenApi(origin);
+    expect(result.check.status).toBe("pass");
+    expect(result.check.data).toMatchObject({ source: "api-catalog", path: "/published/contract",
+      catalogRoute: { source: catalogUrl, target: specUrl } });
+    const calls = mockHttpGet.mock.calls.map(([url]) => url);
+    expect(calls.filter(url => url === specUrl)).toHaveLength(1);
+    expect(calls.filter(url => url === origin + "/openapi.json")).toHaveLength(1);
+    expect(calls.some(url => url.includes("apis.guru"))).toBe(false);
+    for (const [url, options] of mockHttpGet.mock.calls) {
+      if (url === specUrl || url === catalogUrl) expect(options?.maxRedirects).toBe(0);
+    }
+  });
+
+  it("withholds catalog route identity for a query-selected description", async () => {
+    const href = "/published/contract?access=secret#section";
+    mockHttpGet.mockImplementation(async url => {
+      if (url === catalogUrl) return catalog(targets([{ href }]));
+      if (url === origin + "/published/contract?access=secret") return makeSuccess({ url, body: makeOpenApiJson() });
+      return make404();
+    });
+    const { check } = await checkOpenApi(origin);
+    expect(check.data).toMatchObject({ source: "api-catalog", documentHasQuery: true });
+    expect(check.data).not.toHaveProperty("catalogRoute");
+    expect(JSON.stringify(check)).not.toContain("secret");
+  });
+
+  it("ignores off-origin, unsupported and malformed links and never follows nested catalogs", async () => {
+    const context = {
+      "api-catalog": [{ href: "/nested" }], item: [{ href: "/items" }],
+      "service-desc": [
+        null, { href: 42 }, { href: "" }, { href: "https://elsewhere.example/spec.json" },
+        { href: "https://user@example.com/credentials" }, { href: "/xml", type: "application/xml" },
+        { href: "blob:https://example.com/blob" }, { href: "/not-a-spec" },
+      ],
+    };
+    mockHttpGet.mockImplementation(async url => {
+      if (url === catalogUrl) return catalog({ linkset: [context] });
+      if (url === origin + "/not-a-spec") return makeSuccess({ body: '{"name":"catalog entry"}' });
+      return make404();
+    });
+    expect((await checkOpenApi(origin)).check.status).toBe("fail");
+    const calls = mockHttpGet.mock.calls.map(([url]) => url);
+    expect(calls).toContain(origin + "/not-a-spec");
+    expect(calls.some(url => /nested|\/items|elsewhere|credentials|\/xml|blob:/.test(url))).toBe(false);
+  });
+
+  it("caps the number of candidate requests", async () => {
+    const links = Array.from({ length: 8 }, (_, i) => ({ href: "/contract/" + i }));
+    mockHttpGet.mockImplementation(async url => url === catalogUrl ? catalog(targets(links)) : make404());
+    expect((await checkOpenApi(origin)).check.status).toBe("fail");
+    expect(mockHttpGet.mock.calls.filter(([url]) => url.includes("/contract/"))).toHaveLength(3);
+  });
+
+  it.each(["catalog", "candidate"])("reports a skipped %s probe as an error", async stage => {
+    const denied: HttpFailure = { ok: false, error: { kind: "request_budget_exhausted", message: "Budget exhausted", url: catalogUrl } };
+    mockHttpGet.mockImplementation(async url => {
+      if (url === catalogUrl) return stage === "catalog" ? denied : catalog(targets([{ href: "/published/spec" }]));
+      if (url === origin + "/published/spec") return denied;
+      return make404();
+    });
+    expect((await checkOpenApi(origin)).check.status).toBe("error");
+  });
+
+  it.each(["broken JSON", '{"linkset": {}}'])("ignores a malformed catalog and continues discovery", async body => {
+    mockHttpGet.mockImplementation(async url =>
+      url === catalogUrl ? { ...catalog({}), body } : make404(),
+    );
+    expect((await checkOpenApi(origin)).check.status).toBe("fail");
+    expect(mockHttpGet.mock.calls.some(([url]) => url.includes("apis.guru"))).toBe(true);
+  });
+
+  it("only consumes a JSON Linkset representation", async () => {
+    const invalid = catalog(targets([{ href: "/should-not-run" }]));
+    invalid.headers["content-type"] = "text/html";
+    mockHttpGet.mockImplementation(async url => url === catalogUrl ? invalid : make404());
+    expect((await checkOpenApi(origin)).detected).toBe(false);
+    expect(mockHttpGet.mock.calls.some(([url]) => url.endsWith("/should-not-run"))).toBe(false);
   });
 });
 

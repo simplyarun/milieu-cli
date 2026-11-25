@@ -1,5 +1,7 @@
-import type { BridgeResult, Check, ContentSource, ScanContext } from "../../core/types.js";
+import type { BridgeResult, Check, ContentSource, HttpSuccess, ScanContext } from "../../core/types.js";
 import { checkApiPresence } from "./api-presence.js";
+import { contractRoutes, linkedDocWasFetched } from "./published-routes.js";
+import { summarizeSeparation } from "./evidence-summary.js";
 import { checkDeveloperDocs } from "./developer-docs.js";
 import { checkSdkReferences } from "./sdk-references.js";
 import { checkWebhookSupport } from "./webhook-support.js";
@@ -36,11 +38,14 @@ export async function runSeparationBridge(
   const graphqlDetected = (ctx.shared.graphqlDetected as boolean) ?? false;
   const llmsTxtBody = (ctx.shared.llmsTxtBody as string | undefined) ?? null;
 
+  const homepage = ctx.shared.pageResponse as HttpSuccess | undefined;
+
   // Fire async developer docs probe first (non-blocking)
   const devDocsPromise = checkDeveloperDocs(
     ctx.baseUrl,
     pageBody,
     ctx.options.timeout,
+    homepage ?? (ctx.shared.pageUrl as string | undefined) ?? (typeof ctx.shared.pageBody === "string" ? ctx.baseUrl : null),
   );
 
   // Await async check (need pages for content sources)
@@ -57,7 +62,19 @@ export async function runSeparationBridge(
 
   // Run 3 synchronous pure-function checks with assembled content sources
   const apiPresenceCheck = checkApiPresence(openApiDetected, contentSources, pageHeaders, graphqlDetected);
-  const sdkRefsCheck = checkSdkReferences(contentSources);
+  const openApiCheck = ctx.shared.openApiCheck as Check | undefined;
+  const graphqlCheck = ctx.shared.graphqlCheck as Check | undefined;
+  const routeEvidence = contractRoutes(openApiCheck, (ctx.shared.openApiDocumentUrls as string[]) ?? [],
+    homepage, devDocsResult.routeSources);
+  apiPresenceCheck.data = {
+    ...apiPresenceCheck.data, routeEvidence,
+    ...(routeEvidence.capabilities.length ? { descriptionSource: openApiCheck?.data?.documentUrl } : {}),
+  };
+  if (homepage && devDocsResult.routeSources) {
+    devDocsResult.check.data = { ...devDocsResult.check.data,
+      linkedAndFetched: linkedDocWasFetched(devDocsResult.routeSources, homepage) };
+  }
+  const sdkRefsCheck = checkSdkReferences(contentSources, { homepage, docs: devDocsResult.routeSources });
   const webhookCheck = checkWebhookSupport(contentSources, {
     pageHeaders,
     openApiHasWebhooks,
@@ -79,6 +96,7 @@ export async function runSeparationBridge(
     score: null,
     scoreLabel: null,
     checks,
+    message: summarizeSeparation(checks, openApiCheck, graphqlCheck),
     durationMs: Math.round(performance.now() - start),
   };
 }

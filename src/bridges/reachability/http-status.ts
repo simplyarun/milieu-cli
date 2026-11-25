@@ -11,10 +11,10 @@ export function checkHttpStatus(pageResponse: HttpResponse): Check {
   if (pageResponse.ok) {
     const { status, redirects, url } = pageResponse;
 
-    const data: Record<string, unknown> | undefined =
+    const data =
       redirects.length > 0
-        ? { redirects, finalUrl: url }
-        : undefined;
+        ? { statusCode: status, redirects, finalUrl: url }
+        : { statusCode: status };
 
     if (status >= 200 && status < 300) {
       return {
@@ -57,6 +57,7 @@ export function checkHttpStatus(pageResponse: HttpResponse): Check {
         label,
         status: "fail",
         detail: "Bot protection detected",
+        data: { statusCode, errorKind: kind },
       };
 
     case "timeout":
@@ -65,6 +66,7 @@ export function checkHttpStatus(pageResponse: HttpResponse): Check {
         label,
         status: "fail",
         detail: "Request timed out",
+        data: { errorKind: kind },
       };
 
     case "http_error":
@@ -73,6 +75,7 @@ export function checkHttpStatus(pageResponse: HttpResponse): Check {
         label,
         status: "fail",
         detail: statusCode ? `HTTP ${statusCode}` : message,
+        data: { statusCode, errorKind: kind },
       };
 
     case "request_budget_exhausted":

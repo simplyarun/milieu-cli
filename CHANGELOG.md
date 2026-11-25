@@ -4,6 +4,27 @@ All notable changes to milieu-cli are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/). Pre-1.0, breaking changes bump the
 minor version.
 
+## 0.4.0-rc.2 (local release candidate)
+
+- Schema evaluates document-local OpenAPI 3 references in paths, parameters, requests and responses. Moving an operation into a reusable Path Item preserves its Schema checks and callback evidence. Unread references leave dependent observations unmeasured.
+- Context resolves declared server URLs and inherited parameters before choosing an authentication or rate-limit probe. Rate-limit comparisons require the same measured GET, final responder and HTTP status. Redirects to login pages and partial responses leave the probe unmeasured.
+- Markdown comparisons for public CI summaries use structured observations and a size limit. Detailed local comparisons remain available in terminal and JSON output.
+- The report reader accepts Unicode byte-order marks in files saved by editors and Windows shells.
+
+## 0.4.0-rc.1 (local release candidate)
+
+- Separation summarizes linked, fetched, inspected, and inferred evidence in the terminal and JSON. It remains unscored.
+- Diff identifies loss of the last observed published link to the same verified API contract within the checked homepage and docs. It reports optional surface changes as inventory and insufficient evidence as inconclusive.
+- Schema returns a null score when contract discovery is incomplete or a detected contract could not be inspected. The overall remains the rounded mean of measured bridge scores. The terminal displays its coverage. Context preserves independent observations when a contract cannot be read.
+- Schema reads Swagger 2.0 request parameters, form fields, direct response schemas, and local references. Context recognizes Swagger base paths when looking for versioning and selecting probe URLs.
+
+## 0.4.0-rc.0 (local release candidate)
+
+- Compare two saved scan reports with `milieu diff` or the TypeScript `compareReports` API. Terminal, JSON, and Markdown output identify changed observations under the five bridges.
+- Auth checks report the selected operation, final response location, status, and guidance signals. Documentation inventory distinguishes linked paths from fetched destinations. Both can report inconclusive changes when observations differ in coverage.
+- Standards parses YAML and JSON OpenAPI contracts through the same validation path and can discover descriptions from a same-origin API catalog. Schema identifies an uninspectable contract separately from a missing one.
+- Add `scan --require-complete` for CI. A request budget exhausted during OpenAPI discovery no longer produces five apparent schema failures. An unavailable llms.txt probe is distinguished from a measured absence.
+
 ## [0.3.2] (2026-11-24)
 
 **Requires Node.js 22.19.0 or newer.** Upgrade Node before installing this release on an older runtime.

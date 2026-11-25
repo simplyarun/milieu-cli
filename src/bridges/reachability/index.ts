@@ -87,6 +87,8 @@ export async function runReachabilityBridge(
   // Store page body for Bridge 2 (JSON-LD, Schema.org extraction)
   if (pageResponse.ok) {
     ctx.shared.pageBody = pageResponse.body;
+    ctx.shared.pageUrl = pageResponse.url;
+    ctx.shared.pageResponse = pageResponse;
     ctx.shared.pageHeaders = pageResponse.headers;
   }
 

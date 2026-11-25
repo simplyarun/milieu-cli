@@ -212,17 +212,18 @@ async function readBodyStream(
   response: Response,
   maxBytes: number,
   timeoutMs?: number,
-): Promise<string> {
+): Promise<{ body: string; bodyIncomplete?: true }> {
   const stream = response.body;
-  if (!stream) return "";
+  if (!stream) return { body: "" };
 
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
   let totalBytes = 0;
+  let incomplete = false;
 
   // Hard timeout: cancel the reader directly if body reading stalls
   const timeoutId = timeoutMs
-    ? setTimeout(() => { reader.cancel().catch(() => {}); }, timeoutMs)
+    ? setTimeout(() => { incomplete = true; void reader.cancel().catch(() => {}); }, timeoutMs)
     : undefined;
 
   try {
@@ -233,6 +234,7 @@ async function readBodyStream(
       totalBytes += value.length;
       if (totalBytes > maxBytes) {
         // Keep only what fits within the limit
+        incomplete = true;
         const excess = totalBytes - maxBytes;
         chunks.push(value.subarray(0, value.length - excess));
         break;
@@ -241,7 +243,7 @@ async function readBodyStream(
     }
   } catch {
     // reader.read() throws when stream is cancelled (timeout or network error).
-    // Return whatever data was collected so far.
+    incomplete = true;
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
     try { await reader.cancel(); } catch { /* stream may already be closed */ }
@@ -253,7 +255,7 @@ async function readBodyStream(
     body += decoder.decode(chunk, { stream: true });
   }
   body += decoder.decode(); // flush remaining multi-byte chars
-  return body;
+  return incomplete ? { body, bodyIncomplete: true } : { body };
 }
 
 async function readBodyBytes(
@@ -429,7 +431,7 @@ async function fetchOnce(
       const captureResponse = async () => ({
         status: response.status,
         headers: headerRecord,
-        body: options.method === "HEAD" ? "" : await readBodyStream(response, options.maxBodyBytes, options.timeout),
+        ...(options.method === "HEAD" ? { body: "" } : await readBodyStream(response, options.maxBodyBytes, options.timeout)),
       });
 
       // Bot protection detection
@@ -481,7 +483,7 @@ async function fetchOnce(
         }
         return { ...base, body: bytes };
       }
-      return { ...base, body: await readBodyStream(response, options.maxBodyBytes, options.timeout) };
+      return { ...base, ...await readBodyStream(response, options.maxBodyBytes, options.timeout) };
     } catch (err) {
       return classifyFetchError(err, currentUrl);
     } finally {

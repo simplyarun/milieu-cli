@@ -1,6 +1,7 @@
 import type { Check } from "../../core/types.js";
 import type { ParsedOpenApiSpec } from "./oas-types.js";
 import { collectOperations } from "./oas-types.js";
+import { requestSchemas, schemaForFields } from "./schema-sources.js";
 
 export function checkRequiredFields(spec: ParsedOpenApiSpec | undefined): Check {
   const id = "schema_required_fields";
@@ -8,10 +9,10 @@ export function checkRequiredFields(spec: ParsedOpenApiSpec | undefined): Check 
   const ops = collectOperations(spec);
   let schemasWithProperties = 0;
   let withRequired = 0;
-  for (const [, , op] of ops) {
-    if (!op.requestBody?.content) continue;
-    for (const mediaType of Object.values(op.requestBody.content)) {
-      const schema = mediaType?.schema;
+  for (const [path, , op] of ops) {
+    for (const raw of requestSchemas(spec, path, op)) {
+      const schema = schemaForFields(spec, raw);
+      if (!schema) return { id, label, status: "error", detail: "Could not inspect all request fields due to a reference or schema composition" };
       if (!schema?.properties || Object.keys(schema.properties).length === 0) continue;
       schemasWithProperties++;
       if (Array.isArray(schema.required) && schema.required.length > 0) withRequired++;

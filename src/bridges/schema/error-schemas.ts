@@ -1,6 +1,7 @@
 import type { Check } from "../../core/types.js";
 import type { ParsedOpenApiSpec } from "./oas-types.js";
 import { collectOperations } from "./oas-types.js";
+import { responseSchemas } from "./schema-sources.js";
 
 export function checkErrorSchemas(spec: ParsedOpenApiSpec | undefined): Check {
   const id = "schema_error_responses";
@@ -13,10 +14,9 @@ export function checkErrorSchemas(spec: ParsedOpenApiSpec | undefined): Check {
     for (const [code, resp] of Object.entries(op.responses)) {
       if (!code.startsWith("4")) continue;
       total4xx++;
-      if (resp?.content) {
-        const hasSchema = Object.values(resp.content).some((mt) => mt?.schema != null);
-        if (hasSchema) withSchema++;
-      }
+      const schemas = responseSchemas(spec, resp);
+      if (schemas.some(schema => schema !== undefined)) withSchema++;
+      else if (schemas.includes(undefined)) return { id, label, status: "error", detail: "A referenced error response or body schema could not be inspected" };
     }
   }
   if (total4xx === 0) return { id, label, status: "fail", detail: "No 4xx error responses defined in spec", data: { total4xx: 0, withSchema: 0 } };

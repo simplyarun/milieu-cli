@@ -40,10 +40,10 @@ function walkDir(dir: string): string[] {
 }
 
 describe("packaging", () => {
-  it("has exactly 4 runtime dependencies", () => {
-    // undici backs SSRF connection pinning (see SECURITY.md); the rest are CLI/render.
+  it("ships the scanner and terminal runtime dependencies", () => {
+    // js-yaml parses OpenAPI documents; undici pins connections to validated addresses.
     const deps = Object.keys(pkg.dependencies).sort();
-    expect(deps).toEqual(["chalk", "commander", "ora", "undici"]);
+    expect(deps).toEqual(["chalk", "commander", "js-yaml", "ora", "parse5", "undici"]);
   });
 
   it("is ESM-only", () => {

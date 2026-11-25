@@ -11,6 +11,7 @@ As an industry, we've spent decades perfecting UI & UX design for humans. Now we
 - [The 5 Bridges](#the-5-bridges)
 - [Install](#install)
 - [CI/CD integration](#cicd-integration)
+- [Compare two releases](#compare-two-releases)
 - [Options](#options)
 - [How scoring works](#how-scoring-works)
 - [Programmatic API](#programmatic-api)
@@ -81,7 +82,7 @@ Milieu evaluates your product through five progressive bridges. Each one represe
 | 4 | **Schema** | **Can agents use your APIs correctly?** | Operation IDs, schema types, error response schemas, required fields, field descriptions | 0–100 |
 | 5 | **Context** | **Can agents trust and operate your APIs?** | Rate-limit headers, auth clarity, auth legibility, Terms of Service, API versioning, contact info, agents.json | 0–100 |
 
-*Bridge 3 reports what's present rather than scoring quality.
+*Bridge 3 is unscored. Its evidence summary identifies inspected contracts, published links, successful fetches, and inferred signals.
 
 The bridges are progressive: there's no point checking your OpenAPI spec (Bridge 2) if agents can't even reach your product surface (Bridge 1). There's no point evaluating schema quality (Bridge 4) if no spec was found (Bridge 2). Each bridge builds on the last.
 
@@ -108,7 +109,7 @@ An agent's first encounter with any API is unauthenticated. The agent discovers 
   - Structured JSON error body — the agent can parse the rejection
   - Documentation URL in the error body — the agent can self-onboard
 
-An API that returns `{"error": "unauthorized", "docs_url": "https://docs.example.com/auth"}` with a `WWW-Authenticate: Bearer` header scores full marks. An API that returns an HTML login page scores zero — the agent has no idea what to do next.
+An API that returns `{"error": "unauthorized", "docs_url": "https://docs.example.com/auth"}` with a `WWW-Authenticate: Bearer` header scores full marks. A direct 401 or 403 with an HTML body and none of the three guidance signals earns zero for this check. A successful response without a challenge and an unreadable probe have different outcomes.
 
 ### Crawler policies
 
@@ -127,7 +128,7 @@ npm install -g milieu-cli                 # global install
 milieu scan petstore.swagger.io           # short alias after install
 ```
 
-> Both `milieu` and `milieu-cli` work as commands after global install.
+Both `milieu` and `milieu-cli` work as commands after global install. To review an unpublished candidate from its source checkout, run `npm ci`, `npm run build`, then `node dist/cli/index.js --version`. Use that same entry point for `scan` and `diff`. The unversioned npm commands above install the current public release.
 
 ## CI/CD integration
 
@@ -144,7 +145,36 @@ milieu scan api.mycompany.com --json > milieu-report.json
 milieu scan api.mycompany.com --json --pretty
 ```
 
-Exit codes: `0` = score meets threshold (or no threshold set), `1` = score below threshold or scan error.
+Add `--require-complete` to fail the job if a scan exhausts its request budget, skips a bridge, or returns a check with status `error`. A `partial` check alone does not trigger this flag. A scan exits with code 1 on an input or scan error, an unmet score threshold, or an unmet completeness requirement. JSON output still contains the report when a requirement fails. Individual link observations can have incomplete coverage even when this flag passes. For decisions about published routes, inspect the Separation findings and their coverage in the diff.
+
+## Compare two releases
+
+Save a scan from each revision using the same Milieu version. The comparison reads the saved reports locally and makes no network requests. Terminal and JSON output can include original URLs, private endpoint paths and site-supplied text. Use `--markdown` for a shareable summary with known check names and structured observations. Review any origins and resource names shown before sharing. Large Markdown summaries report the number of omitted findings.
+
+```bash
+milieu diff base.json candidate.json
+milieu diff base.json candidate.json --json
+```
+
+Findings are grouped by bridge. Where the scanner observed the same protected operation on both runs, Context compares individual authentication signals, including changes that leave the grade at `partial`. Separation reports changes in documentation links and successful fetches as inventory. Its URL evidence keeps the origin and case-sensitive path and omits user information, queries, and fragments. A linked URL may be on a different host and may never have been fetched.
+
+Bridge 3 currently verifies one capability: discovering the API contract. It looks for a link on the homepage or on a developer docs page linked from the homepage. Milieu must have fetched and parsed the contract. A published API catalog also counts as a route when its link led Milieu to the document. Guessing a conventional spec URL verifies the document but supplies no evidence of a published link. If both scans inspect the same contract and cover those entry pages, losing the last observed route is a Separation regression. Losing an SDK reference or one of several routes changes the inventory. An unread linked page or change of contract identity makes the route comparison inconclusive. This check describes discovery of the contract. It does not exercise its business operations.
+
+Use the same origin by default. To compare equivalent public previews with different hostnames, explicitly supply both origins in base-to-candidate order. The mapping applies only to the two origins you name. External docs hosts keep their own identity. Configure preview auth and indexing consistently.
+
+For a GitHub Actions job with `milieu-cli` pinned in the project's lockfile, run this step after `npm ci`. Set `BASE_ORIGIN` and `CANDIDATE_ORIGIN` to the public origins of the two deployments.
+
+```yaml
+- name: Compare Milieu observations
+  shell: bash
+  run: |
+    ./node_modules/.bin/milieu scan "$BASE_ORIGIN" --json > "$RUNNER_TEMP/milieu-base.json"
+    ./node_modules/.bin/milieu scan "$CANDIDATE_ORIGIN" --json > "$RUNNER_TEMP/milieu-candidate.json"
+    ./node_modules/.bin/milieu diff "$RUNNER_TEMP/milieu-base.json" "$RUNNER_TEMP/milieu-candidate.json" \
+      --map-origin "$BASE_ORIGIN=$CANDIDATE_ORIGIN" --markdown >> "$GITHUB_STEP_SUMMARY"
+```
+
+A valid comparison is advisory and exits with code 0, including when it reports regressions. Invalid files, version mismatches and undeclared origin changes exit with code 1. Each input must be a regular JSON file of up to 32 MiB. Compare older reports in same-version pairs. Missing evidence, skipped bridges and changed probe targets can make a finding inconclusive. A score or a timestamp changing on its own produces no finding.
 
 ## Options
 
@@ -155,6 +185,7 @@ Exit codes: `0` = score meets threshold (or no threshold set), `1` = score below
 | `--verbose` | Show individual check details with explanations | off |
 | `--explain-all` | Show explanations on all checks, not just failures (use with --verbose) | off |
 | `--timeout <ms>` | Per-request timeout in whole milliseconds, from 1 to 2147483647 | 10000 |
+| `--require-complete` | Exit non-zero for request-budget exhaustion, a skipped bridge or an errored check | off |
 | `--threshold <n>` | Exit non-zero if the score falls below n. Accepts values from 0 to 100 | off |
 | `--quiet` | Suppress terminal output | off |
 | `--max-concurrency <n>` | Maximum simultaneous outbound requests | 8 |
@@ -168,21 +199,33 @@ These explanations also appear in `--json` output as a `why` field on every chec
 
 ## How scoring works
 
-The **overall score** is the average of Bridges 1, 2, 4, and 5. Bridge 3 reports detection status only (`score: null`) and is the sole bridge excluded from the average.
+The **overall score** is the rounded mean of the available numeric scores for Reachability, Standards, Schema, and Context. The terminal reports how many of those four contributed. JSON consumers can read each bridge's `score` and `status`. Separation always has `score: null`.
 
-Scoring is **monotone**: adding a machine-readable signal can only raise your score, never lower it. Bridge 4 scores `0` (not "not applicable") when no OpenAPI spec is found, and every Bridge-5 check counts toward a fixed denominator whether or not you publish a spec — so publishing one can only help. Deleting signals to game the number doesn't work.
+Schema distinguishes three cases.
+
+| What the scan observed | Schema result | Contribution to overall |
+|---|---|---|
+| A parsed OpenAPI or Swagger document | Score based on the checks Milieu could evaluate | Included |
+| Completed discovery found no valid contract | Five failed checks, score 0 | Included |
+| A registry listing, protected spec path, or incomplete discovery with no inspected contract | `not_evaluated`, score and label both `null` | Excluded |
+
+A score based on three bridges can rise when a fourth becomes unmeasurable. Check coverage when comparing runs. Use `--require-complete` alongside `--threshold` when CI also requires every bridge to run, every check to return a measured status, and the scan to stay within budget.
 
 **Bridges 1 and 4** use equal-weight scoring: each check contributes **pass = 1**, **partial = 0.5**, **fail = 0**. Bridge score = `(points / total_checks) * 100`. Thresholds: ≥80 = pass, ≥40 = partial, <40 = fail.
 
 **Bridges 2 and 5** use weighted scoring to reflect real-world importance to agents. In Bridge 2, core standards carry weight 2 (`openapi_spec`, `sitemap`, `llms_txt`, `security_txt`, `json_ld`, `schema_org`) and emerging standards weight 1 (GraphQL, markdown negotiation, llms-full.txt, MCP, A2A). In Bridge 5, rate-limit headers and auth checks carry more weight than contact info. Thresholds for both: ≥60 = pass, ≥30 = partial — lower because these signals are nascent.
 
-An `error` means the scanner could not measure a check. For example, it cannot read crawler directives from an unavailable page. Reachability, Standards, and Context exclude these checks from their scoring denominators. The result also sets `incomplete` when the request budget denies a probe.
+An `error` means the scanner could not measure a check. For example, it cannot read crawler directives from an unavailable page. The scored bridges exclude these checks from their scoring denominators. The result also sets `incomplete` when the request budget denies a probe.
 
-A "partial" means the signal exists but is incomplete: an OpenAPI spec served as YAML (detected but not fully parseable), a 401 response with a JSON body but no `WWW-Authenticate` header, or a robots.txt with valid structure but no explicit allow/disallow rules.
+A "partial" means the signal exists but is incomplete: a 401 response with a JSON body but no `WWW-Authenticate` header, or a robots.txt with valid structure but no explicit allow/disallow rules.
 
-When no OpenAPI spec is detected, Bridge 4's five checks all `fail` — each with a message explaining what the agent loses — and the bridge scores `0` (included in the average). Bridge 5 still runs all of its checks even without a spec; the spec-dependent ones (auth clarity, versioning) simply fail rather than being excused, keeping the score monotone.
+When a contract is indicated but cannot be read, Context still credits evidence from other sources, such as an API version header. It marks unresolved contract-dependent checks as unmeasured. When completed discovery finds no contract, the existing missing-contract checks still apply.
 
-All checks are reproducible: same product surface state produces the same score every time.
+Bridge 2 parses JSON and YAML OpenAPI documents and uses the same Schema and Context checks for both. Its discovery fallbacks include the JSON Linkset form of `/.well-known/api-catalog`. Milieu fetches up to three same-origin `service-desc` targets within the scan budget. Catalog and catalog-target requests accept direct responses only. Catalog presence adds no score of its own.
+
+Schema reads Swagger 2.0 and OpenAPI 3 request and response schemas, including supported document-local references. A reference to another document can leave a check unmeasured. Milieu reads field evidence locally without fetching external references. JSON and YAML use the same scoring rules.
+
+Context selects an input-free GET on the scan origin, taking the declared server into account. Rate-limit comparisons require the same declared operation, final resource and HTTP status. When a suitable operation is unavailable, the report identifies the conventional `/api` probe as a fallback.
 
 ## Programmatic API
 
@@ -202,19 +245,21 @@ const outcome: ScanOutcome = await scan("https://petstore.swagger.io", options);
 if (!outcome.ok) {
   console.error(outcome.error.kind, outcome.error.message); // "invalid_url" | "scan_failed"
 } else {
-  console.log(outcome.overallScore);      // number (average of Bridges 1, 2, 4, 5)
+  console.log(outcome.overallScore);      // number (rounded mean of available bridge scores)
   console.log(outcome.overallScoreLabel); // "pass" | "partial" | "fail"
   console.log(outcome.bridges);           // 5-element tuple of BridgeResult
 }
 ```
 
-> **Note:** `result.bridges` always returns 5 elements. Only Bridge 3 has `score: null` (detection inventory); Bridges 1, 2, 4, and 5 are always numeric. Handle the null when mapping:
+> A completed scan returns all five bridges. Filter for numeric scores to reproduce the overall denominator. Separation and unmeasured bridges have a null score.
 >
 > ```typescript
 > const scoredBridges = result.bridges.filter(b => b.score !== null);
 > ```
 
-Check explanations are available as a separate export for library consumers:
+The library includes check explanations on the scan result. Import `compareReports` to compare two successful `ScanResult` values in memory. It returns the origins, scanner version, budget flags and findings. Incompatible versions or origins raise an error. For paired previews, pass `{ originMap: { base: baseOrigin, head: candidateOrigin } }` as the third argument.
+
+Check explanations are also available as a separate export:
 
 ```typescript
 import { resolveExplanation } from "milieu-cli";

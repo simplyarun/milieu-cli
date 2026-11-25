@@ -38,7 +38,7 @@ const mockScanResult = {
       scoreLabel: "pass",
       checks: [
         { id: "https_available", label: "HTTPS Available", status: "pass" as const },
-        { id: "robots_txt", label: "robots.txt", status: "fail" as const, detail: "No robots.txt found at example.com" },
+        { id: "robots_txt", label: "robots.txt", status: "fail" as const, detail: "No robots.txt found at example.com", why: "This host provides no guidance on crawling." },
       ],
       durationMs: 200,
     },
@@ -323,14 +323,10 @@ describe("CLI", () => {
     expect(robotsCheck.why).toContain("no guidance");
   });
 
-  // Test 14: library scan() result does NOT include why field
-  it("library scan() result does NOT include why field", () => {
-    const raw = structuredClone(mockScanResult);
-    for (const bridge of raw.bridges) {
-      for (const check of bridge.checks) {
-        expect((check as Record<string, unknown>).why).toBeUndefined();
-      }
-    }
+  it("--require-complete rejects a skipped bridge even when the score meets the threshold", async () => {
+    await createProgram().parseAsync(["node", "milieu", "scan", "example.com", "--threshold", "70", "--require-complete", "--json"]);
+    expect(process.exitCode).toBe(1);
+    expect(JSON.parse(String(stdoutSpy.mock.calls[0][0])).overallScore).toBe(74);
   });
 });
 

@@ -1,4 +1,4 @@
-import type { Check } from "../../core/types.js";
+import type { Check, HttpFailure } from "../../core/types.js";
 import { httpGet } from "../../utils/http-client.js";
 
 export interface LlmsTxtResult {
@@ -11,6 +11,17 @@ export interface LlmsContentQuality {
   linkCount: number;
   hasApiReferences: boolean;
   lineCount: number;
+}
+
+function failedFile(id: string, label: string, result: HttpFailure): Check {
+  const statusCode = result.response?.status ?? result.error.statusCode;
+  const data = { statusCode, errorKind: result.error.kind };
+  if (statusCode === 404 || statusCode === 410) {
+    return { id, label, status: "fail", detail: "No " + label + " found", data };
+  }
+  return { id, label, status: "error", data, detail: result.error.kind === "request_budget_exhausted"
+    ? label + " probe skipped: scan request budget exhausted"
+    : label + " could not be measured (" + (statusCode ? "HTTP " + statusCode : result.error.kind) + ")" };
 }
 
 /**
@@ -42,14 +53,11 @@ export async function checkLlmsTxt(
   const result = await httpGet(`${baseUrl}/llms.txt`, { timeout });
 
   if (!result.ok) {
-    if (result.error.kind === "request_budget_exhausted") {
-      return { check: { id, label, status: "error", detail: "llms.txt probe skipped: scan request budget exhausted" }, body: null };
-    }
-    return { check: { id, label, status: "fail", detail: "No llms.txt found" }, body: null };
+    return { check: failedFile(id, label, result), body: null };
   }
 
   if (result.body.trim().length === 0) {
-    return { check: { id, label, status: "fail", detail: "No llms.txt found" }, body: null };
+    return { check: { id, label, status: "fail", detail: "No llms.txt found", data: { statusCode: result.status } }, body: null };
   }
 
   // Reject soft 404s: servers returning HTML instead of the actual file
@@ -116,12 +124,9 @@ export async function checkLlmsFullTxt(
 
   const result = await httpGet(`${baseUrl}/llms-full.txt`, { timeout });
 
-  if (!result.ok && result.error.kind === "request_budget_exhausted") {
-    return { id, label, status: "error", detail: "llms-full.txt probe skipped: scan request budget exhausted" };
-  }
-
-  if (!result.ok || result.body.trim().length === 0) {
-    return { id, label, status: "fail", detail: "No llms-full.txt found" };
+  if (!result.ok) return failedFile(id, label, result);
+  if (result.body.trim().length === 0) {
+    return { id, label, status: "fail", detail: "No llms-full.txt found", data: { statusCode: result.status } };
   }
 
   // Reject soft 404s: servers returning HTML instead of the actual file

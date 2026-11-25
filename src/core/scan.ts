@@ -6,6 +6,7 @@ import {
   runSchemaBridge, runContextBridge,
 } from "../bridges/index.js";
 import { getVersion } from "./version.js";
+import { resolveExplanation } from "./explanations.js";
 import { validateScanOptions } from "./scan-options.js";
 import { runWithScanRequestContext, getScanRequestStats } from "../utils/http-client.js";
 
@@ -36,10 +37,10 @@ export async function scan(url: string, options: ScanOptions = {}): Promise<Scan
 
     if (bridge1.abort) {
       spinner.text = "Scan aborted: " + (bridge1.abortReason ?? "unreachable");
-      bridge2 = { id: 2, name: "Standards", status: "not_evaluated", score: 0, scoreLabel: "fail", checks: [], durationMs: 0 };
+      bridge2 = { id: 2, name: "Standards", status: "not_evaluated", score: null, scoreLabel: null, checks: [], durationMs: 0 };
       bridge3 = { id: 3, name: "Separation", status: "not_evaluated", score: null, scoreLabel: null, checks: [], durationMs: 0 };
-      bridge4 = { id: 4, name: "Schema", status: "not_evaluated", score: 0, scoreLabel: "fail", checks: [], durationMs: 0 };
-      bridge5 = { id: 5, name: "Context", status: "not_evaluated", score: 0, scoreLabel: "fail", checks: [], durationMs: 0 };
+      bridge4 = { id: 4, name: "Schema", status: "not_evaluated", score: null, scoreLabel: null, checks: [], durationMs: 0 };
+      bridge5 = { id: 5, name: "Context", status: "not_evaluated", score: null, scoreLabel: null, checks: [], durationMs: 0 };
     } else {
       spinner.text = "Bridge 2: Standards...";
       bridge2 = await runStandardsBridge(ctx);
@@ -49,7 +50,13 @@ export async function scan(url: string, options: ScanOptions = {}): Promise<Scan
       [bridge4, bridge5] = await Promise.all([runSchemaBridge(ctx), runContextBridge(ctx)]);
     }
 
-    const scoredBridges = [bridge1, bridge2, bridge3, bridge4, bridge5].filter(
+    const bridges: ScanResult["bridges"] = [bridge1, bridge2, bridge3, bridge4, bridge5];
+    for (const bridge of bridges) {
+      for (const check of bridge.checks) {
+        check.why ??= resolveExplanation(check.id, check.status);
+      }
+    }
+    const scoredBridges = bridges.filter(
       (b): b is BridgeResult & { score: number } => b.score !== null,
     );
     const overallScore = scoredBridges.length > 0
@@ -63,7 +70,7 @@ export async function scan(url: string, options: ScanOptions = {}): Promise<Scan
       durationMs: Math.round(performance.now() - start),
       overallScore, overallScoreLabel,
       incomplete: (getScanRequestStats()?.denied ?? 0) > 0,
-      bridges: [bridge1, bridge2, bridge3, bridge4, bridge5],
+      bridges,
     };
 
     spinner.stop();

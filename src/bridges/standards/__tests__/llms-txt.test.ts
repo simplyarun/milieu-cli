@@ -79,6 +79,14 @@ describe("checkLlmsTxt", () => {
     expect(check.detail).toBe("No llms.txt found");
   });
 
+  it("distinguishes an unavailable file from a verified absence in both llms files", async () => {
+    mockHttpGet.mockResolvedValue({ ok: false, error: { kind: "timeout", message: "Timed out", url: "https://example.com/llms.txt" } });
+    expect((await checkLlmsTxt("https://example.com")).check.status).toBe("error");
+    expect((await checkLlmsFullTxt("https://example.com")).status).toBe("error");
+    mockHttpGet.mockResolvedValue(make404());
+    expect((await checkLlmsTxt("https://example.com")).check.data?.statusCode).toBe(404);
+  });
+
   it("returns fail on empty body", async () => {
     mockHttpGet.mockResolvedValue(makeSuccess(""));
     const { check } = await checkLlmsTxt("https://example.com");

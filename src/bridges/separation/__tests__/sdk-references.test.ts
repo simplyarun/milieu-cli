@@ -178,4 +178,25 @@ describe("checkSdkReferences", () => {
     expect(result.status).toBe("pass");
     expect(result.data?.registries).toContain("Crates.io");
   });
+
+  it("retains individual registry links and strips queries and fragments without treating commands as links", () => {
+    const html = [
+      '<a href="https://www.npmjs.com/package/@Example/One?tracking=SECRET#readme">One</a>',
+      '<a href="https://www.npmjs.com/package/@Example/Two">Two</a>',
+      '<a href="https://cdn.jsdelivr.net/npm/another@1/dist.js">CDN</a>',
+      '<script>let link = \'<a href="https://pypi.org/project/phantom/">lost</a>\'</script>',
+      '<a href="https://name:SECRET@npmjs.com/package/private">Credentials</a>',
+      '<a href="https://outside.example/npmjs.com/package/fake">Other host</a>',
+      '<a href="https://search.maven.org.example/artifact/example/fake">Other host</a>',
+      '<a href="https://pkg.go.dev/search?q=SECRET">Search</a>',
+      "npm install command-only",
+    ].join("");
+    const result = checkSdkReferences(sources(html));
+    expect(result.data?.packageLinks).toEqual([
+      "https://cdn.jsdelivr.net/npm/another@1/dist.js",
+      "https://www.npmjs.com/package/@Example/One", "https://www.npmjs.com/package/@Example/Two",
+    ]);
+    expect(JSON.stringify(result)).not.toContain("SECRET");
+    expect(checkSdkReferences(sources("npm install command-only")).data?.packageLinks).toEqual([]);
+  });
 });
