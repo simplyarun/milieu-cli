@@ -44,6 +44,13 @@ describe("checkMcpEndpoint", () => {
 
   // --- Tier 1: Endpoint probe ---
 
+  it("continues content discovery after an endpoint returns JSON null", async () => {
+    mockHttpGet.mockResolvedValue(makeJsonSuccess("null"));
+    const result = await checkMcpEndpoint("https://example.com", undefined, "Model Context Protocol");
+    expect(result.check.status).toBe("partial");
+    expect(result.detected).toBe(true);
+  });
+
   it("returns pass for valid Server Card JSON", async () => {
     const body = JSON.stringify({ serverInfo: { name: "test" }, transport: {} });
     mockHttpGet.mockResolvedValue(makeJsonSuccess(body));

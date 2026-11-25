@@ -93,6 +93,11 @@ describe("checkOpenApi", () => {
     mockHttpGet.mockReset();
   });
 
+  it.each([null, {}, "latest", "2.0"])("rejects invalid OpenAPI version %j", async (openapi) => {
+    mockHttpGet.mockResolvedValueOnce(makeSuccess({ body: JSON.stringify({ openapi }) })).mockResolvedValue(make404());
+    expect((await checkOpenApi("https://example.com")).detected).toBe(false);
+  });
+
   it("returns Check with correct id and label", async () => {
     // All 9 paths return 404
     mockHttpGet.mockResolvedValue(make404());

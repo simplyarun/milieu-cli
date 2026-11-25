@@ -9,7 +9,7 @@ import type { Check } from "../../../core/types.js";
 describe("evaluateCrawlerPolicies", () => {
   it("returns 6 checks with pass when no groups exist", () => {
     const parsed = parseRobotsTxt("");
-    const checks = evaluateCrawlerPolicies(parsed, "/");
+    const checks = evaluateCrawlerPolicies(parsed);
     expect(checks).toHaveLength(6);
     checks.forEach((c) => {
       expect(c.status).toBe("pass");
@@ -18,7 +18,7 @@ describe("evaluateCrawlerPolicies", () => {
 
   it("returns 6 checks with fail when * blocks /", () => {
     const parsed = parseRobotsTxt("User-agent: *\nDisallow: /");
-    const checks = evaluateCrawlerPolicies(parsed, "/");
+    const checks = evaluateCrawlerPolicies(parsed);
     expect(checks).toHaveLength(6);
     checks.forEach((c) => {
       expect(c.status).toBe("fail");
@@ -27,7 +27,7 @@ describe("evaluateCrawlerPolicies", () => {
 
   it("returns fail for GPTBot when specifically blocked, pass for others", () => {
     const parsed = parseRobotsTxt("User-agent: GPTBot\nDisallow: /");
-    const checks = evaluateCrawlerPolicies(parsed, "/");
+    const checks = evaluateCrawlerPolicies(parsed);
     const gptbot = checks.find((c) => c.id === "crawler_policy_gptbot");
     expect(gptbot?.status).toBe("fail");
     const others = checks.filter((c) => c.id !== "crawler_policy_gptbot");
@@ -38,7 +38,7 @@ describe("evaluateCrawlerPolicies", () => {
 
   it("returns partial when * has non-root Disallow", () => {
     const parsed = parseRobotsTxt("User-agent: *\nDisallow: /api");
-    const checks = evaluateCrawlerPolicies(parsed, "/");
+    const checks = evaluateCrawlerPolicies(parsed);
     expect(checks).toHaveLength(6);
     checks.forEach((c) => {
       expect(c.status).toBe("partial");
@@ -49,7 +49,7 @@ describe("evaluateCrawlerPolicies", () => {
     const parsed = parseRobotsTxt(
       "User-agent: *\nDisallow: /\nAllow: /public",
     );
-    const checks = evaluateCrawlerPolicies(parsed, "/");
+    const checks = evaluateCrawlerPolicies(parsed);
     checks.forEach((c) => {
       expect(c.status).toBe("partial");
     });
@@ -57,7 +57,7 @@ describe("evaluateCrawlerPolicies", () => {
 
   it("crawler not mentioned, no * group -> pass", () => {
     const parsed = parseRobotsTxt("User-agent: SomeOtherBot\nDisallow: /");
-    const checks = evaluateCrawlerPolicies(parsed, "/");
+    const checks = evaluateCrawlerPolicies(parsed);
     checks.forEach((c) => {
       expect(c.status).toBe("pass");
     });
@@ -67,7 +67,7 @@ describe("evaluateCrawlerPolicies", () => {
     const parsed = parseRobotsTxt(
       "User-agent: *\nDisallow: /\nUser-agent: SomeBot\nDisallow: /x",
     );
-    const checks = evaluateCrawlerPolicies(parsed, "/");
+    const checks = evaluateCrawlerPolicies(parsed);
     // All AI crawlers inherit * block (Disallow: /)
     checks.forEach((c) => {
       expect(c.status).toBe("fail");
@@ -75,7 +75,7 @@ describe("evaluateCrawlerPolicies", () => {
   });
 
   it("returns skip checks when parsed is null (404 case)", () => {
-    const checks = evaluateCrawlerPolicies(null, "/");
+    const checks = evaluateCrawlerPolicies(null);
     expect(checks).toHaveLength(6);
     checks.forEach((c) => {
       expect(c.status).toBe("pass");
@@ -86,15 +86,20 @@ describe("evaluateCrawlerPolicies", () => {
 
   it("empty Disallow means allow all -> pass", () => {
     const parsed = parseRobotsTxt("User-agent: *\nDisallow:");
-    const checks = evaluateCrawlerPolicies(parsed, "/");
+    const checks = evaluateCrawlerPolicies(parsed);
     checks.forEach((c) => {
       expect(c.status).toBe("pass");
     });
   });
 
+  it("combines rules from multiple groups for the same crawler", () => {
+    const parsed = parseRobotsTxt("User-agent: GPTBot\nDisallow:\nUser-agent: GPTBot\nDisallow: /");
+    expect(evaluateCrawlerPolicies(parsed).find(c => c.id === "crawler_policy_gptbot")?.status).toBe("fail");
+  });
+
   it("check ids follow pattern crawler_policy_{id}", () => {
     const parsed = parseRobotsTxt("");
-    const checks = evaluateCrawlerPolicies(parsed, "/");
+    const checks = evaluateCrawlerPolicies(parsed);
     expect(checks.map((c) => c.id)).toEqual([
       "crawler_policy_gptbot",
       "crawler_policy_claudebot",
@@ -107,7 +112,7 @@ describe("evaluateCrawlerPolicies", () => {
 
   it("check labels follow pattern Name Policy", () => {
     const parsed = parseRobotsTxt("");
-    const checks = evaluateCrawlerPolicies(parsed, "/");
+    const checks = evaluateCrawlerPolicies(parsed);
     expect(checks.map((c) => c.label)).toEqual([
       "GPTBot Policy",
       "ClaudeBot Policy",

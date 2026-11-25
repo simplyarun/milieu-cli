@@ -2,6 +2,7 @@ import type { ScanResult } from "../core/types.js";
 import { green, yellow, red, bold, dim } from "./colors.js";
 import { formatBridge } from "./format-bridge.js";
 import { formatVerboseChecks } from "./format-verbose.js";
+import { terminalText } from "./terminal-text.js";
 
 function formatTimestamp(isoTimestamp: string): string {
   const d = new Date(isoTimestamp);
@@ -31,11 +32,11 @@ export function formatScanOutput(
 
   // Header
   const domain = result.url.replace(/^https?:\/\//, "").replace(/\/$/, "");
-  lines.push(bold(`Milieu Scan: ${domain}`));
+  lines.push(bold(`Milieu Scan: ${terminalText(domain)}`));
   lines.push(dim(`Scanned: ${formatTimestamp(result.timestamp)}`));
   const originStripped = result.scannedOrigin.replace(/^https?:\/\//, "").replace(/\/$/, "");
   if (originStripped !== domain) {
-    lines.push(dim(`Scanned origin: ${result.scannedOrigin} (paths and query strings do not narrow the scan)`));
+    lines.push(dim(`Scanned origin: ${terminalText(result.scannedOrigin)} (paths and query strings do not narrow the scan)`));
   }
   lines.push("");
 

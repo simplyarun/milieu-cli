@@ -9,12 +9,12 @@ function findProtectedGetPath(spec: ParsedOpenApiSpec | undefined): string | nul
   if (!spec) return null;
   const ops = collectOperations(spec);
   for (const [path, method, op] of ops) {
-    if (method !== "get") continue;
+    if (method !== "get" || path.includes("{")) continue;
     if (Array.isArray(op.security) && op.security.length > 0) return path;
   }
   if (Array.isArray(spec.security) && spec.security.length > 0) {
-    for (const [path, method] of ops) {
-      if (method === "get") return path;
+    for (const [path, method, op] of ops) {
+      if (method === "get" && !path.includes("{") && op.security === undefined) return path;
     }
   }
   return null;

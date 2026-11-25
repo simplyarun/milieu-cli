@@ -1,9 +1,36 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { scan } from "../core/scan.js";
+import { validateScanOptions } from "../core/scan-options.js";
+import type { ScanFailure } from "../core/types.js";
 import { getVersion } from "../core/version.js";
 import { resolveExplanation } from "../core/explanations.js";
 import { formatScanOutput } from "../render/format-scan.js";
+import { terminalText } from "../render/terminal-text.js";
+
+function writeFailure(error: ScanFailure["error"], jsonMode: boolean): void {
+  if (jsonMode) {
+    process.stdout.write(reportJson({ ok: false, error, version: getVersion() }) + "\n");
+  } else {
+    process.stderr.write(`Error: ${terminalText(error.message)}\n`);
+  }
+  process.exitCode = 1;
+}
+
+function reportJson(value: unknown, pretty = false): string {
+  // JSON.stringify escapes C0 controls. Escape the remaining terminal controls
+  // too, while keeping the decoded strings intact for programmatic consumers.
+  return JSON.stringify(value, null, pretty ? 2 : undefined)
+    .replace(/[\u007f-\u009f\p{Bidi_Control}\u2028\u2029]/gu, char =>
+      "\\u" + char.charCodeAt(0).toString(16).padStart(4, "0"));
+}
+
+function numericFlag(value: unknown): number | undefined {
+  if (value === undefined) return undefined;
+  return typeof value === "string" && value.trim() !== "" ? Number(value) : NaN;
+}
 
 export function buildProgram(): Command {
   const program = new Command();
@@ -22,7 +49,7 @@ export function buildProgram(): Command {
     .option("--timeout <ms>", "Per-request timeout in milliseconds", "10000")
     .option("--max-concurrency <n>", "Maximum simultaneous outbound requests (default: 8)")
     .option("--max-requests <n>", "Maximum request attempts for the whole scan, counting redirects and retries (default: 150)")
-    .option("--threshold <score>", "Exit non-zero if overall score below threshold")
+    .option("--threshold <score>", "Exit non-zero if overall score is below this threshold (0 to 100)")
     .option("--verbose", "Show individual check details")
     .option("--explain-all", "Show explanations on all checks, not just failures (use with --verbose)")
     .option("--quiet", "Suppress terminal output")
@@ -35,45 +62,23 @@ export function buildProgram(): Command {
         const quiet = Boolean(opts.quiet);
         const verbose = Boolean(opts.verbose);
         const explainAll = Boolean(opts.explainAll);
-        const timeout = Number(opts.timeout) || 10_000;
-        const threshold =
-          opts.threshold !== undefined ? Number(opts.threshold) : undefined;
-        const maxConcurrency =
-          opts.maxConcurrency !== undefined ? Number(opts.maxConcurrency) : undefined;
-        const maxRequests =
-          opts.maxRequests !== undefined ? Number(opts.maxRequests) : undefined;
-
-        // A zero/negative/NaN limit would deadlock or disable the budget.
-        for (const [flag, value] of [
-          ["--max-concurrency", maxConcurrency],
-          ["--max-requests", maxRequests],
-        ] as const) {
-          if (value !== undefined && (!Number.isInteger(value) || value < 1)) {
-            process.stderr.write(`Error: ${flag} requires a positive integer\n`);
-            process.exitCode = 1;
-            return;
-          }
-        }
-
-        // scan() never throws — it returns a discriminated outcome.
-        const outcome = await scan(url, {
-          timeout,
+        const threshold = numericFlag(opts.threshold);
+        const options = {
+          timeout: numericFlag(opts.timeout),
           verbose,
           silent: jsonMode || quiet,
-          maxConcurrency,
-          maxRequests,
-        });
+          maxConcurrency: numericFlag(opts.maxConcurrency),
+          maxRequests: numericFlag(opts.maxRequests),
+        };
+        const optionError = validateScanOptions(options);
+        if (optionError) return writeFailure({ kind: "scan_failed", message: optionError }, jsonMode);
+        if (threshold !== undefined && (!Number.isFinite(threshold) || threshold < 0 || threshold > 100)) {
+          return writeFailure({ kind: "scan_failed", message: "--threshold requires a number between 0 and 100" }, jsonMode);
+        }
 
+        const outcome = await scan(url, options);
         if (!outcome.ok) {
-          if (jsonMode) {
-            process.stdout.write(
-              JSON.stringify({ ok: false, error: outcome.error, version: getVersion() }) + "\n",
-            );
-          } else {
-            process.stderr.write(`Error: ${outcome.error.message}\n`);
-          }
-          process.exitCode = 1;
-          return;
+          return writeFailure(outcome.error, jsonMode);
         }
 
         const result = outcome;
@@ -86,10 +91,7 @@ export function buildProgram(): Command {
         }
 
         if (jsonMode) {
-          const output = opts.pretty
-            ? JSON.stringify(result, null, 2)
-            : JSON.stringify(result);
-          process.stdout.write(output + "\n");
+          process.stdout.write(reportJson(result, Boolean(opts.pretty)) + "\n");
         } else if (!quiet) {
           console.log(formatScanOutput(result, verbose, explainAll));
         }
@@ -103,16 +105,13 @@ export function buildProgram(): Command {
   return program;
 }
 
-// Run when executed directly — resolves symlinks so npx works
-import { fileURLToPath } from "node:url";
-import { realpathSync } from "node:fs";
-
+// Resolve npm bin symlinks. Embedded callers may have no script on disk.
+let entry: string | undefined;
 try {
-  const entry = process.argv[1] ? realpathSync(process.argv[1]) : "";
-  if (entry === fileURLToPath(import.meta.url)) {
-    const program = buildProgram();
-    await program.parseAsync(process.argv);
-  }
+  if (process.argv[1]) entry = realpathSync(process.argv[1]);
 } catch {
-  // Not the main module (e.g., imported for testing)
+  // No on-disk entry point.
+}
+if (entry === fileURLToPath(import.meta.url)) {
+  await buildProgram().parseAsync(process.argv);
 }

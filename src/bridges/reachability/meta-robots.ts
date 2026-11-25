@@ -24,36 +24,16 @@ export function checkMetaRobots(html: string): Check {
   }
 
   const headContent = headMatch[1];
-  const allDirectives: string[] = [];
-
-  // Pattern A: name first, then content
-  const patternA =
-    /<meta\s+[^>]*name\s*=\s*["'](robots|googlebot|bingbot)["'][^>]*content\s*=\s*["']([^"']*)["'][^>]*\/?>/gi;
-
-  // Pattern B: content first, then name
-  const patternB =
-    /<meta\s+[^>]*content\s*=\s*["']([^"']*)["'][^>]*name\s*=\s*["'](robots|googlebot|bingbot)["'][^>]*\/?>/gi;
-
-  let match: RegExpExecArray | null;
-
-  while ((match = patternA.exec(headContent)) !== null) {
-    const contentValue = match[2];
-    const directives = contentValue
-      .split(",")
-      .map((d) => d.trim().toLowerCase());
-    allDirectives.push(...directives);
+  const filtered: string[] = [];
+  for (const [tag] of headContent.matchAll(/<meta(?=\s)[^<>]*>/gi)) {
+    if (!/\sname\s*=\s*["'](?:robots|googlebot|bingbot)["']/i.test(tag)) continue;
+    const content = /\scontent\s*=\s*(["'])(.*?)\1/is.exec(tag)?.[2];
+    if (!content) continue;
+    for (const value of content.split(",")) {
+      const directive = value.trim().toLowerCase();
+      if (directive) filtered.push(directive);
+    }
   }
-
-  while ((match = patternB.exec(headContent)) !== null) {
-    const contentValue = match[1];
-    const directives = contentValue
-      .split(",")
-      .map((d) => d.trim().toLowerCase());
-    allDirectives.push(...directives);
-  }
-
-  // Filter out empty strings
-  const filtered = allDirectives.filter((d) => d.length > 0);
 
   if (filtered.some((d) => d === "noindex")) {
     return {

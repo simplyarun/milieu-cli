@@ -4,10 +4,11 @@ import type {
   HttpFailure,
 } from "../core/types.js";
 import { validateDns, type DnsCache } from "./ssrf.js";
-import { resolveRedirectUrl } from "./url.js";
+import { parseHttpUrl, resolveRedirectUrl } from "./url.js";
 import { getVersion } from "../core/version.js";
 import { AsyncLocalStorage } from "node:async_hooks";
-import { Agent } from "undici";
+import { Agent, fetch as undiciFetch } from "undici";
+import type { Headers, RequestInit as UndiciRequestInit, Response } from "undici";
 import type { LookupFunction } from "node:net";
 
 /**
@@ -16,8 +17,16 @@ import type { LookupFunction } from "node:net";
  */
 export function pinnedLookup(ip: string): LookupFunction {
   const family = ip.includes(":") ? 6 : 4;
-  return (_hostname, _options, callback) => {
-    callback(null, ip, family);
+  return (_hostname, options, callback) => {
+    // Node's net.connect (Happy Eyeballs) calls lookup with { all: true } and
+    // expects an array of { address, family }; the single-address path expects
+    // a scalar. Satisfy both, or the pinned socket dies with "Invalid IP
+    // address: undefined" and every request fails.
+    if (options.all) {
+      callback(null, [{ address: ip, family }]);
+    } else {
+      callback(null, ip, family);
+    }
   };
 }
 
@@ -198,8 +207,6 @@ function classifyFetchError(error: unknown, url: string): HttpFailure {
  * independent of the fetch AbortSignal (which may not propagate to
  * body stream reads in all Node.js versions). When the timeout fires,
  * the reader is cancelled and whatever data was collected is returned.
- *
- * Falls back to response.text() if no body stream is available.
  */
 async function readBodyStream(
   response: Response,
@@ -207,11 +214,7 @@ async function readBodyStream(
   timeoutMs?: number,
 ): Promise<string> {
   const stream = response.body;
-  if (!stream) {
-    // Fallback for environments where body stream isn't available
-    const text = await response.text();
-    return text.length > maxBytes ? text.slice(0, maxBytes) : text;
-  }
+  if (!stream) return "";
 
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
@@ -256,32 +259,31 @@ async function readBodyStream(
 async function readBodyBytes(
   response: Response,
   maxBytes: number,
-  timeoutMs?: number,
-): Promise<{ body: Uint8Array; truncated: boolean }> {
-  const stream = response.body;
-  if (!stream) return { body: new Uint8Array(await response.arrayBuffer()), truncated: false };
-  const reader = stream.getReader();
+  timeoutMs: number,
+): Promise<Uint8Array | null> {
+  if (!response.body) return new Uint8Array();
+  const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let totalBytes = 0;
-  let truncated = false;
-  const timeoutId = timeoutMs ? setTimeout(() => { reader.cancel().catch(() => {}); }, timeoutMs) : undefined;
+  let timedOut = false;
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    void reader.cancel().catch(() => {});
+  }, timeoutMs);
   try {
     while (true) {
       const { done, value } = await reader.read();
+      if (timedOut) throw new DOMException("Body read timed out", "TimeoutError");
       if (done) break;
       totalBytes += value.length;
-      if (totalBytes > maxBytes) { truncated = true; break; }
+      if (totalBytes > maxBytes) return null;
       chunks.push(value);
     }
-  } catch { /* cancelled streams are treated as incomplete */ }
-  finally {
-    if (timeoutId) clearTimeout(timeoutId);
+  } finally {
+    clearTimeout(timeoutId);
     try { await reader.cancel(); } catch { /* already closed */ }
   }
-  const body = new Uint8Array(Math.min(totalBytes, maxBytes));
-  let offset = 0;
-  for (const chunk of chunks) { body.set(chunk, offset); offset += chunk.length; }
-  return { body, truncated };
+  return Buffer.concat(chunks, totalBytes);
 }
 
 // ---------------------------------------------------------------------------
@@ -310,7 +312,7 @@ function isBotProtected(status: number, headers: Record<string, string>): boolea
 // ---------------------------------------------------------------------------
 
 function headersToRecord(headers: Headers): Record<string, string> {
-  const result: Record<string, string> = {};
+  const result: Record<string, string> = Object.create(null);
   headers.forEach((value, key) => {
     result[key] = value;
   });
@@ -342,10 +344,11 @@ async function fetchOnce(
 ): Promise<HttpResponse | HttpBytesResponse> {
   let currentUrl = url;
   const redirects: string[] = [];
+  let headers = options.headers;
 
   // Validate initial URL
   try {
-    new URL(currentUrl);
+    parseHttpUrl(currentUrl);
   } catch {
     return { ok: false, error: { kind: "unknown", message: "Invalid URL", url } };
   }
@@ -368,136 +371,127 @@ async function fetchOnce(
     }
     // Pin the connection to the IP validateDns just approved (SSRF hardening).
     const dispatcher = pinnedDispatcher(ssrfResult.ip);
-    let response: Response;
     try {
-      // `dispatcher` is a valid Node fetch option (undici) but isn't in the
-      // global RequestInit type, so the init is cast.
-      const init = {
+      const init: UndiciRequestInit = {
         method: options.method,
         // Manual redirects: required for SSRF re-validation at each hop and redirect chain tracking
-        redirect: "manual" as const,
+        redirect: "manual",
         signal: AbortSignal.timeout(options.timeout),
-        headers: options.headers,
+        headers,
         dispatcher,
         // POST body (only sent on first request, not on redirects)
         ...(options.method === "POST" && options.body && hop === 0
           ? { body: options.body }
           : {}),
       };
-      response = await fetch(currentUrl, init as RequestInit);
-    } catch (err) {
-      options.coordinator.release();
-      void dispatcher.close();
-      return classifyFetchError(err, currentUrl);
-    }
+      // The fetch implementation and dispatcher must share Undici's handler contract.
+      const response = await undiciFetch(currentUrl, init);
 
-    try {
+      // Only follow redirect statuses, and only for GET and HEAD requests.
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location");
+        if (options.method === "POST" || !location || ![301, 302, 303, 307, 308].includes(response.status)) {
+          return {
+            ok: false,
+            error: { kind: "http_error", message: `HTTP ${response.status} ${response.statusText}`, statusCode: response.status, url: currentUrl },
+          };
+        }
+        const resolved = resolveRedirectUrl(location, currentUrl);
+        if (!resolved.ok) {
+          return {
+            ok: false,
+            error: { kind: "http_error", message: `Invalid redirect: ${resolved.error}`, statusCode: response.status, url: currentUrl },
+          };
+        }
 
-    // Handle redirects (3xx) — POST does not follow redirects
-    if (response.status >= 300 && response.status < 400) {
-      if (options.method === "POST") {
-        // POST redirects are not followed — treat as final response
+        if (redirects.length >= options.maxRedirects) {
+          return {
+            ok: false,
+            error: { kind: "http_error", message: `Too many redirects (max ${options.maxRedirects})`, url: currentUrl },
+          };
+        }
+
+        if (new URL(resolved.url).origin !== new URL(currentUrl).origin) {
+          headers = Object.fromEntries(Object.entries(headers).filter(([key]) =>
+            !["authorization", "proxy-authorization", "cookie", "host"].includes(key.toLowerCase()),
+          ));
+        }
+        redirects.push(currentUrl);
+        currentUrl = resolved.url;
+        continue;
+      }
+
+      // Convert headers
+      const headerRecord = headersToRecord(response.headers);
+
+      // For a non-2xx response we're about to reject, keep the actual response
+      // (status/headers/body) for auth legibility and rate-limit checks.
+      const captureResponse = async () => ({
+        status: response.status,
+        headers: headerRecord,
+        body: options.method === "HEAD" ? "" : await readBodyStream(response, options.maxBodyBytes, options.timeout),
+      });
+
+      // Bot protection detection
+      if (isBotProtected(response.status, headerRecord)) {
+        return {
+          ok: false,
+          error: { kind: "bot_protected", message: "Bot protection detected", statusCode: response.status, url: currentUrl },
+          response: await captureResponse(),
+        };
+      }
+
+      // 4xx/5xx errors (non-bot)
+      if (response.status >= 400) {
         return {
           ok: false,
           error: { kind: "http_error", message: `HTTP ${response.status} ${response.statusText}`, statusCode: response.status, url: currentUrl },
+          response: await captureResponse(),
         };
       }
-      const location = response.headers.get("location");
-      if (!location) {
-        // No Location header -- treat as final response
-        break;
+
+      // Success (2xx) -- read body
+      const base = {
+        ok: true as const,
+        url: currentUrl,
+        status: response.status,
+        headers: headerRecord,
+        redirects,
+        durationMs: 0, // Set by outer wrapper
+      };
+
+      if (options.method === "HEAD") {
+        return binary ? { ...base, body: new Uint8Array() } : { ...base, body: "" };
       }
 
-      const resolved = resolveRedirectUrl(location, currentUrl);
-      if (!resolved.ok) {
+      // Check Content-Length before reading
+      const contentLength = response.headers.get("content-length");
+      if (contentLength && parseInt(contentLength, 10) > options.maxBodyBytes) {
         return {
           ok: false,
-          error: { kind: "http_error", message: `Invalid redirect: ${resolved.error}`, statusCode: response.status, url: currentUrl },
+          error: { kind: "body_too_large", message: `Response body exceeds ${options.maxBodyBytes} bytes`, url: currentUrl },
         };
       }
 
-      redirects.push(currentUrl);
-
-      // Check redirect limit BEFORE following
-      if (redirects.length >= options.maxRedirects) {
-        return {
-          ok: false,
-          error: { kind: "http_error", message: `Too many redirects (max ${options.maxRedirects})`, url: currentUrl },
-        };
+      // Stream body with early cancellation at maxBodyBytes and hard timeout
+      if (binary) {
+        const bytes = await readBodyBytes(response, options.maxBodyBytes, options.timeout);
+        if (bytes === null) {
+          return { ok: false, error: { kind: "body_too_large", message: `Response body exceeds ${options.maxBodyBytes} bytes`, url: currentUrl } };
+        }
+        return { ...base, body: bytes };
       }
-
-      currentUrl = resolved.url;
-      continue;
-    }
-
-    // Convert headers
-    const headerRecord = headersToRecord(response.headers);
-
-    // For a non-2xx response we're about to reject, keep the actual response
-    // (status/headers/body) so checks that grade a *rejection* — auth
-    // legibility (401/403 quality) and rate limits (headers on any status) —
-    // can inspect it instead of seeing a headerless failure.
-    const captureResponse = async () => ({
-      status: response.status,
-      headers: headerRecord,
-      body: options.method === "HEAD" ? "" : await readBodyStream(response, options.maxBodyBytes, options.timeout),
-    });
-
-    // Bot protection detection
-    if (isBotProtected(response.status, headerRecord)) {
-      return {
-        ok: false,
-        error: { kind: "bot_protected", message: "Bot protection detected", statusCode: response.status, url: currentUrl },
-        response: await captureResponse(),
-      };
-    }
-
-    // 4xx/5xx errors (non-bot)
-    if (response.status >= 400) {
-      return {
-        ok: false,
-        error: { kind: "http_error", message: `HTTP ${response.status} ${response.statusText}`, statusCode: response.status, url: currentUrl },
-        response: await captureResponse(),
-      };
-    }
-
-    // Success (2xx) -- read body
-    const base = {
-      ok: true as const,
-      url: currentUrl,
-      status: response.status,
-      headers: headerRecord,
-      redirects,
-      durationMs: 0, // Set by outer wrapper
-    };
-
-    if (options.method === "HEAD") {
-      return binary ? { ...base, body: new Uint8Array() } : { ...base, body: "" };
-    }
-
-    // Check Content-Length before reading
-    const contentLength = response.headers.get("content-length");
-    if (contentLength && parseInt(contentLength, 10) > options.maxBodyBytes) {
-      return {
-        ok: false,
-        error: { kind: "body_too_large", message: `Response body exceeds ${options.maxBodyBytes} bytes`, url: currentUrl },
-      };
-    }
-
-    // Stream body with early cancellation at maxBodyBytes and hard timeout
-    if (binary) {
-      const bytes = await readBodyBytes(response, options.maxBodyBytes, options.timeout);
-      if (bytes.truncated) {
-        return { ok: false, error: { kind: "body_too_large", message: `Response body exceeds ${options.maxBodyBytes} bytes`, url: currentUrl } };
-      }
-      return { ...base, body: bytes.body };
-    }
-    return { ...base, body: await readBodyStream(response, options.maxBodyBytes, options.timeout) };
+      return { ...base, body: await readBodyStream(response, options.maxBodyBytes, options.timeout) };
+    } catch (err) {
+      return classifyFetchError(err, currentUrl);
     } finally {
-      options.coordinator.release();
-      // Body has been read (or the hop is returning/continuing) — safe to
-      // release the pinned dispatcher's sockets.
-      void dispatcher.close();
+      // Redirects and size checks can exit with a streaming response still in
+      // flight. Tear down this per-hop dispatcher before granting another slot.
+      try {
+        await dispatcher.destroy();
+      } finally {
+        options.coordinator.release();
+      }
     }
   }
 

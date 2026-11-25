@@ -1,52 +1,27 @@
 import type { Check } from "../../core/types.js";
 import type { ParsedOpenApiSpec } from "../schema/oas-types.js";
 
-/**
- * Extract a clean ToS/legal URL from free text.
- *
- * Requires /terms, /tos, or /legal to appear as a path segment start
- * (preceded by /, followed by -, /, or end-of-URL). This prevents false
- * positives on "denial-of-service", "analytics-overview", etc.
- */
-export function extractTosUrl(text: string): string | null {
-  const urlPattern = /https?:\/\/[^\s<>"'()\]]*\/(?:terms|tos|legal)(?:[-\/][^\s<>"'()\]]*|[^\s<>"'()\]]*)*/gi;
-  const matches: string[] = [];
-  for (const match of text.matchAll(urlPattern)) {
-    const candidate = match[0].replace(/[.,;:!?)}\]]+$/, "");
-    try {
-      new URL(candidate);
-      matches.push(candidate);
-    } catch {
-      continue;
-    }
+/** Select a web URL with a legal path segment, preferring a direct terms link. */
+function selectTosUrl(candidates: Iterable<RegExpMatchArray>, baseUrl?: string): string | null {
+  let legalUrl: string | null = null;
+  for (const match of candidates) {
+    const href = baseUrl ? match[1] : match[0].replace(/[.,;:!?)}\]]+$/, "");
+    if (href.startsWith("#")) continue;
+    const url = URL.parse(href, baseUrl);
+    if (!url || (url.protocol !== "http:" && url.protocol !== "https:")) continue;
+    if (/\/(?:terms|tos)(?=[-/]|$)/i.test(url.pathname)) return url.href;
+    if (!legalUrl && /\/legal(?=[-/]|$)/i.test(url.pathname)) legalUrl = url.href;
   }
-  if (matches.length === 0) return null;
-  // Prefer /terms or /tos over /legal — more specific ToS signals
-  const preferred = matches.find(u => /\/(?:terms|tos)([-\/]|$)/i.test(u));
-  return preferred ?? matches[0];
+  return legalUrl;
 }
 
-/**
- * Extract ToS URL from HTML by scanning <a> tags for /terms, /tos, /legal hrefs.
- * Resolves relative URLs using the provided baseUrl.
- */
+export function extractTosUrl(text: string): string | null {
+  return selectTosUrl(text.matchAll(/https?:\/\/[^\s<>"'()\]]+/gi));
+}
+
 export function extractTosUrlFromHtml(html: string, baseUrl: string): string | null {
-  const hrefPattern = /<a\s[^>]*href=["']([^"']*\/(?:terms|tos|legal)(?:[-\/][^"']*)?)["'][^>]*>/gi;
-  const matches: string[] = [];
-  for (const match of html.matchAll(hrefPattern)) {
-    const href = match[1];
-    if (href.startsWith("#") || href.startsWith("javascript:")) continue;
-    try {
-      const resolved = new URL(href, baseUrl);
-      matches.push(resolved.href);
-    } catch {
-      continue;
-    }
-  }
-  if (matches.length === 0) return null;
-  // Prefer /terms or /tos over /legal — more specific ToS signals
-  const preferred = matches.find(u => /\/(?:terms|tos)([-\/]|$)/i.test(u));
-  return preferred ?? matches[0];
+  const hrefPattern = /<a(?=\s)[^<>]*?\shref\s*=\s*["']([^"']+)["']/gi;
+  return selectTosUrl(html.matchAll(hrefPattern), baseUrl);
 }
 
 export function checkTosUrl(
@@ -58,7 +33,8 @@ export function checkTosUrl(
   const id = "context_tos_url";
   const label = "Terms of Service URL";
   const specTos = spec?.info?.termsOfService;
-  if (typeof specTos === "string" && specTos.trim() !== "") {
+  const url = typeof specTos === "string" ? URL.parse(specTos) : null;
+  if (url?.protocol === "https:" || url?.protocol === "http:") {
     return { id, label, status: "pass", detail: `Terms of Service URL found in spec: ${specTos}`, data: { source: "spec", url: specTos } };
   }
   if (llmsTxtBody) {

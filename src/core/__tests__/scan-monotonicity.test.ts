@@ -9,6 +9,17 @@ vi.mock("../../utils/ssrf.js", () => ({
   isPrivateIp: vi.fn(() => false),
 }));
 
+// The client calls undici's own fetch; route it back to the stubbed global
+// fetch so networkStub() keeps intercepting the transport.
+vi.mock("undici", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("undici")>();
+  return {
+    ...actual,
+    fetch: (input: unknown, init?: unknown) =>
+      (globalThis.fetch as (i: unknown, n?: unknown) => Promise<Response>)(input, init),
+  };
+});
+
 import { scan } from "../scan.js";
 
 function assertOk(outcome: ScanOutcome): asserts outcome is ScanResult {

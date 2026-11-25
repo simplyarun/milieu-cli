@@ -1,6 +1,6 @@
 {
   "name": "milieu-cli",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Check if AI agents can discover, understand, and use your product",
   "type": "module",
   "main": "./dist/index.js",
@@ -19,15 +19,17 @@
     "dist"
   ],
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && chmod +x dist/cli/index.js",
-    "dev": "tsx src/index.ts",
+    "prebuild": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "tsc -p tsconfig.build.json",
+    "postbuild": "node -e \"require('node:fs').chmodSync('dist/cli/index.js', 0o755)\"",
+    "dev": "tsx src/cli/index.ts",
     "test": "vitest run --reporter=verbose",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",
     "prepack": "npm run build"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22.19.0"
   },
   "license": "Apache-2.0",
   "author": "Arun <86504533+simplyarun@users.noreply.github.com>",
@@ -64,12 +66,12 @@
     "@types/node": "^22.0.0",
     "tsx": "^4",
     "typescript": "^5.9",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.12"
   },
   "dependencies": {
     "chalk": "^5.6.2",
     "commander": "^14.0.3",
     "ora": "^9.3.0",
-    "undici": "^8.7.0"
+    "undici": "^8.13.1"
   }
 }

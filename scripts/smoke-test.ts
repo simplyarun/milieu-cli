@@ -40,8 +40,11 @@ const bridge: BridgeResult = {
 
 // Verify ScanResult interface shape with 5-tuple
 const result: ScanResult = {
+  ok: true,
   version: "1.0.0",
   url: "https://example.com",
+  scannedOrigin: "https://example.com",
+  incomplete: false,
   timestamp: new Date().toISOString(),
   durationMs: 5000,
   overallScore: 72,
@@ -50,8 +53,8 @@ const result: ScanResult = {
     bridge,
     { ...bridge, id: 2, name: "Standards" },
     { ...bridge, id: 3, name: "Separation", score: null, scoreLabel: null },
-    { ...bridge, id: 4, name: "Schema", status: "not_evaluated", score: null, scoreLabel: null, checks: [], message: "Not evaluated" },
-    { ...bridge, id: 5, name: "Context", status: "not_evaluated", score: null, scoreLabel: null, checks: [], message: "Not evaluated" },
+    { ...bridge, id: 4, name: "Schema" },
+    { ...bridge, id: 5, name: "Context" },
   ],
 };
 

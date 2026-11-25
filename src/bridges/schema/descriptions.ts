@@ -10,11 +10,11 @@ export function checkDescriptions(spec: ParsedOpenApiSpec | undefined): Check {
   let queryCount = 0;
   let bodySchemaCount = 0;
   for (const [, , op] of ops) {
-    if (op.parameters) {
+    if (Array.isArray(op.parameters)) {
       for (const param of op.parameters) {
-        if (param.in === "path") {
+        if (param?.in === "path") {
           items.push({ hasDescription: typeof param.description === "string" && param.description.trim() !== "" });
-        } else if (param.in === "query" && queryCount < 20) {
+        } else if (param?.in === "query" && queryCount < 20) {
           queryCount++;
           items.push({ hasDescription: typeof param.description === "string" && param.description.trim() !== "" });
         }
@@ -29,7 +29,7 @@ export function checkDescriptions(spec: ParsedOpenApiSpec | undefined): Check {
         if (!schema?.properties) continue;
         bodySchemaCount++;
         for (const prop of Object.values(schema.properties)) {
-          items.push({ hasDescription: typeof prop.description === "string" && prop.description.trim() !== "" });
+          items.push({ hasDescription: typeof prop?.description === "string" && prop.description.trim() !== "" });
           if (items.length >= 30) break;
         }
         if (items.length >= 30) break;

@@ -6,14 +6,18 @@ import {
   runSchemaBridge, runContextBridge,
 } from "../bridges/index.js";
 import { getVersion } from "./version.js";
+import { validateScanOptions } from "./scan-options.js";
 import { runWithScanRequestContext, getScanRequestStats } from "../utils/http-client.js";
 
 export async function scan(url: string, options: ScanOptions = {}): Promise<ScanOutcome> {
   const start = performance.now();
+  const timestamp = new Date().toISOString();
   const normalized = normalizeUrl(url);
   if (!normalized.ok) {
-    return { ok: false, error: { kind: "invalid_url", message: `Invalid URL: ${url}` } };
+    return { ok: false, error: { kind: "invalid_url", message: normalized.error } };
   }
+  const optionError = validateScanOptions(options);
+  if (optionError) return { ok: false, error: { kind: "scan_failed", message: optionError } };
   const { domain, baseUrl } = normalized;
 
   const ctx: ScanContext = { url, domain, baseUrl, options, shared: {} };
@@ -32,10 +36,10 @@ export async function scan(url: string, options: ScanOptions = {}): Promise<Scan
 
     if (bridge1.abort) {
       spinner.text = "Scan aborted: " + (bridge1.abortReason ?? "unreachable");
-      bridge2 = { id: 2, name: "Standards", status: "evaluated", score: 0, scoreLabel: "fail", checks: [], durationMs: 0 };
-      bridge3 = { id: 3, name: "Separation", status: "evaluated", score: null, scoreLabel: null, checks: [], durationMs: 0 };
-      bridge4 = { id: 4, name: "Schema", status: "evaluated", score: 0, scoreLabel: "fail", checks: [], durationMs: 0 };
-      bridge5 = { id: 5, name: "Context", status: "evaluated", score: 0, scoreLabel: "fail", checks: [], durationMs: 0 };
+      bridge2 = { id: 2, name: "Standards", status: "not_evaluated", score: 0, scoreLabel: "fail", checks: [], durationMs: 0 };
+      bridge3 = { id: 3, name: "Separation", status: "not_evaluated", score: null, scoreLabel: null, checks: [], durationMs: 0 };
+      bridge4 = { id: 4, name: "Schema", status: "not_evaluated", score: 0, scoreLabel: "fail", checks: [], durationMs: 0 };
+      bridge5 = { id: 5, name: "Context", status: "not_evaluated", score: 0, scoreLabel: "fail", checks: [], durationMs: 0 };
     } else {
       spinner.text = "Bridge 2: Standards...";
       bridge2 = await runStandardsBridge(ctx);
@@ -55,7 +59,7 @@ export async function scan(url: string, options: ScanOptions = {}): Promise<Scan
 
     const result: ScanResult = {
       ok: true,
-      version: getVersion(), url, scannedOrigin: baseUrl, timestamp: new Date().toISOString(),
+      version: getVersion(), url, scannedOrigin: baseUrl, timestamp,
       durationMs: Math.round(performance.now() - start),
       overallScore, overallScoreLabel,
       incomplete: (getScanRequestStats()?.denied ?? 0) > 0,

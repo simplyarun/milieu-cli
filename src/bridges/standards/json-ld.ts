@@ -44,8 +44,11 @@ export function checkJsonLd(html: string): Check {
           "@type" in (item as Record<string, unknown>)
         ) {
           const obj = item as Record<string, unknown>;
+          const type = obj["@type"];
+          if (!(typeof type === "string" && type.trim()) &&
+              !(Array.isArray(type) && type.length > 0 && type.every((t) => typeof t === "string" && t.trim()))) continue;
           blocks.push({
-            type: obj["@type"] as string | string[],
+            type: type as string | string[],
             context: obj["@context"] ?? null,
           });
         }

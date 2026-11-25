@@ -41,7 +41,7 @@ describe("checkRobotsTxt", () => {
 
   it("includes domain in detail on 404", async () => {
     mockHttpGet.mockResolvedValue(make404());
-    const { check } = await checkRobotsTxt("sub.example.com");
+    const { check } = await checkRobotsTxt("https://sub.example.com");
     expect(check.status).toBe("partial");
     expect(check.detail).toBe("No robots.txt found at sub.example.com");
   });
@@ -50,7 +50,7 @@ describe("checkRobotsTxt", () => {
     mockHttpGet.mockResolvedValue(
       makeSuccess("<html>not robots</html>", { "content-type": "text/html" }),
     );
-    const { check } = await checkRobotsTxt("sub.example.com");
+    const { check } = await checkRobotsTxt("https://sub.example.com");
     expect(check.status).toBe("fail");
     expect(check.detail).toContain("sub.example.com");
     expect(check.detail).toContain("per-origin");
@@ -58,7 +58,7 @@ describe("checkRobotsTxt", () => {
 
   it("includes domain in detail when no rules", async () => {
     mockHttpGet.mockResolvedValue(makeSuccess("# just a comment"));
-    const { check } = await checkRobotsTxt("sub.example.com");
+    const { check } = await checkRobotsTxt("https://sub.example.com");
     expect(check.status).toBe("partial");
     expect(check.detail).toBe(
       "robots.txt at sub.example.com exists but has no rules",
@@ -69,7 +69,7 @@ describe("checkRobotsTxt", () => {
     mockHttpGet.mockResolvedValue(
       makeSuccess("User-agent: *\nDisallow: /private"),
     );
-    const { check } = await checkRobotsTxt("sub.example.com");
+    const { check } = await checkRobotsTxt("https://sub.example.com");
     expect(check.status).toBe("pass");
     expect(check.detail).toContain("sub.example.com");
   });
@@ -81,7 +81,7 @@ describe("checkRobotsTxt under request-budget exhaustion", () => {
       ok: false as const,
       error: { kind: "request_budget_exhausted" as const, message: "Scan request budget exhausted", url: "https://example.com/robots.txt" },
     });
-    const result = await checkRobotsTxt("example.com");
+    const result = await checkRobotsTxt("https://example.com");
     expect(result.check.status).toBe("error");
     expect(result.parsed).toBeNull();
   });

@@ -87,7 +87,7 @@ The bridges are progressive: there's no point checking your OpenAPI spec (Bridge
 
 **Bridge 1 — Reachability** is the front door. Can AI agents get to your content at all? Are you blocking specific crawlers without realizing it? This is the most actionable bridge for most products — many are unknowingly blocking GPTBot or ClaudeBot in their robots.txt.
 
-**Bridge 2 — Standards** is the shared language. Do you speak the protocols AI agents understand? OpenAPI specs, GraphQL endpoints, XML sitemaps, markdown content negotiation, llms.txt, structured data — these are the machine-readable standards that let agents go beyond scraping your HTML. milieu also checks for [MCP](https://modelcontextprotocol.io/) discovery at `/.well-known/mcp.json` and [A2A Agent Cards](https://a2a-protocol.org/) at `/.well-known/agent.json`.
+**Bridge 2 — Standards** is the shared language. Do you speak the protocols AI agents understand? OpenAPI specs, GraphQL endpoints, XML sitemaps, markdown content negotiation, llms.txt, structured data — these are the machine-readable standards that let agents go beyond scraping your HTML. milieu also checks for [MCP](https://modelcontextprotocol.io/) discovery at `/.well-known/mcp.json` and [A2A Agent Cards](https://a2a-protocol.org/latest/specification/#82-discovery-mechanisms) at `/.well-known/agent-card.json`, with a fallback to the legacy `/.well-known/agent.json` path.
 
 **Bridge 3 — Separation** is the developer surface. Do you have a clear API boundary? Developer docs? SDKs? Webhooks? This is where agents look to determine if your product is something they can build with, not just read from.
 
@@ -154,8 +154,8 @@ Exit codes: `0` = score meets threshold (or no threshold set), `1` = score below
 | `--pretty` | Pretty-print JSON (use with --json) | off |
 | `--verbose` | Show individual check details with explanations | off |
 | `--explain-all` | Show explanations on all checks, not just failures (use with --verbose) | off |
-| `--timeout <ms>` | Per-request timeout in milliseconds | 10000 |
-| `--threshold <n>` | Exit non-zero if overall score < n | off |
+| `--timeout <ms>` | Per-request timeout in whole milliseconds, from 1 to 2147483647 | 10000 |
+| `--threshold <n>` | Exit non-zero if the score falls below n. Accepts values from 0 to 100 | off |
 | `--quiet` | Suppress terminal output | off |
 | `--max-concurrency <n>` | Maximum simultaneous outbound requests | 8 |
 | `--max-requests <n>` | Maximum request attempts for the whole scan, counting every redirect hop and retry. If the budget runs out, affected checks report `error` (skipped, not failed) and the result is marked `incomplete` | 150 |
@@ -176,7 +176,7 @@ Scoring is **monotone**: adding a machine-readable signal can only raise your sc
 
 **Bridges 2 and 5** use weighted scoring to reflect real-world importance to agents. In Bridge 2, core standards carry weight 2 (`openapi_spec`, `sitemap`, `llms_txt`, `security_txt`, `json_ld`, `schema_org`) and emerging standards weight 1 (GraphQL, markdown negotiation, llms-full.txt, MCP, A2A). In Bridge 5, rate-limit headers and auth checks carry more weight than contact info. Thresholds for both: ≥60 = pass, ≥30 = partial — lower because these signals are nascent.
 
-Checks with status `error` (probes that never ran because the scan request budget was exhausted) are excluded from scoring entirely — neither numerator nor denominator — and the result is flagged `incomplete`.
+An `error` means the scanner could not measure a check. For example, it cannot read crawler directives from an unavailable page. Reachability, Standards, and Context exclude these checks from their scoring denominators. The result also sets `incomplete` when the request budget denies a probe.
 
 A "partial" means the signal exists but is incomplete: an OpenAPI spec served as YAML (detected but not fully parseable), a 401 response with a JSON body but no `WWW-Authenticate` header, or a robots.txt with valid structure but no explicit allow/disallow rules.
 
@@ -226,7 +226,7 @@ const why = resolveExplanation("robots_txt", "fail");
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 22.19.0 or newer. Use the latest patch release of a [supported LTS line](https://nodejs.org/en/about/previous-releases).
 
 ## License
 

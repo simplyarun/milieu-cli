@@ -199,6 +199,25 @@ describe("CLI", () => {
   });
 
   // Test 7 (CLI-03): --threshold 80 sets exitCode 1 when overallScore < 80
+  it.each([
+    ["--threshold", "typo"], ["--threshold", ""], ["--threshold", "101"],
+    ["--timeout", "0"], ["--timeout", "Infinity"],
+  ])("rejects invalid %s %j with a machine-readable error", async (flag, value) => {
+    await createProgram().parseAsync(["node", "milieu", "scan", "example.com", "--json", flag, value]);
+    expect(mockScan).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+    expect(JSON.parse(String(stdoutSpy.mock.calls[0][0])).error.message).toContain(flag);
+  });
+
+  it("escapes control characters on stdout and preserves their value in decoded JSON", async () => {
+    const message = "first\u009bsecond\r\n";
+    mockScan.mockResolvedValueOnce({ ok: false, error: { kind: "scan_failed", message } });
+    await createProgram().parseAsync(["node", "milieu", "scan", "example.com", "--json"]);
+    const output = String(stdoutSpy.mock.calls[0][0]);
+    expect(output).not.toContain("\u009b");
+    expect(JSON.parse(output).error.message).toBe(message);
+  });
+
   it("--threshold sets exitCode 1 when score is below threshold", async () => {
     const program = createProgram();
     await program.parseAsync([

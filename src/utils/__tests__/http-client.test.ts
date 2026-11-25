@@ -6,11 +6,24 @@ vi.mock("../ssrf.js", () => ({
   validateDns: vi.fn(),
 }));
 
-vi.mock("../url.js", () => ({
+vi.mock("../url.js", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../url.js")>(),
   resolveRedirectUrl: vi.fn(),
 }));
 
-import { httpGet, RequestCoordinator, runWithScanRequestContext, getScanRequestStats, pinnedLookup } from "../http-client.js";
+// The client calls undici's own fetch (Node's global fetch can't drive an
+// external-undici dispatcher — see http-client.ts). Route it back to the
+// stubbed global fetch so vi.stubGlobal("fetch", ...) below keeps intercepting.
+vi.mock("undici", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("undici")>();
+  return {
+    ...actual,
+    fetch: (input: unknown, init?: unknown) =>
+      (globalThis.fetch as (i: unknown, n?: unknown) => Promise<Response>)(input, init),
+  };
+});
+
+import { httpGet, httpGetBytes, RequestCoordinator, runWithScanRequestContext, getScanRequestStats, pinnedLookup } from "../http-client.js";
 import { getVersion } from "../../core/version.js";
 import { validateDns } from "../ssrf.js";
 import { resolveRedirectUrl } from "../url.js";
@@ -318,6 +331,15 @@ describe("httpGet", () => {
       }
     });
 
+    it.each(["file:///example.txt", "https://user:pass@example.com"])(
+      "rejects unsupported URLs before DNS: %s", async (url) => {
+        const callsBefore = mockValidateDns.mock.calls.length;
+        expect((await httpGet(url)).ok).toBe(false);
+        expect(mockValidateDns).toHaveBeenCalledTimes(callsBefore);
+        expect(fetchSpy).not.toHaveBeenCalled();
+      },
+    );
+
     it("returns kind 'unknown' for invalid URL", async () => {
       const result = await httpGet("not a url at all");
       expect(result.ok).toBe(false);
@@ -519,13 +541,30 @@ describe("httpGet", () => {
           mockResponse({ status: 200, body: "Final page" }),
         );
 
-      const result = await httpGet("https://example.com");
+      const result = await httpGet("https://example.com", { maxRedirects: 1 });
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.redirects).toEqual(["https://example.com"]);
         expect(result.url).toBe("https://example.com/final");
         expect(result.body).toBe("Final page");
       }
+    });
+
+    it("drops credentials on a cross-origin redirect", async () => {
+      mockResolveRedirectUrl.mockReturnValueOnce({ ok: true, url: "https://other.example/final" });
+      fetchSpy.mockResolvedValueOnce(mockResponse({ status: 302, headers: { location: "//other.example/final" } }))
+        .mockResolvedValueOnce(mockResponse({}));
+      await httpGet("https://example.com", {
+        headers: { Authorization: "test", Cookie: "test=1", Accept: "application/json" },
+      });
+      expect(fetchSpy.mock.calls[1][1].headers).toEqual({ "User-Agent": expect.any(String), Accept: "application/json" });
+    });
+
+    it("reports the status of a redirect without a Location header", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse({ status: 302, statusText: "Found" }));
+      expect(await httpGet("https://example.com")).toMatchObject({
+        ok: false, error: { kind: "http_error", statusCode: 302, message: "HTTP 302 Found" },
+      });
     });
 
     it("returns error on too many redirects", async () => {
@@ -731,6 +770,22 @@ describe("httpGet", () => {
       if (result.ok) {
         expect(result.body.length).toBe(100);
       }
+    });
+
+    it("rejects an interrupted binary response", async () => {
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) { controller.error(new Error("Body read failed")); },
+      });
+      fetchSpy.mockResolvedValueOnce(new Response(stream));
+      expect(await httpGetBytes("https://example.com/spec.gz")).toMatchObject({
+        ok: false, error: { kind: "unknown" },
+      });
+    });
+
+    it("rejects a binary response over the streaming limit", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse({ body: "binary" }));
+      expect(await httpGetBytes("https://example.com/spec.gz", { maxBodyBytes: 5 }))
+        .toMatchObject({ ok: false, error: { kind: "body_too_large" } });
     });
 
     it("reads body correctly when delivered in multiple chunks", async () => {

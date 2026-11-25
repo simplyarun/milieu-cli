@@ -16,13 +16,14 @@ const DIRECTIVE_PATTERN = /\b(user-agent|disallow|allow)\s*:/i;
  * use by crawler policy evaluation.
  */
 export async function checkRobotsTxt(
-  domain: string,
+  origin: string,
   timeout?: number,
 ): Promise<RobotsTxtCheckResult> {
   const id = "robots_txt";
   const label = "robots.txt";
 
-  const result = await httpGet("https://" + domain + "/robots.txt", {
+  const domain = new URL(origin).host;
+  const result = await httpGet(origin + "/robots.txt", {
     timeout,
   });
 

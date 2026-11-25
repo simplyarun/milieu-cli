@@ -18,6 +18,17 @@ describe("normalizeUrl", () => {
     }
   });
 
+  it("accepts mixed-case HTTPS", () => {
+    expect(normalizeUrl("HtTpS://EXAMPLE.COM")).toMatchObject({
+      ok: true, href: "https://example.com/",
+    });
+  });
+
+  it.each(["ftp://example.com", "file:///example.txt", "mailto:account@example.com",
+    "https://user:pass@example.com"])("rejects unsupported or credential-bearing input %s", (input) => {
+    expect(normalizeUrl(input).ok).toBe(false);
+  });
+
   it("preserves existing http:// protocol", () => {
     const result = normalizeUrl("http://example.com");
     expect(result.ok).toBe(true);
@@ -65,6 +76,11 @@ describe("normalizeUrl", () => {
     if (!result.ok) {
       expect(result.error).toBe("Empty URL");
     }
+  });
+
+  it("returns an error for a non-string URL from a JavaScript caller", () => {
+    // @ts-expect-error JavaScript callers bypass the parameter type.
+    expect(normalizeUrl(null).ok).toBe(false);
   });
 
   it("returns error for whitespace only", () => {
@@ -134,6 +150,11 @@ describe("resolveRedirectUrl", () => {
       expect(result.url).toBe("https://example.com/other");
     }
   });
+
+  it.each(["data:text/plain,hello", "file:///example.txt", "https://user@example.org"])
+    ("rejects unsupported or credential-bearing redirect %s", (location) => {
+      expect(resolveRedirectUrl(location, "https://example.com").ok).toBe(false);
+    });
 
   it("returns error for empty Location header", () => {
     const result = resolveRedirectUrl("", "https://example.com");

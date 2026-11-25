@@ -41,9 +41,9 @@ milieu-cli is a **read-only network scanner** that makes outbound HTTP requests 
 
 Since the tool fetches arbitrary URLs, Server-Side Request Forgery is the most relevant attack class. Mitigations in place:
 
-- **DNS validation at every redirect hop** — the hostname is resolved and every resolved address is checked (rejecting if *any* is private) before each request
+- **DNS validation at every redirect hop.** On the first lookup of a hostname, the scanner checks every returned address. Subsequent probes in the same scan can reuse the validated address. IP literals are checked directly.
 - **Connection pinning** — the socket is pinned to the exact IP that validation approved (via an undici dispatcher with a fixed `connect.lookup`), so a low-TTL hostname cannot return a public IP to the validator and a private one to the actual connection. This closes the DNS-rebinding TOCTOU that per-hop validation alone leaves open. The original hostname is preserved for the Host header and TLS SNI/certificate checks.
-- **Private IP blocking** — all RFC 1918, loopback, link-local, CGNAT, IPv6 ULA, and IPv4-mapped IPv6 addresses are rejected
+- **Private IP blocking.** The scanner rejects loopback, private, link-local, CGNAT and multicast destinations. IPv4 rules also apply to IPv4-mapped IPv6 addresses and the well-known NAT64 prefix.
 - **Manual redirect handling** — redirects are followed explicitly (not by the HTTP client) so SSRF checks cannot be bypassed via 3xx chains; each hop is re-validated and re-pinned
 - **Redirect depth limit** — maximum of 5 hops prevents infinite redirect loops
 
@@ -57,7 +57,7 @@ Since the tool fetches arbitrary URLs, Server-Side Request Forgery is the most r
 The following are **not** considered vulnerabilities for this project:
 
 - **Scan results from malicious websites** — milieu-cli reports what it finds; a site returning misleading metadata is expected behavior, not a scanner bug
-- **Rate limiting or blocking by target sites** — the scanner makes a modest number of sequential requests; being blocked by WAFs is expected
+- **Rate limiting or blocking by target sites.** By default a scan permits up to eight concurrent HTTP requests and 150 attempts, including redirect hops and retries.
 - **Local privilege escalation** — milieu-cli runs with the invoking user's permissions and does not require elevated privileges
 - **Denial of service against the scanner itself** — e.g., a target returning an extremely slow response. Timeouts mitigate this, but targeted resource exhaustion of the scanning process is out of scope
 
@@ -66,5 +66,5 @@ The following are **not** considered vulnerabilities for this project:
 - **No code execution** — responses are parsed as text/JSON only; no `eval`, no script execution, no dynamic `import()`
 - **No secrets or credentials** — milieu-cli does not use API keys, tokens, or any form of authentication
 - **No persistent storage** — no databases, no caches on disk, no config files written
-- **Minimal dependencies** — only three runtime dependencies (`chalk`, `commander`, `ora`), all well-established libraries, reducing supply chain risk
+- **Runtime dependencies.** The CLI uses `chalk`, `commander`, and `ora`. The HTTP client uses `undici` for fetching and connection pinning.
 - **No network listeners** — the tool is purely an outbound client; it never binds to a port

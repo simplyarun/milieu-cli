@@ -15,10 +15,20 @@ function make404(): HttpResponse {
 describe("checkA2aAgentCard", () => {
   beforeEach(() => mockHttpGet.mockReset());
   it("returns pass with valid JSON", async () => {
-    mockHttpGet.mockResolvedValue(makeSuccess('{"name":"Agent"}'));
+    mockHttpGet.mockResolvedValue(makeSuccess(JSON.stringify({name: 'Agent', supportedInterfaces: [{url: 'https://example.com/a2a'}]})));
     const result = await checkA2aAgentCard("https://example.com");
     expect(result.id).toBe("standards_a2a_agent_card");
     expect(result.status).toBe("pass");
+  });
+  it("falls back to a legacy card", async () => {
+    mockHttpGet.mockResolvedValueOnce(make404()).mockResolvedValueOnce(makeSuccess('{"name":"Agent","url":"https://example.com/a2a"}'));
+    const result = await checkA2aAgentCard("https://example.com");
+    expect(result.status).toBe("pass");
+    expect(mockHttpGet.mock.calls.map(([url]) => url)).toEqual(["https://example.com/.well-known/agent-card.json", "https://example.com/.well-known/agent.json"]);
+  });
+  it("rejects unrelated JSON", async () => {
+    mockHttpGet.mockResolvedValue(makeSuccess('{"name":"ordinary page metadata"}'));
+    expect((await checkA2aAgentCard("https://example.com")).status).toBe("fail");
   });
   it("returns fail with invalid JSON", async () => {
     mockHttpGet.mockResolvedValue(makeSuccess("not json"));

@@ -1,7 +1,7 @@
 // AI crawler policy evaluation from parsed robots.txt data
 
 import type { Check } from "../../core/types.js";
-import type { RobotsTxtResult, RobotsGroup } from "./robots-parser.js";
+import type { RobotsTxtResult, RobotsRule } from "./robots-parser.js";
 import { matchesPath } from "./robots-parser.js";
 
 export const AI_CRAWLERS = [
@@ -17,16 +17,18 @@ export const AI_CRAWLERS = [
  * Evaluate per-AI-crawler policy from parsed robots.txt data.
  *
  * @param parsed - Parsed robots.txt result, or null if robots.txt was not found (404)
- * @param targetPath - The URL path to evaluate against (e.g., "/")
+ * @param unavailable - robots.txt could not be evaluated
  * @returns Array of 6 Check objects, one per AI crawler
  */
 export function evaluateCrawlerPolicies(
   parsed: RobotsTxtResult | null,
-  targetPath: string,
+  unavailable = false,
 ): Check[] {
   return AI_CRAWLERS.map((crawler) => {
     const id = `crawler_policy_${crawler.id}`;
     const label = `${crawler.name} Policy`;
+
+    if (unavailable) return { id, label, status: "error", detail: "Could not evaluate crawler policy without robots.txt" };
 
     // No robots.txt (404 case): skip
     if (parsed === null) {
@@ -40,9 +42,9 @@ export function evaluateCrawlerPolicies(
     }
 
     // Find group matching this crawler
-    const group = findMatchingGroup(parsed, crawler.userAgent);
+    const rules = findMatchingRules(parsed, crawler.userAgent);
 
-    if (!group) {
+    if (!rules.length) {
       // No matching group at all -> allowed
       return {
         id,
@@ -54,7 +56,7 @@ export function evaluateCrawlerPolicies(
     }
 
     // Evaluate policy from the group's rules
-    return evaluateGroupPolicy(group, id, label);
+    return evaluateGroupPolicy(rules, id, label);
   });
 }
 
@@ -62,39 +64,25 @@ export function evaluateCrawlerPolicies(
  * Find the most specific matching group for a crawler.
  * Prefer crawler-specific group over * group (RFC 9309).
  */
-function findMatchingGroup(
-  parsed: RobotsTxtResult,
-  userAgent: string,
-): RobotsGroup | null {
-  const ua = userAgent.toLowerCase();
-
-  // Look for specific match first
-  const specific = parsed.groups.find((g) =>
-    g.userAgents.some((a) => a === ua),
-  );
-  if (specific) return specific;
-
-  // Fall back to * group
-  const wildcard = parsed.groups.find((g) =>
-    g.userAgents.some((a) => a === "*"),
-  );
-  return wildcard ?? null;
+function findMatchingRules(parsed: RobotsTxtResult, userAgent: string): RobotsRule[] {
+  const specific = parsed.groups.filter((group) => group.userAgents.includes(userAgent));
+  const matching = specific.length ? specific : parsed.groups.filter((group) => group.userAgents.includes("*"));
+  return matching.flatMap((group) => group.rules).filter((rule) => rule.path !== "");
 }
 
 /**
  * Evaluate a crawler's policy from its matching group's rules.
  */
 function evaluateGroupPolicy(
-  group: RobotsGroup,
+  rules: RobotsRule[],
   id: string,
   label: string,
 ): Check {
-  const disallowRules = group.rules.filter((r) => r.type === "disallow");
-  const allowRules = group.rules.filter((r) => r.type === "allow");
+  const disallowRules = rules.filter((r) => r.type === "disallow");
+  const allowRules = rules.filter((r) => r.type === "allow");
 
   // No rules or only empty-path Disallow -> pass
-  const hasSubstantiveDisallow = disallowRules.some((r) => r.path !== "");
-  if (!hasSubstantiveDisallow) {
+  if (disallowRules.length === 0) {
     return {
       id,
       label,

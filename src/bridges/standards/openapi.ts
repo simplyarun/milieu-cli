@@ -65,11 +65,6 @@ const ALL_PATHS = [...SPEC_PATHS, ...DOC_UI_PATHS];
 
 const HTML_TYPES = new Set(["text/html", "application/xhtml+xml"]);
 
-const JSON_TYPES = new Set([
-  "application/json",
-  "application/vnd.oai.openapi+json",
-]);
-
 const YAML_TYPES = new Set([
   "application/yaml",
   "text/yaml",
@@ -86,70 +81,21 @@ function mediaType(headers: Record<string, string>): string {
   return (headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
 }
 
-/**
- * Validate that an HTTP response contains a genuine OpenAPI / Swagger spec.
- * Returns true only when the body is confirmed to contain spec content.
- */
-function isOpenApiResponse(response: HttpSuccess): boolean {
-  const ct = mediaType(response.headers);
-
-  // Reject HTML responses (Swagger UI pages)
-  if (HTML_TYPES.has(ct)) return false;
-
-  // JSON content types -- parse and check for top-level key
-  if (JSON_TYPES.has(ct)) {
-    return jsonHasSpecKey(response.body);
-  }
-
-  // YAML content types -- regex check
-  if (YAML_TYPES.has(ct)) {
-    return /^(openapi|swagger):/m.test(response.body);
-  }
-
-  // Unknown Content-Type -- try JSON.parse fallback if body looks like JSON
-  if (response.body.trimStart().startsWith("{")) {
-    return jsonHasSpecKey(response.body);
-  }
-
-  return false;
+function validVersion(specType: string, version: unknown): version is string {
+  if (specType === "swagger") return version === "2.0";
+  return typeof version === "string" && /^3\.\d+\.\d+(?:-[\w.-]+)?$/.test(version);
 }
 
-/** Parse JSON and check for top-level "openapi" or "swagger" key */
-function jsonHasSpecKey(body: string): boolean {
+/** Parse a JSON spec once for detection and the downstream schema checks. */
+function extractJsonInfo(body: string): (OpenApiInfo & { parsedSpec: unknown }) | null {
   try {
     const parsed = JSON.parse(body);
-    return "openapi" in parsed || "swagger" in parsed;
-  } catch {
-    return false;
-  }
-}
-
-/** Determine whether the response is JSON (parseable) or YAML */
-function isJsonParseable(body: string): boolean {
-  try {
-    JSON.parse(body);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** Extract version, spec type, and endpoint count from a JSON body */
-function extractJsonInfo(body: string): OpenApiInfo | null {
-  try {
-    const parsed = JSON.parse(body);
-    const specType: "openapi" | "swagger" | null =
-      "openapi" in parsed
-        ? "openapi"
-        : "swagger" in parsed
-          ? "swagger"
-          : null;
-    if (!specType) return null;
-
-    const version = String(parsed[specType]);
-    const endpointCount = parsed.paths
-      ? Object.keys(parsed.paths).length
-      : 0;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const specType = "openapi" in parsed ? "openapi" : "swagger";
+    const version = parsed[specType];
+    if (!validVersion(specType, version)) return null;
+    if (parsed.paths !== undefined && (!parsed.paths || typeof parsed.paths !== "object" || Array.isArray(parsed.paths))) return null;
+    const endpointCount = Object.keys(parsed.paths ?? {}).filter(path => path.startsWith("/")).length;
 
     // OpenAPI 3.1+ top-level webhooks
     const hasWebhooks =
@@ -172,7 +118,7 @@ function extractJsonInfo(body: string): OpenApiInfo | null {
       }
     }
 
-    return { version, specType, endpointCount, hasWebhooks, hasCallbacks };
+    return { version, specType, endpointCount, hasWebhooks, hasCallbacks, parsedSpec: parsed };
   } catch {
     return null;
   }
@@ -181,9 +127,9 @@ function extractJsonInfo(body: string): OpenApiInfo | null {
 /** Extract version, spec type, and endpoint count from YAML via regex */
 function extractYamlInfo(body: string): OpenApiInfo | null {
   const versionMatch = body.match(
-    /^(openapi|swagger):\s*["']?(\d+\.\d+(?:\.\d+)?)/m,
+    /^(openapi|swagger):[ \t]*["']?([\w.-]+)["']?[ \t]*(?:#.*)?\r?$/m,
   );
-  if (!versionMatch) return null;
+  if (!versionMatch || !validVersion(versionMatch[1], versionMatch[2])) return null;
 
   // Count paths in YAML (lines that start with / at indent level 2)
   const pathMatches = body.match(/^ {2}\/\S+:/gm);
@@ -200,6 +146,24 @@ function extractYamlInfo(body: string): OpenApiInfo | null {
     endpointCount: pathMatches?.length ?? 0,
     hasWebhooks,
     hasCallbacks,
+  };
+}
+
+function detectSpec(response: HttpSuccess, path: string): OpenApiResult | null {
+  const ct = mediaType(response.headers);
+  if (HTML_TYPES.has(ct)) return null;
+  const json = response.body.trimStart().startsWith("{");
+  const info = json ? extractJsonInfo(response.body) : YAML_TYPES.has(ct) ? extractYamlInfo(response.body) : null;
+  if (!info) return null;
+  const { version, specType, endpointCount, hasWebhooks, hasCallbacks } = info;
+  return {
+    check: {
+      id: "openapi_spec", label: "OpenAPI Spec", status: json ? "pass" : "partial",
+      detail: json ? `OpenAPI ${version} found with ${endpointCount} endpoints` : `OpenAPI ${version} found (YAML format)`,
+      data: { version, specType, endpointCount, path },
+    },
+    detected: true, hasWebhooks, hasCallbacks,
+    parsedSpec: "parsedSpec" in info ? info.parsedSpec : null,
   };
 }
 
@@ -223,70 +187,23 @@ const SPEC_URL_PATTERNS = [
   /(https?:\/\/[^\s,`"'<>]+(?:openapi|swagger)\.(?:json|yaml))/g,
 ];
 
-/**
- * Extract spec URLs from text content (HTML or JS).
- * Returns deduplicated, same-origin, absolute URLs.
- */
-function extractSpecUrls(body: string, pageUrl: string): string[] {
+const SCRIPT_URL_PATTERNS = [/<script[^<>]+src=["']([^"']*swagger[^"']*\.js)["']/gi];
+const MAX_CANDIDATES = 3;
+
+/** Keep only same-origin candidates that might actually be fetched. */
+function collectCandidates(
+  body: string, pageUrl: string, patterns: RegExp[], candidates: Set<string>, excluded?: Set<string>,
+): void {
+  if (candidates.size >= MAX_CANDIDATES) return;
   const origin = new URL(pageUrl).origin;
-  const seen = new Set<string>();
-  const results: string[] = [];
-
-  for (const pattern of SPEC_URL_PATTERNS) {
-    pattern.lastIndex = 0;
-    let match;
-    while ((match = pattern.exec(body)) !== null) {
-      const raw = match[1];
-      if (!raw) continue;
-
-      let absolute: string;
-      try {
-        absolute = new URL(raw, pageUrl).href;
-      } catch {
-        continue;
-      }
-
-      try {
-        if (new URL(absolute).origin !== origin) continue;
-      } catch {
-        continue;
-      }
-
-      if (!seen.has(absolute)) {
-        seen.add(absolute);
-        results.push(absolute);
-      }
+  for (const pattern of patterns) {
+    for (const match of body.matchAll(pattern)) {
+      const url = URL.parse(match[1], pageUrl);
+      if (url?.origin !== origin || url.username || url.password || excluded?.has(url.href)) continue;
+      candidates.add(url.href);
+      if (candidates.size >= MAX_CANDIDATES) return;
     }
   }
-
-  return results;
-}
-
-/**
- * Extract Swagger UI config script URLs from HTML.
- * Returns URLs of JS files that likely contain spec URL configuration.
- */
-function extractSwaggerScriptUrls(html: string, pageUrl: string): string[] {
-  const origin = new URL(pageUrl).origin;
-  // Match <script src="...swagger...js"> or <script src="...swagger...js">
-  const pattern = /<script[^>]+src=["']([^"']*swagger[^"']*\.js)["']/gi;
-  const results: string[] = [];
-
-  let match;
-  while ((match = pattern.exec(html)) !== null) {
-    const raw = match[1];
-    if (!raw) continue;
-
-    try {
-      const absolute = new URL(raw, pageUrl).href;
-      if (new URL(absolute).origin !== origin) continue;
-      results.push(absolute);
-    } catch {
-      continue;
-    }
-  }
-
-  return results;
 }
 
 /** Returns true if response is a 401/403 HTTP error (not bot-protected) */
@@ -396,61 +313,15 @@ export async function checkOpenApi(
   for (let i = 0; i < specPathResponses.length; i++) {
     const response = specPathResponses[i];
     if (!response.ok) continue;
-    if (!isOpenApiResponse(response)) continue;
-
-    const path = SPEC_PATHS[i];
-
-    if (isJsonParseable(response.body)) {
-      const info = extractJsonInfo(response.body);
-      if (info) {
-        return {
-          check: {
-            id,
-            label,
-            status: "pass",
-            detail: `OpenAPI ${info.version} found with ${info.endpointCount} endpoints`,
-            data: {
-              version: info.version,
-              specType: info.specType,
-              endpointCount: info.endpointCount,
-              path,
-            },
-          },
-          detected: true,
-          hasWebhooks: info.hasWebhooks,
-          hasCallbacks: info.hasCallbacks,
-          parsedSpec: JSON.parse(response.body),
-        };
-      }
-    }
-
-    const yamlInfo = extractYamlInfo(response.body);
-    if (yamlInfo) {
-      return {
-        check: {
-          id,
-          label,
-          status: "partial",
-          detail: `OpenAPI ${yamlInfo.version} found (YAML format)`,
-          data: {
-            version: yamlInfo.version,
-            specType: yamlInfo.specType,
-            endpointCount: yamlInfo.endpointCount,
-            path,
-          },
-        },
-        detected: true,
-        hasWebhooks: yamlInfo.hasWebhooks,
-        hasCallbacks: yamlInfo.hasCallbacks,
-        parsedSpec: null,
-      };
-    }
+    const result = detectSpec(response, SPEC_PATHS[i]);
+    if (result) return result;
   }
 
   // Phase 3: Check doc-UI-path responses for HTML with extractable spec URLs
+  const origin = new URL(baseUrl).origin;
   const allProbedUrls = new Set(ALL_PATHS.map((p) => new URL(p, baseUrl).href));
-  const specCandidateUrls: string[] = [];
-  const scriptUrls: string[] = [];
+  const specCandidates = new Set<string>();
+  const scriptCandidates = new Set<string>();
 
   for (let i = 0; i < docUiResponses.length; i++) {
     const response = docUiResponses[i];
@@ -462,28 +333,15 @@ export async function checkOpenApi(
     const pageUrl = new URL(DOC_UI_PATHS[i], baseUrl).href;
 
     // Extract spec URLs directly from HTML
-    const extracted = extractSpecUrls(response.body, pageUrl);
-    for (const url of extracted) {
-      if (!allProbedUrls.has(url) && !specCandidateUrls.includes(url)) {
-        specCandidateUrls.push(url);
-      }
-    }
-
-    // Extract Swagger UI config script URLs for secondary fetching
-    if (specCandidateUrls.length === 0) {
-      const scripts = extractSwaggerScriptUrls(response.body, pageUrl);
-      for (const url of scripts) {
-        if (!scriptUrls.includes(url)) {
-          scriptUrls.push(url);
-        }
-      }
-    }
+    collectCandidates(response.body, pageUrl, SPEC_URL_PATTERNS, specCandidates, allProbedUrls);
+    if (!specCandidates.size) collectCandidates(response.body, pageUrl, SCRIPT_URL_PATTERNS, scriptCandidates);
   }
 
   // Phase 3a: Fetch external Swagger UI config scripts and extract spec URLs from them
-  if (specCandidateUrls.length === 0 && scriptUrls.length > 0) {
+  if (!specCandidates.size && scriptCandidates.size) {
+    const scriptUrls = [...scriptCandidates];
     const scriptResponses = await Promise.all(
-      scriptUrls.slice(0, 3).map((url) =>
+      scriptUrls.map((url) =>
         httpGet(url, {
           timeout,
           headers: { Accept: "*/*" },
@@ -496,27 +354,21 @@ export async function checkOpenApi(
       const response = scriptResponses[i];
       if (!response.ok) continue;
 
-      const scriptUrl = scriptUrls[i];
-      const extracted = extractSpecUrls(response.body, scriptUrl);
-      for (const url of extracted) {
-        if (!allProbedUrls.has(url) && !specCandidateUrls.includes(url)) {
-          specCandidateUrls.push(url);
-        }
-      }
+      collectCandidates(response.body, scriptUrls[i], SPEC_URL_PATTERNS, specCandidates, allProbedUrls);
     }
   }
 
-  // Merge sitemap-discovered API URLs into candidates (deduplicated)
-  for (const url of sitemapCandidateUrls) {
-    if (!allProbedUrls.has(url) && !specCandidateUrls.includes(url)) {
-      specCandidateUrls.push(url);
-    }
+  for (const candidate of sitemapCandidateUrls) {
+    if (specCandidates.size >= MAX_CANDIDATES) break;
+    const url = URL.parse(candidate);
+    if (url?.origin === origin && !url.username && !url.password && !allProbedUrls.has(url.href)) specCandidates.add(url.href);
   }
 
   // Phase 3b: Fetch candidate spec URLs and validate
-  if (specCandidateUrls.length > 0) {
+  if (specCandidates.size) {
+    const specCandidateUrls = [...specCandidates];
     const secondaryResponses = await Promise.all(
-      specCandidateUrls.slice(0, 3).map((url) =>
+      specCandidateUrls.map((url) =>
         httpGet(url, {
           timeout,
           headers: { Accept: "application/json, application/yaml, */*" },
@@ -528,55 +380,8 @@ export async function checkOpenApi(
     for (let i = 0; i < secondaryResponses.length; i++) {
       const response = secondaryResponses[i];
       if (!response.ok) continue;
-      if (!isOpenApiResponse(response)) continue;
-
-      const path = new URL(specCandidateUrls[i]).pathname;
-
-      if (isJsonParseable(response.body)) {
-        const info = extractJsonInfo(response.body);
-        if (info) {
-          return {
-            check: {
-              id,
-              label,
-              status: "pass",
-              detail: `OpenAPI ${info.version} found with ${info.endpointCount} endpoints`,
-              data: {
-                version: info.version,
-                specType: info.specType,
-                endpointCount: info.endpointCount,
-                path,
-              },
-            },
-            detected: true,
-            hasWebhooks: info.hasWebhooks,
-            hasCallbacks: info.hasCallbacks,
-            parsedSpec: JSON.parse(response.body),
-          };
-        }
-      }
-
-      const yamlInfo = extractYamlInfo(response.body);
-      if (yamlInfo) {
-        return {
-          check: {
-            id,
-            label,
-            status: "partial",
-            detail: `OpenAPI ${yamlInfo.version} found (YAML format)`,
-            data: {
-              version: yamlInfo.version,
-              specType: yamlInfo.specType,
-              endpointCount: yamlInfo.endpointCount,
-              path,
-            },
-          },
-          detected: true,
-          hasWebhooks: yamlInfo.hasWebhooks,
-          hasCallbacks: yamlInfo.hasCallbacks,
-          parsedSpec: null,
-        };
-      }
+      const result = detectSpec(response, new URL(specCandidateUrls[i]).pathname);
+      if (result) return result;
     }
   }
 

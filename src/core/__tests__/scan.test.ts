@@ -29,6 +29,17 @@ vi.mock("../version.js", () => ({
   getVersion: vi.fn(() => "0.1.0"),
 }));
 
+// The real http-client (used by the budget-exhaustion block) calls undici's own
+// fetch; route it back to the stubbed global fetch so those stubs intercept it.
+vi.mock("undici", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("undici")>();
+  return {
+    ...actual,
+    fetch: (input: unknown, init?: unknown) =>
+      (globalThis.fetch as (i: unknown, n?: unknown) => Promise<Response>)(input, init),
+  };
+});
+
 // Mock utils
 vi.mock("../../utils/index.js", () => ({
   normalizeUrl: vi.fn((url: string) => ({
@@ -142,7 +153,7 @@ describe("scan", () => {
     expect(runSeparationBridge).toHaveBeenCalledOnce();
   });
 
-  it("skips Bridges 2 and 3 when Bridge 1 aborts", async () => {
+  it("marks all remaining bridges as not evaluated when Bridge 1 aborts", async () => {
     vi.mocked(runReachabilityBridge).mockResolvedValue(mockBridge1Abort);
 
     const result = await scan("https://example.com");
@@ -155,10 +166,9 @@ describe("scan", () => {
     expect(result.bridges[0].abort).toBe(true);
     // Bridges 4 and 5 zeroed out
     expect(result.bridges[3].id).toBe(4);
-    expect(result.bridges[3].status).toBe("evaluated");
+    expect(result.bridges.slice(1).every(b => b.status === "not_evaluated")).toBe(true);
     expect(result.bridges[3].score).toBe(0);
     expect(result.bridges[4].id).toBe(5);
-    expect(result.bridges[4].status).toBe("evaluated");
     expect(result.bridges[4].score).toBe(0);
   });
 
@@ -206,13 +216,22 @@ describe("scan", () => {
 
   it("returns an invalid_url outcome for an unparseable URL", async () => {
     vi.mocked(normalizeUrl).mockReturnValueOnce({ ok: false, error: "bad url" });
-    const outcome = await scan("not a url");
+    const outcome = await scan("https://name:secret@example.com");
     expect(outcome.ok).toBe(false);
     if (!outcome.ok) {
       expect(outcome.error.kind).toBe("invalid_url");
+      expect(outcome.error.message).not.toContain("secret");
     }
     expect(runReachabilityBridge).not.toHaveBeenCalled();
   });
+
+  it.each([{ timeout: 0 }, { timeout: 2 ** 31 }, { maxRequests: NaN }, { maxConcurrency: 0.5 }])(
+    "rejects invalid scan options before starting requests: %o", async options => {
+      const outcome = await scan("example.com", options);
+      expect(outcome).toMatchObject({ ok: false, error: { kind: "scan_failed" } });
+      expect(runReachabilityBridge).not.toHaveBeenCalled();
+    },
+  );
 
   it("passes isSilent to ora when options.silent is true", async () => {
     vi.mocked(runReachabilityBridge).mockResolvedValue(mockBridge1Normal);

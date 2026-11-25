@@ -9,7 +9,7 @@ export function checkAuthClarity(spec: ParsedOpenApiSpec | undefined): Check {
     return { id, label, status: "fail", detail: "No spec available — agents cannot discover how to authenticate without documented security schemes", data: { schemesCount: 0, withDescription: 0, securityApplied: false } };
   }
   const schemes: Record<string, { description?: string }> = spec.components?.securitySchemes ?? spec.securityDefinitions ?? {};
-  const entries = Object.entries(schemes);
+  const entries = Object.entries(schemes).filter(([, s]) => s && typeof s === "object" && !Array.isArray(s));
   const schemesCount = entries.length;
   if (schemesCount === 0) {
     return { id, label, status: "fail", detail: "No security schemes defined in spec", data: { schemesCount: 0, withDescription: 0, securityApplied: false } };

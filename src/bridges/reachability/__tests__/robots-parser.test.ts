@@ -242,6 +242,12 @@ describe("matchesPath", () => {
     expect(matchesPath("", "/anything")).toBe(true);
   });
 
+  it("handles literal dollar signs, multiple stars and overlapping end segments", () => {
+    expect(matchesPath("/prices/$5", "/prices/$5/item")).toBe(true);
+    expect(matchesPath("/a**b$", "/ab")).toBe(true);
+    expect(matchesPath("/abc*bc$", "/abc")).toBe(false);
+  });
+
   it("matches prefix paths", () => {
     expect(matchesPath("/a/b", "/a/b/c")).toBe(true);
   });

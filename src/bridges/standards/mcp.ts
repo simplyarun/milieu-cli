@@ -80,7 +80,8 @@ export async function checkMcpEndpoint(
   if (result.ok) {
     let parsed: Record<string, unknown>;
     try {
-      parsed = JSON.parse(result.body) as Record<string, unknown>;
+      const value = JSON.parse(result.body);
+      parsed = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     } catch {
       // Fall through to content scanning
       parsed = {};
@@ -88,8 +89,8 @@ export async function checkMcpEndpoint(
 
     // Server Card format (SEP-1649)
     if (parsed.serverInfo && parsed.transport) {
-      const name =
-        (parsed.serverInfo as Record<string, unknown>).name ?? "unknown";
+      const serverName = (parsed.serverInfo as Record<string, unknown>).name;
+      const name = typeof serverName === "string" ? serverName : "unknown";
       const detail = `MCP Server Card: ${name}`;
       return {
         check: {

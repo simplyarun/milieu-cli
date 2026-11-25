@@ -69,7 +69,7 @@ export interface ParsedOpenApiSpec {
 }
 
 const HTTP_METHODS = [
-  "get", "post", "put", "patch", "delete", "options", "head",
+  "get", "post", "put", "patch", "delete", "options", "head", "trace",
 ] as const;
 
 /**
@@ -82,10 +82,13 @@ export function collectOperations(
   if (!spec?.paths) return [];
   const ops: Array<[string, string, OasOperation]> = [];
   for (const [path, pathItem] of Object.entries(spec.paths)) {
-    if (!pathItem || typeof pathItem !== "object") continue;
+    // Only root-relative paths belong to this API. Context probes append
+    // these keys to the scanned origin, so never accept authority fragments.
+    if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\")) continue;
+    if (!pathItem || typeof pathItem !== "object" || Array.isArray(pathItem)) continue;
     for (const method of HTTP_METHODS) {
       const op = pathItem[method];
-      if (op && typeof op === "object") {
+      if (op && typeof op === "object" && !Array.isArray(op)) {
         ops.push([path, method, op as OasOperation]);
       }
     }
