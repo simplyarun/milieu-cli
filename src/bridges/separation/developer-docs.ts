@@ -23,19 +23,27 @@ export interface DeveloperDocsResult {
  * Scan homepage HTML for links pointing to documentation paths.
  * Returns matched paths (deduplicated).
  */
-function scanDocLinks(html: string): string[] {
-  const found: string[] = [];
-  for (const path of DOC_PATHS) {
-    const escaped = path.replace(/\//g, "\\/");
-    const regex = new RegExp(
-      `<a\\s[^>]*href=["'][^"']*${escaped}[^"']*["']`,
-      "gi",
-    );
-    if (regex.test(html)) {
-      found.push(path);
+function scanDocLinks(html: string, baseUrl: string): string[] {
+  const found = new Set<string>();
+  const anchors = /<a(?=\s)(?:[^<>"']|"[^"]*"|'[^']*')*>/gi;
+  const attributes = /([^\s=/<>"']+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s<>"'=`]+)))?/g;
+
+  for (const [tag] of html.matchAll(anchors)) {
+    for (const [, name, doubleQuoted, singleQuoted, unquoted] of tag.matchAll(attributes)) {
+      if (name.toLowerCase() !== "href") continue;
+      const href = doubleQuoted ?? singleQuoted ?? unquoted;
+      const url = href ? URL.parse(href, baseUrl) : null;
+      if (url?.protocol === "http:" || url?.protocol === "https:") {
+        // Match whole path segments, including nested and off-site docs.
+        const pathname = url.pathname.toLowerCase() + "/";
+        for (const path of DOC_PATHS) {
+          if (pathname.includes(path + "/")) found.add(path);
+        }
+      }
+      break;
     }
   }
-  return found;
+  return DOC_PATHS.filter((path) => found.has(path));
 }
 
 /**
@@ -78,7 +86,7 @@ export async function checkDeveloperDocs(
   }
 
   // Also scan homepage HTML for documentation links
-  const linkedPaths = scanDocLinks(html);
+  const linkedPaths = scanDocLinks(html, baseUrl);
 
   // Combine both signals (dedup)
   const allFound = [...new Set([...reachablePaths, ...linkedPaths])];
