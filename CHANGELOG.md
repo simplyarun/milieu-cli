@@ -4,7 +4,9 @@ All notable changes to milieu-cli are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/). Pre-1.0, breaking changes bump the
 minor version.
 
-## [0.3.2] — unreleased
+## [0.3.2] (2026-11-24)
+
+**Requires Node.js 22.19.0 or newer.** Upgrade Node before installing this release on an older runtime.
 
 ### Fixed
 
@@ -32,6 +34,9 @@ minor version.
   discovery. An aborted scan now marks the remaining bridges as skipped.
 - Invalid timeout, request limit and threshold values now produce errors
   before scanning. This prevents a mistyped threshold from passing a CI check.
+- Developer documentation detection now checks the path of each link. Relative
+  and off-site documentation links count, while a path mentioned only in a query
+  string or another HTML attribute no longer earns credit.
 
 ## [0.3.1] — 2026-07-19
 
