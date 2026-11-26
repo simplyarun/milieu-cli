@@ -78,8 +78,12 @@ export async function runStandardsBridge(ctx: ScanContext): Promise<BridgeResult
   const schemaOrgCheck = checkSchemaOrg(pageBody, jsonLdCheck);
 
   // Store results for downstream bridges
+  ctx.shared.openApiCheck = openApiResult.check;
+  ctx.shared.graphqlCheck = graphqlResult.check;
+  ctx.shared.openApiDocumentUrls = openApiResult.verifiedDocumentUrls ?? [];
   ctx.shared.openApiDetected = openApiResult.detected;
   ctx.shared.openApiSpec = openApiResult.parsedSpec ?? null;
+  ctx.shared.openApiDiscoveryIncomplete = openApiResult.check.status === "error";
   ctx.shared.openApiHasWebhooks = openApiResult.hasWebhooks;
   ctx.shared.openApiHasCallbacks = openApiResult.hasCallbacks;
   ctx.shared.graphqlDetected = graphqlResult.detected;

@@ -1,5 +1,7 @@
+import { load as loadYaml, CORE_SCHEMA } from "js-yaml";
 import type { Check, HttpResponse, HttpSuccess } from "../../core/types.js";
 import { httpGet } from "../../utils/http-client.js";
+import { collectOperations, type ParsedOpenApiSpec } from "../schema/oas-types.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -12,16 +14,10 @@ export interface OpenApiResult {
   hasWebhooks: boolean;
   /** OpenAPI 3.0+ `callbacks` found in any operation */
   hasCallbacks: boolean;
-  /** Full parsed spec object when JSON spec found. For Bridge 4/5 consumption. */
+  /** Full parsed spec object when a JSON or YAML spec was read. For Bridge 4/5 consumption. */
   parsedSpec: unknown | null;
-}
-
-interface OpenApiInfo {
-  version: string;
-  specType: "openapi" | "swagger";
-  endpointCount: number;
-  hasWebhooks: boolean;
-  hasCallbacks: boolean;
+  /** Query-free URLs actually visited on the way to the parsed document. */
+  verifiedDocumentUrls?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -86,84 +82,73 @@ function validVersion(specType: string, version: unknown): version is string {
   return typeof version === "string" && /^3\.\d+\.\d+(?:-[\w.-]+)?$/.test(version);
 }
 
-/** Parse a JSON spec once for detection and the downstream schema checks. */
-function extractJsonInfo(body: string): (OpenApiInfo & { parsedSpec: unknown }) | null {
-  try {
-    const parsed = JSON.parse(body);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    const specType = "openapi" in parsed ? "openapi" : "swagger";
-    const version = parsed[specType];
-    if (!validVersion(specType, version)) return null;
-    if (parsed.paths !== undefined && (!parsed.paths || typeof parsed.paths !== "object" || Array.isArray(parsed.paths))) return null;
-    const endpointCount = Object.keys(parsed.paths ?? {}).filter(path => path.startsWith("/")).length;
-
-    // OpenAPI 3.1+ top-level webhooks
-    const hasWebhooks =
-      parsed.webhooks != null &&
-      typeof parsed.webhooks === "object" &&
-      Object.keys(parsed.webhooks).length > 0;
-
-    // OpenAPI 3.0+ callbacks in any operation
-    let hasCallbacks = false;
-    if (parsed.paths && typeof parsed.paths === "object") {
-      for (const pathItem of Object.values(parsed.paths)) {
-        if (!pathItem || typeof pathItem !== "object") continue;
-        for (const op of Object.values(pathItem as Record<string, unknown>)) {
-          if (op && typeof op === "object" && "callbacks" in op) {
-            hasCallbacks = true;
-            break;
-          }
-        }
-        if (hasCallbacks) break;
-      }
-    }
-
-    return { version, specType, endpointCount, hasWebhooks, hasCallbacks, parsedSpec: parsed };
-  } catch {
-    return null;
-  }
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-/** Extract version, spec type, and endpoint count from YAML via regex */
-function extractYamlInfo(body: string): OpenApiInfo | null {
-  const versionMatch = body.match(
-    /^(openapi|swagger):[ \t]*["']?([\w.-]+)["']?[ \t]*(?:#.*)?\r?$/m,
-  );
-  if (!versionMatch || !validVersion(versionMatch[1], versionMatch[2])) return null;
+function partialBody(response: HttpSuccess): boolean {
+  return response.bodyIncomplete === true || response.status === 206 || response.headers["content-range"] !== undefined;
+}
 
-  // Count paths in YAML (lines that start with / at indent level 2)
-  const pathMatches = body.match(/^ {2}\/\S+:/gm);
-
-  // Top-level webhooks key (OpenAPI 3.1+)
-  const hasWebhooks = /^webhooks:/m.test(body);
-
-  // Callbacks nested under operations (indented 6+ spaces)
-  const hasCallbacks = /^ {6,}callbacks:/m.test(body);
-
-  return {
-    version: versionMatch[2],
-    specType: versionMatch[1] as "openapi" | "swagger",
-    endpointCount: pathMatches?.length ?? 0,
-    hasWebhooks,
-    hasCallbacks,
-  };
+/** Count shared subtrees on every visit to bound the cost of downstream checks. */
+function parseYamlSpec(body: string): unknown {
+  const maxDepth = 100;
+  const spec = loadYaml(body, { schema: CORE_SCHEMA, maxDepth, maxAliases: 64 });
+  if (!body.includes("*")) return spec;
+  let remainingNodes = 100_000;
+  function withinLimits(value: unknown, depth: number): boolean {
+    if (--remainingNodes < 0 || depth > maxDepth) return false;
+    if (value === null || typeof value !== "object") return true;
+    const container = value as Record<string, unknown>;
+    for (const key in container) {
+      if (!withinLimits(container[key], depth + 1)) return false;
+    }
+    return true;
+  }
+  return withinLimits(spec, 0) ? spec : null;
 }
 
 function detectSpec(response: HttpSuccess, path: string): OpenApiResult | null {
   const ct = mediaType(response.headers);
-  if (HTML_TYPES.has(ct)) return null;
-  const json = response.body.trimStart().startsWith("{");
-  const info = json ? extractJsonInfo(response.body) : YAML_TYPES.has(ct) ? extractYamlInfo(response.body) : null;
-  if (!info) return null;
-  const { version, specType, endpointCount, hasWebhooks, hasCallbacks } = info;
+  if (partialBody(response) || HTML_TYPES.has(ct)) return null;
+  const yaml = YAML_TYPES.has(ct) || ct.endsWith("+yaml") || /\.ya?ml$/i.test(path);
+  if (!yaml && !response.body.trimStart().startsWith("{")) return null;
+  let spec: unknown;
+  try {
+    // The HTTP client caps response size before either parser runs.
+    spec = yaml ? parseYamlSpec(response.body) : JSON.parse(response.body);
+  } catch {
+    return null;
+  }
+
+  if (!isRecord(spec)) return null;
+  const specType = "openapi" in spec ? "openapi" : "swagger";
+  const version = spec[specType];
+  if (!validVersion(specType, version)) return null;
+  if (spec.paths !== undefined && !isRecord(spec.paths)) return null;
+
+  const document = new URL(response.url);
+  const chain = [...response.redirects, response.url].map(raw => new URL(raw));
+  const safeIdentity = (u: URL) => ["https:", "http:"].includes(u.protocol) && !u.username && !u.password && !u.search;
+  const verifiedDocumentUrls = (chain.every(safeIdentity) ? chain : [document].filter(safeIdentity))
+    .map(u => u.origin + u.pathname);
+  const paths = spec.paths ?? {};
+  const endpointCount = Object.keys(paths).filter(path => path.startsWith("/")).length;
+  const hasWebhooks = isRecord(spec.webhooks) && Object.keys(spec.webhooks).length > 0;
+  const hasCallbacks = specType === "openapi" && collectOperations(spec as ParsedOpenApiSpec).some(([, , op]) =>
+    "callbacks" in op && isRecord(op.callbacks) && Object.keys(op.callbacks).length > 0);
+
   return {
     check: {
-      id: "openapi_spec", label: "OpenAPI Spec", status: json ? "pass" : "partial",
-      detail: json ? `OpenAPI ${version} found with ${endpointCount} endpoints` : `OpenAPI ${version} found (YAML format)`,
-      data: { version, specType, endpointCount, path },
+      id: "openapi_spec", label: "OpenAPI Spec", status: "pass",
+      detail: `OpenAPI ${version} found with ${endpointCount} endpoints`,
+      data: {
+        version, specType, endpointCount, path,
+        documentUrl: document.origin + document.pathname,
+        ...(document.search ? { documentHasQuery: true } : {}),
+      },
     },
-    detected: true, hasWebhooks, hasCallbacks,
-    parsedSpec: "parsedSpec" in info ? info.parsedSpec : null,
+    detected: true, hasWebhooks, hasCallbacks, parsedSpec: spec, verifiedDocumentUrls,
   };
 }
 
@@ -199,11 +184,73 @@ function collectCandidates(
   for (const pattern of patterns) {
     for (const match of body.matchAll(pattern)) {
       const url = URL.parse(match[1], pageUrl);
-      if (url?.origin !== origin || url.username || url.password || excluded?.has(url.href)) continue;
+      if (url?.origin !== origin || url.username || url.password) continue;
+      url.hash = "";
+      if (excluded?.has(url.href)) continue;
       candidates.add(url.href);
       if (candidates.size >= MAX_CANDIDATES) return;
     }
   }
+}
+
+/** Read only machine-description targets from an RFC 9727 JSON Linkset. */
+function catalogCandidates(response: HttpSuccess, excluded: Set<string>): string[] {
+  if (mediaType(response.headers) !== "application/linkset+json") return [];
+  let catalog: unknown;
+  try {
+    catalog = JSON.parse(response.body);
+  } catch {
+    return [];
+  }
+  if (!isRecord(catalog) || !Array.isArray(catalog.linkset)) return [];
+
+  const catalogUrl = new URL(response.url);
+  const candidates = new Set<string>();
+  for (const context of catalog.linkset) {
+    if (!isRecord(context) || !Array.isArray(context["service-desc"])) continue;
+    for (const link of context["service-desc"]) {
+      if (!isRecord(link) || typeof link.href !== "string" || !link.href.trim()) continue;
+      if (link.type !== undefined) {
+        if (typeof link.type !== "string") continue;
+        const type = link.type.split(";")[0].trim().toLowerCase();
+        if (type !== "application/json" && !YAML_TYPES.has(type) && !/\+(json|yaml)$/.test(type)) continue;
+      }
+      const url = URL.parse(link.href, response.url);
+      if (!url || url.protocol !== catalogUrl.protocol || url.origin !== catalogUrl.origin || url.username || url.password) continue;
+      url.hash = "";
+      if (excluded.has(url.href)) continue;
+      candidates.add(url.href);
+      if (candidates.size >= MAX_CANDIDATES) return [...candidates];
+    }
+  }
+  return [...candidates];
+}
+
+async function probeSpecCandidates(get: typeof httpGet, urls: string[], timeout?: number, catalogUrl?: string) {
+  const responses = await Promise.all(urls.map(url =>
+    get(url, {
+      timeout,
+      ...(catalogUrl ? { maxRedirects: 0 } : {}),
+      headers: { Accept: "application/json, application/yaml, */*" },
+    }),
+  ));
+  for (const [i, response] of responses.entries()) {
+    if (!response.ok) continue;
+    const spec = detectSpec(response, new URL(urls[i]).pathname);
+    if (spec) {
+      if (catalogUrl) {
+        const catalog = new URL(catalogUrl);
+        const published = new URL(urls[i]);
+        const target = published.origin + published.pathname;
+        const safe = !catalog.search && !catalog.username && !catalog.password &&
+          !published.search && !published.username && !published.password && spec.verifiedDocumentUrls?.includes(target);
+        spec.check.data = { ...spec.check.data, source: "api-catalog",
+          ...(safe ? { catalogRoute: { source: catalog.origin + catalog.pathname, target } } : {}) };
+      }
+      return spec;
+    }
+  }
+  return null;
 }
 
 /** Returns true if response is a 401/403 HTTP error (not bot-protected) */
@@ -231,35 +278,29 @@ function isProtectedResponse(response: HttpResponse): boolean {
  * rather than self-hosting it at a standard path on their own domain.
  */
 async function lookupApisGuru(
+  get: typeof httpGet,
   domain: string,
   timeout?: number,
-): Promise<{ specUrl: string | null; budgetDenied: boolean }> {
-  const result = await httpGet(`https://api.apis.guru/v2/${domain}.json`, {
+): Promise<string | null> {
+  const result = await get(`https://api.apis.guru/v2/${domain}.json`, {
     timeout,
     headers: { Accept: "application/json" },
   });
-  if (!result.ok) {
-    return { specUrl: null, budgetDenied: result.error.kind === "request_budget_exhausted" };
-  }
+  if (!result.ok || partialBody(result)) return null;
 
   try {
     const parsed = JSON.parse(result.body);
     const apis = parsed?.apis;
-    if (!apis || typeof apis !== "object") return { specUrl: null, budgetDenied: false };
+    if (!apis || typeof apis !== "object") return null;
 
     // Take the first API entry (most providers have exactly one)
     const firstApi = Object.values(apis)[0] as Record<string, unknown> | null;
-    if (!firstApi) return { specUrl: null, budgetDenied: false };
+    if (!firstApi) return null;
 
-    return {
-      specUrl:
-        (firstApi.swaggerUrl as string | undefined) ??
-        (firstApi.swaggerYamlUrl as string | undefined) ??
-        null,
-      budgetDenied: false,
-    };
+    const specUrl = firstApi.swaggerUrl ?? firstApi.swaggerYamlUrl;
+    return typeof specUrl === "string" ? specUrl : null;
   } catch {
-    return { specUrl: null, budgetDenied: false };
+    return null;
   }
 }
 
@@ -285,16 +326,32 @@ export async function checkOpenApi(
   const id = "openapi_spec";
   const label = "OpenAPI Spec";
 
+  // Every discovery wave contributes to coverage. A timeout, blocked fetch,
+  // server failure or truncated body cannot establish a missing contract.
+  let budgetDenied = false;
+  let unavailable = false;
+  const get: typeof httpGet = async (url, options) => {
+    const response = await httpGet(url, options);
+    if (response.ok) unavailable ||= partialBody(response);
+    else if (response.error.kind === "request_budget_exhausted") budgetDenied = true;
+    else {
+      const status = response.error.statusCode;
+      unavailable ||= response.error.kind !== "http_error" || !status ||
+        status === 401 || status === 403 || status === 408 || status === 429 || status >= 500;
+    }
+    return response;
+  };
+
   // Phase 1: Fire all 24 probes in parallel (17 spec paths + 7 doc UI paths)
   const responses = await Promise.all([
     ...SPEC_PATHS.map((path) =>
-      httpGet(new URL(path, baseUrl).href, {
+      get(new URL(path, baseUrl).href, {
         timeout,
         headers: { Accept: "application/json, application/yaml, */*" },
       }),
     ),
     ...DOC_UI_PATHS.map((path) =>
-      httpGet(new URL(path, baseUrl).href, {
+      get(new URL(path, baseUrl).href, {
         timeout,
         headers: { Accept: "text/html, */*" },
       }),
@@ -303,11 +360,6 @@ export async function checkOpenApi(
 
   const specPathResponses = responses.slice(0, SPEC_PATHS.length);
   const docUiResponses = responses.slice(SPEC_PATHS.length);
-
-  // Track budget denials across EVERY fetch wave (primary probes, script
-  // fetches, secondary candidates, registry lookup) — a denied probe is not
-  // evidence the spec is absent.
-  let budgetDenied = responses.some((r) => !r.ok && r.error.kind === "request_budget_exhausted");
 
   // Phase 2: Check spec-path responses for direct spec hits
   for (let i = 0; i < specPathResponses.length; i++) {
@@ -342,13 +394,12 @@ export async function checkOpenApi(
     const scriptUrls = [...scriptCandidates];
     const scriptResponses = await Promise.all(
       scriptUrls.map((url) =>
-        httpGet(url, {
+        get(url, {
           timeout,
           headers: { Accept: "*/*" },
         }),
       ),
     );
-    budgetDenied ||= scriptResponses.some((r) => !r.ok && r.error.kind === "request_budget_exhausted");
 
     for (let i = 0; i < scriptResponses.length; i++) {
       const response = scriptResponses[i];
@@ -361,28 +412,24 @@ export async function checkOpenApi(
   for (const candidate of sitemapCandidateUrls) {
     if (specCandidates.size >= MAX_CANDIDATES) break;
     const url = URL.parse(candidate);
-    if (url?.origin === origin && !url.username && !url.password && !allProbedUrls.has(url.href)) specCandidates.add(url.href);
+    if (url?.origin !== origin || url.username || url.password) continue;
+    url.hash = "";
+    if (!allProbedUrls.has(url.href)) specCandidates.add(url.href);
   }
 
   // Phase 3b: Fetch candidate spec URLs and validate
-  if (specCandidates.size) {
-    const specCandidateUrls = [...specCandidates];
-    const secondaryResponses = await Promise.all(
-      specCandidateUrls.map((url) =>
-        httpGet(url, {
-          timeout,
-          headers: { Accept: "application/json, application/yaml, */*" },
-        }),
-      ),
-    );
-    budgetDenied ||= secondaryResponses.some((r) => !r.ok && r.error.kind === "request_budget_exhausted");
+  const secondary = await probeSpecCandidates(get, [...specCandidates], timeout);
+  if (secondary) return secondary;
 
-    for (let i = 0; i < secondaryResponses.length; i++) {
-      const response = secondaryResponses[i];
-      if (!response.ok) continue;
-      const result = detectSpec(response, new URL(specCandidateUrls[i]).pathname);
-      if (result) return result;
-    }
+  // A catalog is a pointer, so only a validated document can earn credit.
+  const catalogUrl = new URL("/.well-known/api-catalog", origin).href;
+  const catalog = await get(catalogUrl, {
+    timeout, maxRedirects: 0, headers: { Accept: "application/linkset+json" },
+  });
+  if (catalog.ok) {
+    const excluded = new Set([...allProbedUrls, ...scriptCandidates, ...specCandidates, catalogUrl]);
+    const discovered = await probeSpecCandidates(get, catalogCandidates(catalog, excluded), timeout, catalog.url);
+    if (discovered) return discovered;
   }
 
   // Phase 4: Check spec-path responses for 401/403 (not bot_protected)
@@ -409,16 +456,15 @@ export async function checkOpenApi(
   // Catches companies like Stripe that publish specs on GitHub rather than
   // self-hosting at a standard path on their own domain.
   const domain = new URL(baseUrl).hostname;
-  const registry = await lookupApisGuru(domain, timeout);
-  budgetDenied ||= registry.budgetDenied;
-  if (registry.specUrl) {
+  const specUrl = await lookupApisGuru(get, domain, timeout);
+  if (specUrl) {
     return {
       check: {
         id,
         label,
         status: "partial",
         detail: "OpenAPI spec found via APIs.guru registry (not self-hosted on domain)",
-        data: { specUrl: registry.specUrl, registry: "apis.guru" },
+        data: { specUrl, registry: "apis.guru" },
         why: "The spec exists but isn't directly discoverable from your domain — AI agents navigating your site won't find it without going through an external registry.",
       },
       detected: true,
@@ -430,13 +476,14 @@ export async function checkOpenApi(
 
   // Phase 6: Budget starvation is not evidence of absence — probes that
   // never ran cannot prove the spec is missing.
-  if (budgetDenied) {
+  if (budgetDenied || unavailable) {
     return {
       check: {
         id,
         label,
         status: "error",
-        detail: "OpenAPI discovery incomplete: scan request budget exhausted",
+        detail: budgetDenied ? "OpenAPI discovery incomplete: scan request budget exhausted"
+          : "OpenAPI discovery incomplete: one or more sources could not be fully read",
       },
       detected: false,
       hasWebhooks: false,

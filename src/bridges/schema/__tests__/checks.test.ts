@@ -79,8 +79,9 @@ describe("checkOperationIds", () => {
 });
 
 describe("checkSchemaTypes", () => {
-  it("returns pass when all schemas have type or $ref", () => {
+  it("returns pass when inline and referenced schemas declare a type", () => {
     const spec: ParsedOpenApiSpec = {
+      components: { schemas: { User: { type: "object" } } },
       paths: { "/users": { post: { requestBody: { content: { "application/json": { schema: { type: "object" } } } }, responses: { "200": { content: { "application/json": { schema: { $ref: "#/components/schemas/User" } } } } } } } },
     };
     expect(checkSchemaTypes(spec).status).toBe("pass");

@@ -42,7 +42,7 @@ describe("formatBridge", () => {
     expect(output).toContain("(1450ms)");
   });
 
-  it("formats a detection bridge with signal count", () => {
+  it("shows the Separation evidence summary", () => {
     const bridge: BridgeResult = {
       id: 3,
       name: "Separation",
@@ -51,15 +51,17 @@ describe("formatBridge", () => {
       scoreLabel: null,
       checks: [
         { id: "api_presence", label: "API presence", status: "pass" },
-        { id: "dev_docs", label: "Developer docs", status: "pass" },
-        { id: "sdk_refs", label: "SDK references", status: "pass" },
-        { id: "webhooks", label: "Webhook support", status: "fail" },
+        { id: "developer_docs", label: "Developer docs", status: "pass" },
+        { id: "sdk_references", label: "SDK references", status: "pass" },
+        { id: "webhook_support", label: "Webhook support", status: "fail" },
       ],
+      message: "API described in OpenAPI · Developer docs linked and fetched · SDK/package reference found",
       durationMs: 320,
     };
     const output = stripAnsi(formatBridge(bridge, false));
     expect(output).toContain("Separation: Does my product surface expose API infrastructure?");
-    expect(output).toContain("3 of 4 signals detected");
+    expect(output).toContain(bridge.message!);
+    expect(output).not.toContain("signals detected");
     expect(output).toContain("(320ms)");
   });
 

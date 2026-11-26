@@ -6,6 +6,9 @@ const VERSION_HEADERS = ["x-api-version", "api-version", "x-version"];
 export function checkVersioningSignal(spec: ParsedOpenApiSpec | undefined, contextProbeHeaders: Record<string, string>): Check {
   const id = "context_versioning_signal";
   const label = "Versioning Signal";
+  if (spec?.swagger === "2.0" && typeof spec.basePath === "string" && /^\/(?!\/)/.test(spec.basePath) && /\/v\d+(?:\/|$)/.test(spec.basePath)) {
+    return { id, label, status: "pass", detail: `Path-based versioning detected: ${spec.basePath}`, data: { signal: "path", value: spec.basePath } };
+  }
   if (spec?.paths) {
     for (const path of Object.keys(spec.paths)) {
       if (/^\/v\d+\//.test(path)) return { id, label, status: "pass", detail: `Path-based versioning detected: ${path}`, data: { signal: "path", value: path } };

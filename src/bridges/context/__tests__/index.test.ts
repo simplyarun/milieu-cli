@@ -61,7 +61,7 @@ describe("runContextBridge", () => {
     // Spec-gated checks (auth_clarity, versioning) fail with no spec → 0pts, still counted.
     // Total: 4.5/16 = 28
     mockHttpGet.mockImplementation(async (url: string) => {
-      if (url.includes("/api")) return makeSuccess("", { "x-ratelimit-limit": "100" });
+      if (url.includes("/api")) return makeSuccess('{"service":"example"}', { "content-type": "application/json", "x-ratelimit-limit": "100" });
       return makeFailure(404);
     });
     const result = await runContextBridge(makeCtx());

@@ -1,5 +1,5 @@
 import type { BridgeResult, Check, ScanContext } from "../../core/types.js";
-import type { ParsedOpenApiSpec } from "./oas-types.js";
+import { hasUnreadPathItems, type ParsedOpenApiSpec } from "./oas-types.js";
 import { checkOperationIds } from "./operation-ids.js";
 import { checkSchemaTypes } from "./schema-types.js";
 import { checkErrorSchemas } from "./error-schemas.js";
@@ -26,6 +26,7 @@ function calculateScore(checks: Check[]): { score: number; scoreLabel: "pass" | 
   let points = 0;
   let maxPoints = 0;
   for (const check of checks) {
+    if (check.status === "error") continue;
     maxPoints += 1;
     if (check.status === "pass") points += 1;
     else if (check.status === "partial") points += 0.5;
@@ -40,6 +41,16 @@ export async function runSchemaBridge(ctx: ScanContext): Promise<BridgeResult> {
   const hasSpec = ctx.shared.openApiDetected === true && ctx.shared.openApiSpec != null;
   const spec = hasSpec ? (ctx.shared.openApiSpec as ParsedOpenApiSpec) : undefined;
 
+  if (!hasSpec && (ctx.shared.openApiDiscoveryIncomplete || ctx.shared.openApiDetected)) {
+    const message = ctx.shared.openApiDiscoveryIncomplete
+      ? "OpenAPI discovery was incomplete, so schema quality could not be measured."
+      : "An OpenAPI document was indicated, but its contents were unavailable for schema evaluation.";
+    return {
+      id: 4, name: "Schema", status: "not_evaluated", score: null, scoreLabel: null,
+      checks: [], durationMs: Math.round(performance.now() - start), message,
+    };
+  }
+
   // No spec → all five checks fail over a FIXED denominator (score 0), not
   // null. Excluding Bridge 4 from the average when there's no spec made the
   // overall score non-monotone: publishing a mediocre spec could lower it.
@@ -53,6 +64,16 @@ export async function runSchemaBridge(ctx: ScanContext): Promise<BridgeResult> {
     return {
       id: 4, name: "Schema", status: "evaluated", score, scoreLabel, checks,
       durationMs: Math.round(performance.now() - start),
+    };
+  }
+
+  // Every Schema check grades the operation collection. Even one unread
+  // path can hide operations, request fields and error responses.
+  if (hasUnreadPathItems(spec)) {
+    return {
+      id: 4, name: "Schema", status: "not_evaluated", score: null, scoreLabel: null, checks: [],
+      durationMs: Math.round(performance.now() - start),
+      message: "A referenced OpenAPI path item could not be inspected, so the full set of operations is unknown.",
     };
   }
 

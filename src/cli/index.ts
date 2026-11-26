@@ -3,14 +3,16 @@ import { Command } from "commander";
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { scan } from "../core/scan.js";
+import { compareReports } from "../core/diff.js";
 import { validateScanOptions } from "../core/scan-options.js";
 import type { ScanFailure } from "../core/types.js";
 import { getVersion } from "../core/version.js";
-import { resolveExplanation } from "../core/explanations.js";
+import { readReport } from "./read-report.js";
+import { formatReportDiff } from "../render/format-diff.js";
 import { formatScanOutput } from "../render/format-scan.js";
 import { terminalText } from "../render/terminal-text.js";
 
-function writeFailure(error: ScanFailure["error"], jsonMode: boolean): void {
+function writeFailure(error: ScanFailure["error"] | { kind: "diff_failed"; message: string }, jsonMode: boolean): void {
   if (jsonMode) {
     process.stdout.write(reportJson({ ok: false, error, version: getVersion() }) + "\n");
   } else {
@@ -50,6 +52,7 @@ export function buildProgram(): Command {
     .option("--max-concurrency <n>", "Maximum simultaneous outbound requests (default: 8)")
     .option("--max-requests <n>", "Maximum request attempts for the whole scan, counting redirects and retries (default: 150)")
     .option("--threshold <score>", "Exit non-zero if overall score is below this threshold (0 to 100)")
+    .option("--require-complete", "Exit non-zero if the request budget ran out, a bridge was skipped, or a check errored")
     .option("--verbose", "Show individual check details")
     .option("--explain-all", "Show explanations on all checks, not just failures (use with --verbose)")
     .option("--quiet", "Suppress terminal output")
@@ -83,13 +86,6 @@ export function buildProgram(): Command {
 
         const result = outcome;
 
-        // Attach "why this matters" explanations to each check
-        for (const bridge of result.bridges) {
-          for (const check of bridge.checks) {
-            check.why = resolveExplanation(check.id, check.status);
-          }
-        }
-
         if (jsonMode) {
           process.stdout.write(reportJson(result, Boolean(opts.pretty)) + "\n");
         } else if (!quiet) {
@@ -99,8 +95,35 @@ export function buildProgram(): Command {
         if (threshold !== undefined && result.overallScore < threshold) {
           process.exitCode = 1;
         }
+        if (opts.requireComplete && (result.incomplete || result.bridges.some(bridge =>
+          bridge.status === "not_evaluated" || bridge.checks.some(check => check.status === "error")))) {
+          process.exitCode = 1;
+          if (!quiet && !jsonMode) process.stderr.write("Scan did not meet --require-complete. Review skipped bridges and errored checks.\n");
+        }
       },
     );
+
+  program.command("diff")
+    .description("Compare two saved scan reports without making network requests")
+    .argument("<base>", "Base scan JSON file")
+    .argument("<candidate>", "Candidate scan JSON file")
+    .option("--map-origin <base=candidate>", "Compare explicitly paired preview origins")
+    .option("--markdown", "Render a Markdown job summary")
+    .option("--json", "Output the comparison as JSON")
+    .action(async (basePath: string, candidatePath: string, opts: { mapOrigin?: string; markdown?: boolean; json?: boolean }) => {
+      try {
+        if (opts.json && opts.markdown) throw new Error("Choose one of --markdown and --json");
+        const pair = opts.mapOrigin?.split("=");
+        if (pair && (pair.length !== 2 || !pair[0] || !pair[1])) {
+          throw new Error("--map-origin requires base-origin=candidate-origin");
+        }
+        const [base, candidate] = await Promise.all([readReport(basePath), readReport(candidatePath)]);
+        const diff = compareReports(base, candidate, { originMap: pair ? { base: pair[0], head: pair[1] } : undefined });
+        process.stdout.write((opts.json ? reportJson(diff) : formatReportDiff(diff, Boolean(opts.markdown))) + "\n");
+      } catch (error) {
+        writeFailure({ kind: "diff_failed", message: error instanceof Error ? error.message : "Comparison failed" }, Boolean(opts.json));
+      }
+    });
 
   return program;
 }

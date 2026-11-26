@@ -153,7 +153,7 @@ describe("runSeparationBridge", () => {
       expect.any(Boolean),
     );
     // checkSdkReferences: 1st arg is ContentSource[]
-    expect(checkSdkReferences).toHaveBeenCalledWith(expectedSources);
+    expect(checkSdkReferences).toHaveBeenCalledWith(expectedSources, expect.any(Object));
     // checkWebhookSupport: 1st arg is ContentSource[], 2nd is options
     expect(checkWebhookSupport).toHaveBeenCalledWith(expectedSources, expect.objectContaining({
       pageHeaders: expect.any(Object),
@@ -162,12 +162,13 @@ describe("runSeparationBridge", () => {
 
   it("still passes pageBody to checkDeveloperDocs as 2nd argument", async () => {
     setupAllPass();
-    const ctx = makeCtx({ shared: { pageBody: "<html>test</html>" } });
+    const ctx = makeCtx({ shared: { pageBody: "<html>test</html>", pageUrl: "https://example.org/landing/" } });
     await runSeparationBridge(ctx);
     expect(checkDeveloperDocs).toHaveBeenCalledWith(
       expect.any(String),
       "<html>test</html>",
       expect.anything(),
+      "https://example.org/landing/",
     );
   });
 
@@ -192,6 +193,7 @@ describe("runSeparationBridge", () => {
       "https://api.example.com",
       expect.any(String),
       expect.anything(),
+      null,
     );
   });
 
@@ -203,6 +205,7 @@ describe("runSeparationBridge", () => {
       expect.any(String),
       expect.any(String),
       8000,
+      null,
     );
   });
 
@@ -211,12 +214,13 @@ describe("runSeparationBridge", () => {
     const ctx = makeCtx(); // shared: {} -- no pageBody
     await runSeparationBridge(ctx);
     // Empty pageBody means no homepage ContentSource is added
-    expect(checkSdkReferences).toHaveBeenCalledWith([]);
+    expect(checkSdkReferences).toHaveBeenCalledWith([], expect.any(Object));
     expect(checkWebhookSupport).toHaveBeenCalledWith([], expect.any(Object));
     expect(checkDeveloperDocs).toHaveBeenCalledWith(
       expect.any(String),
       "",
       expect.anything(),
+      null,
     );
   });
 
@@ -272,7 +276,7 @@ describe("runSeparationBridge", () => {
       { content: "docs content", source: "/docs" },
     ];
 
-    expect(checkSdkReferences).toHaveBeenCalledWith(expectedSources);
+    expect(checkSdkReferences).toHaveBeenCalledWith(expectedSources, expect.any(Object));
     expect(checkWebhookSupport).toHaveBeenCalledWith(expectedSources, expect.any(Object));
     expect(checkApiPresence).toHaveBeenCalledWith(
       expect.anything(),
@@ -293,7 +297,7 @@ describe("runSeparationBridge", () => {
       { content: "<html>homepage</html>", source: "homepage" },
     ];
 
-    expect(checkSdkReferences).toHaveBeenCalledWith(expectedSources);
+    expect(checkSdkReferences).toHaveBeenCalledWith(expectedSources, expect.any(Object));
   });
 
   it("passes OpenAPI webhook flags and pageHeaders to checkWebhookSupport", async () => {

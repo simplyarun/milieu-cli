@@ -164,12 +164,9 @@ describe("scan", () => {
     expect(vi.mocked(runSchemaBridge)).not.toHaveBeenCalled();
     expect(vi.mocked(runContextBridge)).not.toHaveBeenCalled();
     expect(result.bridges[0].abort).toBe(true);
-    // Bridges 4 and 5 zeroed out
-    expect(result.bridges[3].id).toBe(4);
     expect(result.bridges.slice(1).every(b => b.status === "not_evaluated")).toBe(true);
-    expect(result.bridges[3].score).toBe(0);
-    expect(result.bridges[4].id).toBe(5);
-    expect(result.bridges[4].score).toBe(0);
+    expect(result.bridges.slice(1).every(b => b.score === null && b.scoreLabel === null)).toBe(true);
+    expect(result.overallScore).toBe(0);
   });
 
   it("averages only non-null scores (excludes Bridge 3)", async () => {

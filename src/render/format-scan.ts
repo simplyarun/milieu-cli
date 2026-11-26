@@ -52,7 +52,8 @@ export function formatScanOutput(
 
   // Overall score (colored by score label)
   const colorize = scoreColorFn(result.overallScoreLabel);
-  const scoreLine = `Overall Score: ${colorize(String(result.overallScore))} (${result.overallScoreLabel})`;
+  const scoredCount = result.bridges.filter(b => b.score !== null).length;
+  const scoreLine = `Overall Score: ${colorize(String(result.overallScore))} (${result.overallScoreLabel}) · ${scoredCount} of 4 bridges scored`;
   lines.push(bold(scoreLine));
 
   if (result.incomplete) {

@@ -125,23 +125,23 @@ export const CHECK_EXPLANATIONS: Record<string, ExplanationEntry> = {
 
   // Bridge 3: Separation
   api_presence: {
-    pass: "AI agents can see that your product has a programmatic interface — they'll attempt to integrate with it.",
-    fail: "Without API presence signals, AI agents treat your product surface as content-only — they won't attempt programmatic integration.",
+    pass: "The scan found evidence of an API. The Separation summary identifies the strongest observation.",
+    fail: "The checked sources gave an integrator no indication of an API.",
     default: "API presence signals tell AI agents your product has a programmatic interface, not just web pages.",
   },
   developer_docs: {
-    pass: "Your developer documentation gives AI agents the information they need to build integrations with your product.",
-    fail: "Without developer documentation, AI agents can't learn how to integrate with your product.",
+    pass: "A documentation link or a successful request to a conventional docs path gives an integrator a place to look.",
+    fail: "The checked links and paths yielded no developer documentation.",
     default: "Developer documentation is where AI agents learn how to build integrations with your product.",
   },
   sdk_references: {
-    pass: "AI agents can see which languages your API supports and how to install the client libraries.",
-    fail: "Without SDK references, AI agents can't determine which languages you support or how to install your client libraries.",
+    pass: "A package registry reference or installation command gives an integrator a client library to investigate.",
+    fail: "The checked sources yielded no package registry references or installation commands.",
     default: "SDK and package references tell AI agents which languages your API supports and how to get started.",
   },
   webhook_support: {
-    pass: "AI agents can see your webhook support — they'll build reactive workflows that respond to your events in real-time.",
-    fail: "No webhook signals found in your OpenAPI spec, standards headers, or documentation — AI agents must poll your API for changes.",
+    pass: "The recorded signals identify where an integrator can look for event delivery support.",
+    fail: "The checked sources yielded no webhook evidence.",
     default: "Webhooks enable AI agents to receive real-time events instead of polling your API.",
   },
 
@@ -152,7 +152,7 @@ export const CHECK_EXPLANATIONS: Record<string, ExplanationEntry> = {
     default: "operationId is the machine-readable function name that AI agents use to call your API endpoints.",
   },
   schema_types_defined: {
-    pass: "All request/response schemas have type or $ref — agents can construct valid payloads.",
+    pass: "The inspected request and successful-response schemas declare their types.",
     fail: "Schemas lack type definitions — agents cannot determine the shape of data to send or expect.",
     default: "Typed schemas tell AI agents exactly what data structures your API accepts and returns.",
   },

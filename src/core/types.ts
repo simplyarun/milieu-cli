@@ -51,9 +51,9 @@ export interface BridgeResult {
   id: BridgeId;
   /** Bridge name */
   name: BridgeName;
-  /** Whether this bridge ran or was skipped after a fatal reachability error */
+  /** Whether this bridge ran or a prerequisite prevented evaluation */
   status: BridgeStatus;
-  /** Score 0-100 for scored bridges (1, 2, 4, 5), null for detection-only (3) */
+  /** Score 0-100, or null for an unmeasured bridge or the Separation inventory */
   score: number | null;
   /** Score category for scored bridges, null for unscored */
   scoreLabel: "pass" | "partial" | "fail" | null;
@@ -115,7 +115,7 @@ export interface ScanResult {
   timestamp: string;
   /** Total scan duration in milliseconds */
   durationMs: number;
-  /** Overall score (0-100) averaged from scored bridges (1, 2, 4, 5) */
+  /** Rounded average of available numeric scores for Bridges 1, 2, 4 and 5 */
   overallScore: number;
   /** Overall score category */
   overallScoreLabel: "pass" | "partial" | "fail";
@@ -164,6 +164,8 @@ export interface HttpError {
 
 /** HTTP success response */
 export interface HttpSuccess {
+  /** The text body was truncated or interrupted before its end. */
+  bodyIncomplete?: true;
   ok: true;
   url: string;
   status: number;
@@ -187,7 +189,7 @@ export interface HttpFailure {
    * (401/403 quality) and rate limits (headers on any response) — read this
    * instead of treating every non-2xx as "unreachable".
    */
-  response?: { status: number; headers: Record<string, string>; body: string };
+  response?: Pick<HttpSuccess, "status" | "headers" | "body" | "bodyIncomplete">;
 }
 
 /** Discriminated union for HTTP responses */

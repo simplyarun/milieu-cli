@@ -28,7 +28,7 @@ function makeSuccess(url: string, body = ""): HttpSuccess {
 function makeFailure(url: string): HttpFailure {
   return {
     ok: false,
-    error: { kind: "http_error", message: "HTTP 404 Not Found", url },
+    error: { kind: "http_error", statusCode: 404, message: "HTTP 404 Not Found", url },
   };
 }
 
@@ -126,6 +126,68 @@ describe("checkDeveloperDocs", () => {
     const html = '<a HREF = developers/start>Dev</a><a class="menu" href="https://help.example.org/en/docs/start">Docs</a>';
     const { check } = await checkDeveloperDocs("https://example.com", html);
     expect(check.data?.paths).toEqual(["/docs", "/developers"]);
+    expect(check.data?.linkedUrls).toEqual(["https://example.com/developers/start", "https://help.example.org/en/docs/start"]);
+    expect(check.data?.fetchedUrls).toEqual([]);
+    expect(check.data?.fetchesComplete).toBe(true);
+  });
+
+  it("reports published docs and developer subdomain links even when no guessed docs path resolves", async () => {
+    mockAllProbesFail();
+    const html = ["docs", "developer", "developers", "docs-other", "support"].map(name =>
+      '<a href="https://' + name + '.example.org/#start">Link</a>').join("");
+    const { check } = await checkDeveloperDocs("https://example.com", html);
+    expect(check.status).toBe("pass");
+    expect(check.data).toMatchObject({ paths: [], fetchedUrls: [], linksMeasured: true, fetchesComplete: true,
+      linkedUrls: ["https://docs.example.org/", "https://developer.example.org/", "https://developers.example.org/"] });
+    expect(vi.mocked(httpGet).mock.calls.some(([url]) => url.includes("example.org"))).toBe(false);
+  });
+
+  it.each([{ bodyIncomplete: true as const }, { status: 206 }, { headers: { "content-range": "bytes 0-5/100" } }])(
+    "keeps positive observations and marks only the interrupted channel incomplete", async partial => {
+      const html = '<a href="/docs">Docs</a>';
+      const homepage = makeSuccess("https://example.com", html);
+      const docs = makeSuccess("https://example.com/docs", "Documentation");
+      mockProbePass("/docs", docs.body);
+      const fromHome = await checkDeveloperDocs("https://example.com", html, 1000, { ...homepage, ...partial });
+      expect(fromHome.check).toMatchObject({ status: "pass", data: {
+        linkedUrls: [docs.url], fetchedUrls: [docs.url], linksMeasured: false, fetchesComplete: true } });
+      vi.mocked(httpGet).mockImplementation(async url => url === docs.url ? { ...docs, ...partial } : makeFailure(url));
+      const fromDocs = await checkDeveloperDocs("https://example.com", html, 1000, homepage);
+      expect(fromDocs.check).toMatchObject({ status: "pass", data: {
+        linkedUrls: [docs.url], fetchedUrls: [docs.url], linksMeasured: true, fetchesComplete: false } });
+    },
+  );
+
+  it("keeps linked routes and successful fetch destinations distinct after redirects", async () => {
+    vi.mocked(httpGet).mockImplementation(async (url) => new URL(url).pathname === "/docs"
+      ? makeSuccess("https://help.example.org/Docs/index/?token=secret#section")
+      : makeFailure(url));
+    const html = '<a href="docs/Guide?key=secret#start">Guide</a><a href="https://user:secret@example.org/en/docs">Legacy</a>';
+    const { check } = await checkDeveloperDocs("https://example.com", html, 5000, "https://example.org/landing/");
+    expect(check.data).toEqual({
+      paths: ["/docs"],
+      linkedUrls: ["https://example.org/landing/docs/Guide", "https://example.org/en/docs"],
+      fetchedUrls: ["https://help.example.org/Docs/index/"],
+      linksMeasured: true, fetchesComplete: true,
+    });
+  });
+
+  it("marks missing homepage evidence and interrupted fetches even when another probe succeeds", async () => {
+    vi.mocked(httpGet).mockImplementation(async (url) => new URL(url).pathname === "/docs"
+      ? makeSuccess(url)
+      : { ok: false, error: { kind: "timeout", message: "Timed out", url } });
+    const { check } = await checkDeveloperDocs("https://example.com", "", 5000, null);
+    expect(check.status).toBe("pass");
+    expect(check.data).toMatchObject({
+      linkedUrls: [], fetchedUrls: ["https://example.com/docs"], linksMeasured: false, fetchesComplete: false,
+    });
+  });
+
+  it("resolves relative anchors against the first HTML base href", async () => {
+    mockAllProbesFail();
+    const html = '<base target="_blank"><base href="../reference/"><a href="docs/Guide">Guide</a>';
+    const result = await checkDeveloperDocs("https://example.com", html, 5000, "https://portal.example.org/en/start/");
+    expect(result.check.data?.linkedUrls).toEqual(["https://portal.example.org/en/reference/docs/Guide"]);
   });
 
   it("ignores doc-like text outside anchor href path segments", async () => {
@@ -135,7 +197,7 @@ describe("checkDeveloperDocs", () => {
       '<a data-href="/docs">Label</a>',
       `<a title="see href='/docs'" href="/help">Help</a>`,
       '<a href="/search?next=/docs">Search</a>',
-      '<a href="https://docs.example.com/">Home</a>',
+      '<a href="https://docs-archive.example.com/">Home</a>',
     ].join("");
     const { check } = await checkDeveloperDocs("https://example.com", html);
     expect(check.status).toBe("fail");

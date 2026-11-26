@@ -1,49 +1,15 @@
-import type { Check, ContentSource } from "../../core/types.js";
+import type { Check, ContentSource, HttpSuccess } from "../../core/types.js";
+import { completeRepresentation, DOC_PATHS, docPathMatches, isDeveloperDocsLink, htmlLinks, type PublishedSources } from "./published-routes.js";
 import { httpGet } from "../../utils/http-client.js";
 
 /** Maximum body size for developer docs page fetches (1 MB) */
 const DEV_DOCS_MAX_BODY = 1_048_576;
 
-/** Well-known paths for developer documentation */
-const DOC_PATHS = [
-  "/docs",
-  "/developers",
-  "/developer",
-  "/api/docs",
-  "/documentation",
-] as const;
-
 /** Result of developer docs check, including page bodies for downstream use */
 export interface DeveloperDocsResult {
   check: Check;
   pages: ContentSource[];
-}
-
-/**
- * Scan homepage HTML for links pointing to documentation paths.
- * Returns matched paths (deduplicated).
- */
-function scanDocLinks(html: string, baseUrl: string): string[] {
-  const found = new Set<string>();
-  const anchors = /<a(?=\s)(?:[^<>"']|"[^"]*"|'[^']*')*>/gi;
-  const attributes = /([^\s=/<>"']+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s<>"'=`]+)))?/g;
-
-  for (const [tag] of html.matchAll(anchors)) {
-    for (const [, name, doubleQuoted, singleQuoted, unquoted] of tag.matchAll(attributes)) {
-      if (name.toLowerCase() !== "href") continue;
-      const href = doubleQuoted ?? singleQuoted ?? unquoted;
-      const url = href ? URL.parse(href, baseUrl) : null;
-      if (url?.protocol === "http:" || url?.protocol === "https:") {
-        // Match whole path segments, including nested and off-site docs.
-        const pathname = url.pathname.toLowerCase() + "/";
-        for (const path of DOC_PATHS) {
-          if (pathname.includes(path + "/")) found.add(path);
-        }
-      }
-      break;
-    }
-  }
-  return DOC_PATHS.filter((path) => found.has(path));
+  routeSources?: PublishedSources;
 }
 
 /**
@@ -63,9 +29,12 @@ export async function checkDeveloperDocs(
   baseUrl: string,
   html: string,
   timeout?: number,
+  homepage: string | HttpSuccess | null = baseUrl,
 ): Promise<DeveloperDocsResult> {
   const id = "developer_docs";
   const label = "Developer Documentation";
+  const pageUrl = typeof homepage === "string" ? homepage : homepage?.url ?? null;
+  const linksMeasured = typeof homepage === "string" || (homepage !== null && completeRepresentation(homepage));
 
   // Probe all 5 paths in parallel with GET requests (1 MB cap)
   const results = await Promise.all(
@@ -76,33 +45,54 @@ export async function checkDeveloperDocs(
 
   // Filter to reachable paths (2xx responses) and collect page bodies
   const reachablePaths: string[] = [];
+  const fetchedUrls = new Set<string>();
   const pages: ContentSource[] = [];
+  let fetchesComplete = true;
   for (let i = 0; i < DOC_PATHS.length; i++) {
     const response = results[i];
     if (response.ok) {
+      if (!completeRepresentation(response)) fetchesComplete = false;
       reachablePaths.push(DOC_PATHS[i]);
+      const url = new URL(response.url);
+      fetchedUrls.add(url.origin + url.pathname);
       pages.push({ content: response.body, source: DOC_PATHS[i] });
+    } else {
+      const status = response.response?.status ?? response.error.statusCode;
+      if (status !== 404 && status !== 410) fetchesComplete = false;
     }
   }
 
   // Also scan homepage HTML for documentation links
-  const linkedPaths = scanDocLinks(html, baseUrl);
+  const homeLinks = htmlLinks(html, pageUrl ?? baseUrl);
+  const linkedDocs = homeLinks.filter(isDeveloperDocsLink);
+  const linkedPaths = DOC_PATHS.filter(path => linkedDocs.some(url => docPathMatches(url, path)));
+  const linkedUrls = [...new Set(linkedDocs.map(url => url.origin + url.pathname))];
+  const routeSources = {
+    homeLinks,
+    docs: results.map((response, i) => ({ requestedUrl: new URL(DOC_PATHS[i], baseUrl).href, response })),
+  };
 
   // Combine both signals (dedup)
   const allFound = [...new Set([...reachablePaths, ...linkedPaths])];
+  const data = {
+    paths: allFound, linkedUrls, fetchedUrls: [...fetchedUrls],
+    linksMeasured, fetchesComplete,
+  };
 
-  if (allFound.length === 0) {
-    // Denied probes never ran — without link evidence either way, the
-    // check is unmeasured rather than failing.
-    if (results.some((r) => !r.ok && r.error.kind === "request_budget_exhausted")) {
+  if (!allFound.length && !linkedUrls.length) {
+    if (!fetchesComplete || !linksMeasured) {
+      const budgetDenied = results.some((r) => !r.ok && r.error.kind === "request_budget_exhausted");
       return {
         check: {
           id,
           label,
           status: "error",
-          detail: "Developer documentation probes skipped: scan request budget exhausted",
+          detail: budgetDenied
+            ? "Developer documentation probes skipped: scan request budget exhausted"
+            : "Developer documentation could not be fully measured",
+          data,
         },
-        pages: [],
+        pages: [], routeSources,
       };
     }
     return {
@@ -111,8 +101,9 @@ export async function checkDeveloperDocs(
         label,
         status: "fail",
         detail: "No developer documentation found",
+        data,
       },
-      pages: [],
+      pages: [], routeSources,
     };
   }
 
@@ -121,9 +112,10 @@ export async function checkDeveloperDocs(
       id,
       label,
       status: "pass",
-      detail: `Developer documentation detected: ${allFound.join(", ")}`,
-      data: { paths: allFound },
+      detail: allFound.length ? `Developer documentation detected: ${allFound.join(", ")}` :
+        `Published documentation link: ${linkedUrls[0]}`,
+      data,
     },
-    pages,
+    pages, routeSources,
   };
 }

@@ -122,6 +122,7 @@ describe("formatScanOutput", () => {
     const output = stripAnsi(formatScanOutput(mockScanResult, false));
     expect(output).toContain("74");
     expect(output).toContain("partial");
+    expect(output).toContain("2 of 4 bridges scored");
   });
 
   it("renders untrusted URL and check text on single lines without terminal controls", () => {

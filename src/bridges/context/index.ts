@@ -62,6 +62,17 @@ export async function runContextBridge(ctx: ScanContext): Promise<BridgeResult> 
   const versioningCheck = checkVersioningSignal(spec, contextProbeHeaders);
   const contactCheck = checkContactInfo(spec, securityTxtBody);
 
+  // A header or page can establish a signal even when the contract is unread.
+  if (!hasSpec && (ctx.shared.openApiDiscoveryIncomplete || ctx.shared.openApiDetected)) {
+    for (const check of [authClarityCheck, tosCheck, versioningCheck, contactCheck]) {
+      if (check.status === "fail") {
+        check.status = "error";
+        check.detail = "The contract could not be inspected and the other checked sources did not establish this signal.";
+        delete check.data;
+      }
+    }
+  }
+
   const checks: Check[] = [
     rateLimitCheck, authClarityCheck, authLegibilityCheck,
     tosCheck, versioningCheck, contactCheck, agentsJsonCheck,
